@@ -403,7 +403,7 @@ class Chunk{
     }
 
     const buildDoor=(entry,exitDoor)=>{
-      const p=wallPoint(entry,.105,1.29),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
+      const p=wallPoint(entry,.105,1.95),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
       const frameMat=exitDoor?lib.exitFrame:lib.doorFrame;
       box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,-1.02,0,0);
       box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,1.02,0,0);
@@ -427,7 +427,7 @@ class Chunk{
           e.side==="west"?new THREE.Vector3(px-cell/2-.78,1.28,pz):
           new THREE.Vector3(px+cell/2+.78,1.28,pz);
       }else{
-        const p=wallPoint(e,.105,1.29),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
+        const p=wallPoint(e,.105,1.95),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
         anomaly.userData.exit=true;
         this.lightSources.push({position:p.position.clone(),color:0xffeaa0,baseIntensity:.65,intensity:.65,distance:5,decay:2});
         this.exit.position=p.position.clone();
