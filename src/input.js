@@ -12,7 +12,7 @@ export class InputManager {
     this.lookId = null;
     this.joystickCenter = {x:0,y:0};
     this.lastTouch = {x:0,y:0};
-    this.bind();
+    this.bind();\n    document.documentElement.classList.toggle("touch-device",navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches);
   }
 
   bind(){
@@ -25,7 +25,7 @@ export class InputManager {
     });
     addEventListener("keyup", e => this.keys.delete(e.code));
 
-    const canvas = this.game.renderer?.domElement;
+    const canvas = this.game.renderer?.domElement;\n    const touchCapable=()=>navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === this.game.renderer.domElement;
     });
