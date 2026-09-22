@@ -1810,6 +1810,7 @@ button,.audio-gate{
 
 /* Touch devices with a browser reporting a fine pointer, such as some iPads. */
 .touch-device #mobile-controls{display:block!important}
+.touch-device #mobile-controls.hidden{display:none!important}
 
 /* Pre-intro loading gate */
 .loading-screen{
