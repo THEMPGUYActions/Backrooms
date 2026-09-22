@@ -45,7 +45,11 @@ export class AudioDirector{
     }
     if(this.loading){await this.loading;return}
     this.loading=(async()=>{
-      this.ctx=new(window.AudioContext||window.webkitAudioContext)();
+      if(!this.ctx){
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        if(!Ctx)throw new Error("Web Audio API unavailable");
+        this.ctx=new Ctx();
+      }
       this.master=this.ctx.createGain();this.master.gain.value=this.volume;this.master.connect(this.ctx.destination);
       this.fxBus=this.ctx.createGain();this.fxBus.gain.value=.64;this.fxBus.connect(this.master);
       this.reverb=this.ctx.createConvolver();this.reverb.buffer=this.createImpulse();
@@ -109,8 +113,25 @@ export class AudioDirector{
     return !!this.ctx&&this.ctx.state==="running";
   }
   unlockFromGesture(){
-    if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
-    if(this.ctx?.state==="suspended")this.ctx.resume().catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
+    try{
+      if(!this.ctx){
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        if(!Ctx)return;
+        // Construct the context synchronously from the user gesture.
+        this.ctx=new Ctx();
+      }
+      if(this.ctx.state==="suspended"){
+        const resume=this.ctx.resume();
+        Promise.resolve(resume).then(()=>{
+          if(this.isEnabled()&&this.ready)this.clickToEnter();
+        }).catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
+      }else if(this.isEnabled()&&this.ready){
+        this.clickToEnter();
+      }
+      if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
+    }catch(error){
+      console.warn("[Backrooms] Audio unlock failed:",error);
+    }
   }
   async resume(){await this.init()}
   connectFx(node,send=.3,delay=.18){
