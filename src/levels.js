@@ -83,7 +83,7 @@ export const LEVELS = {
     exitAfterChunks: 5,
     objective: "The power is unstable. Reach the emergency threshold.",
     safe: false
-  }
+  },
   "3": {
     id: "3",
     number: "LEVEL 3",
