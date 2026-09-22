@@ -62,7 +62,7 @@ export const LEVELS = {
     name: "ABANDONED UTILITY HALLS",
     sourceTitle: 'Level 2 - "Abandoned Utility Halls"',
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-2",
-    next: null,
+    next: "3",
     theme: {
       wall: 0x62605a,
       wallRough: 0.96,
@@ -83,6 +83,64 @@ export const LEVELS = {
     exitAfterChunks: 5,
     objective: "The power is unstable. Reach the emergency threshold.",
     safe: false
+  }
+  "3": {
+    id: "3",
+    number: "LEVEL 3",
+    name: "ELECTRICAL STATION",
+    sourceTitle: 'Level 3 - "Electrical Station"',
+    sourceUrl: "https://backrooms-wiki.wikidot.com/level-3",
+    next: "4",
+    theme: {
+      wall: 0x66584f,
+      wallRough: 0.96,
+      floor: 0x50504c,
+      ceiling: 0x878781,
+      fog: 0x000000,
+      accent: 0xffa45c,
+      light: 0xd9d5c7,
+      ambient: 0x151818
+    },
+    cellSize: 7.2,
+    wallHeight: 3.9,
+    darkness: 0.34,
+    holeChance: 0.004,
+    pipeChance: 0.38,
+    batteryChance: 0.10,
+    entity: "hound",
+    exitStyle: "green",
+    exitAfterChunks: 4,
+    objective: "Follow the service markings. Find an elevator out.",
+    safe: false
+  },
+  "4": {
+    id: "4",
+    number: "LEVEL 4",
+    name: "ABANDONED OFFICE",
+    sourceTitle: 'Level 4 - "Abandoned Office"',
+    sourceUrl: "https://backrooms-wiki.wikidot.com/level-4",
+    next: null,
+    theme: {
+      wall: 0xd2d0c8,
+      wallRough: 0.86,
+      floor: 0x777872,
+      ceiling: 0xb9b9b2,
+      fog: 0x000000,
+      accent: 0xe5d59a,
+      light: 0xf1eee0,
+      ambient: 0x4b4c46
+    },
+    cellSize: 9.5,
+    wallHeight: 4.0,
+    darkness: 0.10,
+    holeChance: 0,
+    pipeChance: 0.02,
+    batteryChance: 0.14,
+    entity: "none",
+    exitStyle: "green",
+    exitAfterChunks: 5,
+    objective: "The lights still work. Find the next door.",
+    safe: true
   }
 };
 
