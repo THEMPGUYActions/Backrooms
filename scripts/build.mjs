@@ -62,8 +62,7 @@ for (const filename of PBR_FILES) {
   manifest.files[filename] = await downloadPbrAsset(filename);
 }
 
-await writeFile(join(pbrDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "
-", "utf8");
+await writeFile(join(pbrDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n", "utf8");
 await writeFile(join(dist, ".nojekyll"), "", "utf8");
 
 const manifestSize = (await stat(join(pbrDir, "manifest.json"))).size;
