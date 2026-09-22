@@ -188,8 +188,10 @@ export function disposeLibrary(library){
 }
 
 export function makeLibrary(level){
-  const ceiling=createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.88,scale:2,normalStrength:.24});
+  const ceiling=createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.9,scale:2,normalStrength:.24});
   ceiling.side=THREE.FrontSide;
+  ceiling.emissive=new THREE.Color(0x5a5850);
+  ceiling.emissiveIntensity=level.id==="0"?.055:.028;
   return {
     floor:createPBRMaterial({base:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:3.8,normalStrength:.35}),
@@ -216,7 +218,9 @@ export function makeLibrary(level){
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
     light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
-    orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2})
+    orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2}),
+    battery:new THREE.MeshStandardMaterial({color:0x1c1d1b,roughness:.55,metalness:.35}),
+    batteryLabel:new THREE.MeshStandardMaterial({color:0xc9b85f,roughness:.45,metalness:.15,emissive:0x6f5b1c,emissiveIntensity:.45})
   };
 }
 
