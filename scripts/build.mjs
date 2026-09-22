@@ -4,18 +4,18 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const dist = join(root, "dist");
-const pbrDir=join(dist,"assets","pbr");
-const audioDir=join(dist,"assets","audio");
-const LOCK_PATH=join(root,"data","pbr-assets-lock.json");
-const AUDIO_LOCK_PATH=join(root,"data","audio-assets-lock.json");
-const MAX_ASSET_BYTES=6*1024*1024;
-const MAX_AUDIO_BYTES=8*1024*1024;
+const pbrDir = join(dist, "assets", "pbr");
+const audioDir = join(dist, "assets", "audio");
+const LOCK_PATH = join(root, "data", "pbr-assets-lock.json");
+const AUDIO_LOCK_PATH = join(root, "data", "audio-assets-lock.json");
+const MAX_ASSET_BYTES = 6 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
 
-const lock=JSON.parse(await readFile(LOCK_PATH,"utf8"));
-const audioLock=JSON.parse(await readFile(AUDIO_LOCK_PATH,"utf8"));
-if(lock.license!=="CC0")throw new Error("PBR asset lock must be CC0.");
-if(audioLock.license!=="CC0")throw new Error("Audio asset lock must be CC0.");
+const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
+const audioLock = JSON.parse(await readFile(AUDIO_LOCK_PATH, "utf8"));
+if (lock.license !== "CC0") throw new Error("PBR asset lock must be CC0.");
+if (audioLock.license !== "CC0") throw new Error("Audio asset lock must be CC0.");
 if (lock.author !== "methodical pixel") throw new Error("PBR asset lock author does not match the OpenGameArt pack.");
 if (lock.source !== "https://opengameart.org/content/backrooms-pbr-texture-pack") throw new Error("PBR asset lock source is unexpected.");
 
