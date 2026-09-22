@@ -71,19 +71,21 @@ export class AudioDirector{
       const noiseGain=this.ctx.createGain();noiseGain.gain.value=.025;
       noise.connect(buzzFilter).connect(noiseGain).connect(this.humGain);noise.start();
 
+      this.ready=true;
+      if(this.ctx.state==="suspended")await this.ctx.resume();
+
       const entries=[
         ["ambient_horror",BACKROOMS_AUDIO_SOURCES.ambient_horror],
         ["electric_buzz",BACKROOMS_AUDIO_SOURCES.electric_buzz],
         ...BACKROOMS_AUDIO_SOURCES.footsteps.map((url,i)=>["footstep_"+String(i+1).padStart(2,"0"),url])
       ];
-      const results=await Promise.allSettled(entries.map(async([key,url])=>{
+      Promise.allSettled(entries.map(async([key,url])=>{
         const response=await fetch(url,{cache:"force-cache"});
         if(!response.ok)throw new Error("HTTP "+response.status);
         this.buffers.set(key,await this.ctx.decodeAudioData(await response.arrayBuffer()));
-      }));
-      for(const result of results)if(result.status==="rejected")console.warn("[Backrooms] Audio asset unavailable; generated fallback remains active.",result.reason);
-      this.ready=true;
-      if(this.ctx.state==="suspended")await this.ctx.resume();
+      })).then(results=>{
+        for(const result of results)if(result.status==="rejected")console.warn("[Backrooms] Audio asset unavailable; generated fallback remains active.",result.reason);
+      });
     })();
     await this.loading;this.loading=null;
   }
