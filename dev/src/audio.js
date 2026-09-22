@@ -39,10 +39,7 @@ export class AudioDirector{
     return buffer;
   }
   async init(){
-    if(this.ready){
-      if(this.ctx.state==="suspended")await this.ctx.resume();
-      return;
-    }
+    if(this.ready)return;
     if(this.loading){await this.loading;return}
     this.loading=(async()=>{
       if(!this.ctx){
@@ -76,7 +73,6 @@ export class AudioDirector{
       noise.connect(buzzFilter).connect(noiseGain).connect(this.humGain);noise.start();
 
       this.ready=true;
-      if(this.ctx.state==="suspended")await this.ctx.resume();
 
       const entries=[
         ["ambient_horror",BACKROOMS_AUDIO_SOURCES.ambient_horror],
