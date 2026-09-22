@@ -117,13 +117,18 @@ export class AudioDirector{
       if(!this.ctx){
         const Ctx=window.AudioContext||window.webkitAudioContext;
         if(!Ctx)return;
+        // Construct the context synchronously from the user gesture.
         this.ctx=new Ctx();
       }
-      const resume=this.ctx.state==="suspended"?this.ctx.resume():Promise.resolve();
+      if(this.ctx.state==="suspended"){
+        const resume=this.ctx.resume();
+        Promise.resolve(resume).then(()=>{
+          if(this.isEnabled()&&this.ready)this.clickToEnter();
+        }).catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
+      }else if(this.isEnabled()&&this.ready){
+        this.clickToEnter();
+      }
       if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
-      Promise.resolve(resume).then(()=>{
-        if(this.isEnabled()&&this.ready)this.clickToEnter();
-      }).catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
     }catch(error){
       console.warn("[Backrooms] Audio unlock failed:",error);
     }

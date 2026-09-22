@@ -1334,13 +1334,24 @@ export class BackroomsGame{
     this.last=performance.now();
   }
   async mount(){
+    const loading=document.getElementById("loading");
+    this.setLoadingProgress(.04,"INITIALIZING CAMERA","Preparing the recording...");
     document.getElementById("game").appendChild(this.renderer.domElement);
     this.resize();
     this.quality.apply();
-    await this.world.configure();
+    this.setLoadingProgress(.12,"BUILDING WORLD","Loading procedural materials...");
+    await this.world.configure((progress,label,detail)=>{
+      const p=typeof progress==="number"?Math.max(0,Math.min(1,progress)):.5;
+      this.setLoadingProgress(.12+p*.68,label||"BUILDING WORLD",detail||"Generating the environment...");
+    });
+    this.setLoadingProgress(.86,"STREAMING SPAWN","Generating the first rooms...");
     this.world.ensureAround(0,0);
+    this.setLoadingProgress(.96,"FINALIZING","Starting camera systems...");
     this.player.reset();
     this.mounted=true;
+    this.setLoadingProgress(1,"READY","Recording ready.");
+    loading?.classList.add("hidden");
+    document.getElementById("boot")?.classList.add("intro-ready");
     if(this.pendingStart)this.beginIntroReveal();
     this.render();
     this.last=performance.now();
@@ -1367,23 +1378,18 @@ export class BackroomsGame{
       return style.visibility!=="hidden"&&Number.parseFloat(style.opacity||"0")>.5;
     };
     const handleAudioGesture=event=>{
-      if(!this.introActive||!isAudioPageVisible())return;
+      if(!isAudioPageVisible())return;
       event.preventDefault();
       event.stopPropagation();
       begin(event);
     };
     boot?.addEventListener("pointerdown",handleAudioGesture,{passive:false,capture:true});
-    boot?.addEventListener("pointerup",handleAudioGesture,{passive:false,capture:true});
     boot?.addEventListener("touchend",handleAudioGesture,{passive:false,capture:true});
     boot?.addEventListener("click",handleAudioGesture,{capture:true});
     const gate=$("audio-gate");
     gate?.addEventListener("pointerdown",handleAudioGesture,{passive:false});
-    gate?.addEventListener("pointerup",handleAudioGesture,{passive:false});
     gate?.addEventListener("touchend",handleAudioGesture,{passive:false});
     gate?.addEventListener("click",handleAudioGesture);
-    audioPage?.addEventListener("pointerdown",handleAudioGesture,{passive:false});
-    audioPage?.addEventListener("pointerup",handleAudioGesture,{passive:false});
-    audioPage?.addEventListener("touchend",handleAudioGesture,{passive:false});
     gate?.addEventListener("keydown",event=>{
       if(event.key==="Enter"||event.key===" "){
         event.preventDefault();
