@@ -1,27 +1,27 @@
 import * as THREE from "three";
 
-const OPEN_GAME_ART_PACK = "https://opengameart.org/sites/default/files/oga-textures/175228/";
+const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
 
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
   wallpaper: {
-    color: OPEN_GAME_ART_PACK + "wallpaper_color.png",
-    rough: OPEN_GAME_ART_PACK + "wallpaper_rough.png",
-    normal: OPEN_GAME_ART_PACK + "wallpaper_normal.png"
+    color: LOCAL_PBR_ASSET_BASE + "wallpaper_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "wallpaper_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "wallpaper_normal.png"
   },
   carpet: {
-    color: OPEN_GAME_ART_PACK + "carpet_color.png",
-    rough: OPEN_GAME_ART_PACK + "carpet_rough.png",
-    normal: OPEN_GAME_ART_PACK + "carpet_normal.png"
+    color: LOCAL_PBR_ASSET_BASE + "carpet_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "carpet_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "carpet_normal.png"
   },
   paintedWall: {
-    color: OPEN_GAME_ART_PACK + "painted_wall_color.png",
-    rough: OPEN_GAME_ART_PACK + "painted_wall_rough.png",
-    normal: OPEN_GAME_ART_PACK + "painted_wall_normal.png"
+    color: LOCAL_PBR_ASSET_BASE + "painted_wall_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "painted_wall_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "painted_wall_normal.png"
   },
   ceiling: {
-    color: OPEN_GAME_ART_PACK + "ceiling_tiles_color.png",
-    rough: OPEN_GAME_ART_PACK + "ceiling_tiles_rough.png",
-    normal: OPEN_GAME_ART_PACK + "ceiling_tiles_normal.png"
+    color: LOCAL_PBR_ASSET_BASE + "ceiling_tiles_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "ceiling_tiles_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "ceiling_tiles_normal.png"
   }
 });
 
