@@ -480,6 +480,57 @@ class Chunk{
         const horizontal=new THREE.Mesh(new THREE.CylinderGeometry(.075+rng.next()*.09,.075+rng.next()*.09,size*.52,8),pipeMat);
         horizontal.rotation.z=Math.PI/2;horizontal.position.set(this.originX+rng.next()*size,y,this.originZ+rng.next()*size);g.add(horizontal);
       }
+    }else if(level.id==="3"){
+      const rng=new RNG(this.seedKey()^0x31e1);
+      for(let i=0;i<8;i++){
+        const y=1.15+rng.next()*2.35;
+        const radius=.055+rng.next()*.085;
+        const vertical=rng.next()<.35;
+        const length=vertical?2.6+ rng.next()*1.4:size*.36+rng.next()*size*.18;
+        const pipe=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,8),lib.metal);
+        if(vertical){
+          pipe.position.set(this.originX+rng.next()*size,y,this.originZ+rng.next()*size);
+        }else{
+          pipe.rotation.z=Math.PI/2;
+          pipe.position.set(this.originX+rng.next()*size,y,this.originZ+rng.next()*size);
+        }
+        g.add(pipe);
+      }
+      for(let i=0;i<2;i++){
+        const bx=this.originX+cell*(1+rng.next()*Math.max(1,cells-2));
+        const bz=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
+        const panel=new THREE.Group();
+        panel.position.set(bx,1.55,bz);
+        box(panel,new THREE.BoxGeometry(.72,1.1,.16),lib.officePlastic,0,0,0);
+        box(panel,new THREE.BoxGeometry(.055,.055,.035),lib.indicator,.2,.3,-.095);
+        box(panel,new THREE.BoxGeometry(.055,.055,.035),lib.indicator,.2,.12,-.095);
+        g.add(panel);
+      }
+    }else if(level.id==="4"){
+      const rng=new RNG(this.seedKey()^0x44aa);
+      for(let i=0;i<3;i++){
+        const ox=this.originX+cell*(1+rng.next()*Math.max(1,cells-2));
+        const oz=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
+        const desk=new THREE.Group();
+        desk.position.set(ox,.0,oz);
+        box(desk,new THREE.BoxGeometry(1.55,.12,.75),lib.officeWood,0,.78,0);
+        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,-.62,.39,-.27);
+        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,.62,.39,-.27);
+        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,-.62,.39,.27);
+        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,.62,.39,.27);
+        box(desk,new THREE.BoxGeometry(.8,.5,.06),lib.officePlastic,0,1.08,.18);
+        box(desk,new THREE.BoxGeometry(.62,.035,.035),lib.indicator,0,1.12,.215);
+        g.add(desk);
+      }
+      for(let i=0;i<Math.min(4,edges.length);i++){
+        const e=edges[(rng.int(0,edges.length-1)+i*7)%edges.length];
+        const p=wallPoint(e,.112,2.25);
+        const windowGroup=new THREE.Group();
+        windowGroup.position.copy(p.position);windowGroup.rotation.y=p.rotation;
+        box(windowGroup,new THREE.BoxGeometry(2.9,1.2,.035),lib.windowDark,0,0,0);
+        box(windowGroup,new THREE.BoxGeometry(.045,1.28,.05),lib.trim,.0,0,0);
+        g.add(windowGroup);
+      }
     }
   }
   contains(x,z){return x>=this.originX&&x<this.originX+this.world.size&&z>=this.originZ&&z<this.originZ+this.world.size}
