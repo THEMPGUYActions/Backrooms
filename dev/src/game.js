@@ -695,7 +695,7 @@ export class BackroomsGame{
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x000000);this.camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"mediump"});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.0));this.renderer.setSize(innerWidth,innerHeight);
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.0));this.renderer.setSize(innerWidth,innerHeight,false);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.62;
     this.scene.environment=null;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
@@ -855,12 +855,20 @@ export class BackroomsGame{
     clearTimeout(this.argMessageTimer);this.argMessageTimer=setTimeout(()=>el.classList.add("hidden"),2300+Math.random()*2400);
   }
 
-  render(){this.renderer.render(this.scene,this.camera)}
+  render(){this.syncRendererViewport();this.renderer.render(this.scene,this.camera)}
   loop(now){const raw=(now-this.last)/1000;this.last=now;const dt=Math.min(MAX_DT,raw);if(this.running&&!this.paused)this.update(dt);this.render();requestAnimationFrame(this.loop.bind(this))}
+  syncRendererViewport(){
+    const size=this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const ratio=Math.max(.0001,this.renderer.getPixelRatio());
+    this.renderer.setViewport(0,0,size.x/ratio,size.y/ratio);
+    this.renderer.setScissor(0,0,size.x/ratio,size.y/ratio);
+    this.renderer.setScissorTest(false);
+  }
   resize(){
     const ratio=Math.min(this.renderer.getPixelRatio(),this.quality.maxSafePixelRatio());
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(innerWidth,innerHeight,false);
+    this.syncRendererViewport();
     this.camera.aspect=innerWidth/innerHeight;
     this.camera.updateProjectionMatrix();
   }
