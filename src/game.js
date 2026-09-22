@@ -3,7 +3,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { InputManager } from "./input.js";
 import { AudioDirector } from "./audio.js";
 import { LEVELS, levelById, cycleHash } from "./levels.js";
-import { makeLibrary, box, makePropSet } from "./assets.js";
+import { makeLibrary, applyOpenGameArtPBR, disposeLibrary, box, makePropSet } from "./assets.js";
 
 const CELLS=16;
 const BASE_RADIUS=1;
@@ -153,6 +153,22 @@ class Chunk{
     ix=Math.max(0,Math.min(CELLS-1,ix));iz=Math.max(0,Math.min(CELLS-1,iz));
     return {ix,iz,mask:this.walls[this.index(ix,iz)]};
   }
+  dispose(){
+    const shared=new Set(Object.values(this.world.library||{}));
+    const geometries=new Set();
+    const uniqueMaterials=new Set();
+    this.group.traverse(object=>{
+      if(object.geometry)geometries.add(object.geometry);
+      const material=object.material;
+      if(material && !shared.has(material)){
+        if(Array.isArray(material))material.forEach(m=>uniqueMaterials.add(m));
+        else uniqueMaterials.add(material);
+      }
+    });
+    for(const geometry of geometries)geometry.dispose();
+    for(const material of uniqueMaterials)material.dispose();
+    this.group.clear();
+  }
   update(dt){
     this.flickerTimer-=dt;
     if(this.flickerTimer<=0&&this.fixtures.length){
@@ -166,11 +182,41 @@ class Chunk{
 }
 
 class WorldStreamer{
-  constructor(game){this.game=game;this.chunks=new Map();this.library=null;this.radius=BASE_RADIUS;this.size=0}
+  constructor(game){
+    this.game=game;this.chunks=new Map();this.library=null;this.radius=BASE_RADIUS;this.size=0;
+    this.infiniteCeiling=null;
+  }
   key(cx,cz){return cx+","+cz}
   configure(){
-    for(const c of this.chunks.values())this.game.scene.remove(c.group);
-    this.chunks.clear();this.size=this.game.level.cellSize*CELLS;this.library=makeLibrary(this.game.level);
+    for(const c of this.chunks.values()){
+      this.game.scene.remove(c.group);
+      c.dispose();
+    }
+    this.chunks.clear();
+
+    if(this.infiniteCeiling){
+      this.game.scene.remove(this.infiniteCeiling);
+      this.infiniteCeiling.geometry.dispose();
+      this.infiniteCeiling=null;
+    }
+    if(this.library)disposeLibrary(this.library);
+
+    this.size=this.game.level.cellSize*CELLS;
+    this.library=makeLibrary(this.game.level);
+
+    this.infiniteCeiling=new THREE.Mesh(
+      new THREE.PlaneGeometry(this.size*10,this.size*10),
+      this.library.ceiling
+    );
+    this.infiniteCeiling.rotation.x=Math.PI/2;
+    this.infiniteCeiling.position.set(0,this.game.level.wallHeight+.14,0);
+    this.infiniteCeiling.frustumCulled=false;
+    this.game.scene.add(this.infiniteCeiling);
+
+    const library=this.library;
+    applyOpenGameArtPBR(library,this.game.level).catch(error=>{
+      console.warn("[Backrooms] OpenGameArt enhancement failed; procedural materials remain active.",error);
+    });
   }
   chunkAt(x,z){
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
@@ -191,7 +237,16 @@ class WorldStreamer{
     }
   }
   currentCell(){const c=this.chunkAt(this.game.player.position.x,this.game.player.position.z);return c?c.cellAt(this.game.player.position.x,this.game.player.position.z):null}
-  update(dt){this.ensureAround(this.game.player.position.x,this.game.player.position.z);for(const c of this.chunks.values())c.update(dt)}
+  update(dt){
+    const p=this.game.player.position;
+    this.ensureAround(p.x,p.z);
+    if(this.infiniteCeiling){
+      const snap=this.size*2;
+      this.infiniteCeiling.position.x=Math.floor(p.x/snap)*snap;
+      this.infiniteCeiling.position.z=Math.floor(p.z/snap)*snap;
+    }
+    for(const c of this.chunks.values())c.update(dt)
+  }
   collision(position,radius){
     const chunk=this.chunkAt(position.x,position.z);if(!chunk)return position;
     const c=chunk.cellAt(position.x,position.z),cell=this.game.level.cellSize,ox=chunk.originX+c.ix*cell,oz=chunk.originZ+c.iz*cell;
@@ -315,11 +370,17 @@ export class BackroomsGame{
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
-    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,140);this.camera.rotation.order="YXZ";
+    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,220);this.camera.rotation.order="YXZ";
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));this.renderer.setSize(innerWidth,innerHeight);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
-    const room=new RoomEnvironment();this.environmentTarget=new THREE.PMREMGenerator(this.renderer).fromScene(room,0.04);room.dispose();this.scene.environment=this.environmentTarget.texture;
+    const room=new RoomEnvironment();
+    const pmrem=new THREE.PMREMGenerator(this.renderer);
+    this.environmentTarget=pmrem.fromScene(room,0.04);
+    pmrem.dispose();
+    room.dispose();
+    this.scene.environment=this.environmentTarget.texture;
+    this.scene.environmentIntensity=.42;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
     this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.20);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffee,18,28,.48,.75,1.3);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
