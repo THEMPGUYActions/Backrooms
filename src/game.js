@@ -105,7 +105,7 @@ class Chunk{
         fixture.userData.light=true;this.fixtures.push(fixture);
         if(((x*13+z*7)%61===0)||level.id==="2"&&((x+z)%29===0)){
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const l=new THREE.PointLight(lightColor,level.id==="0"?.30:.24,level.id==="2"?14:24,1.15);
+          const l=new THREE.PointLight(lightColor,level.id==="0"?.30:.24,level.id==="2"?28:40,1.15);
           l.position.set(px,level.wallHeight-.2,pz);g.add(l);this.fixtures.push(l);
         }
       }
