@@ -1334,24 +1334,13 @@ export class BackroomsGame{
     this.last=performance.now();
   }
   async mount(){
-    const loading=document.getElementById("loading");
-    this.setLoadingProgress(.04,"INITIALIZING CAMERA","Preparing the recording...");
     document.getElementById("game").appendChild(this.renderer.domElement);
     this.resize();
     this.quality.apply();
-    this.setLoadingProgress(.12,"BUILDING WORLD","Loading procedural materials...");
-    await this.world.configure((progress,label,detail)=>{
-      const p=typeof progress==="number"?Math.max(0,Math.min(1,progress)):.5;
-      this.setLoadingProgress(.12+p*.68,label||"BUILDING WORLD",detail||"Generating the environment...");
-    });
-    this.setLoadingProgress(.86,"STREAMING SPAWN","Generating the first rooms...");
+    await this.world.configure();
     this.world.ensureAround(0,0);
-    this.setLoadingProgress(.96,"FINALIZING","Starting camera systems...");
     this.player.reset();
     this.mounted=true;
-    this.setLoadingProgress(1,"READY","Recording ready.");
-    loading?.classList.add("hidden");
-    document.getElementById("boot")?.classList.add("intro-ready");
     if(this.pendingStart)this.beginIntroReveal();
     this.render();
     this.last=performance.now();
