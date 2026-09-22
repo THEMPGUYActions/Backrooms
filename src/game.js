@@ -25,7 +25,7 @@ class Chunk{
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
     this.originX=cx*world.size-world.size/2;this.originZ=cz*world.size-world.size/2;
     this.group=new THREE.Group();this.group.name="chunk_"+cx+"_"+cz;
-    this.walls=new Uint8Array(CELLS*CELLS);this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];
+    this.walls=new Uint8Array(CELLS*CELLS);this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -215,8 +215,16 @@ class Chunk{
         box(g,new THREE.BoxGeometry(1.9,.08,.66),lib.metal,px+jx,level.wallHeight-.05,pz+jz,0,rotation,0);
         fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
         if(rngBase.next()<.34){
-          const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light,intensity=level.id==="0"?4.2:3.1;
-          const l=new THREE.PointLight(lightColor,intensity,11,2);l.position.set(px+jx,level.wallHeight-.28,pz+jz);l.userData.baseIntensity=intensity;g.add(l);this.fixtures.push(l);
+          const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
+          const intensity=level.id==="0"?4.2:3.1;
+          this.lightSources.push({
+            position:new THREE.Vector3(px+jx,level.wallHeight-.28,pz+jz),
+            color:lightColor,
+            baseIntensity:intensity,
+            intensity,
+            distance:11,
+            decay:2
+          });
         }
       }
     }
@@ -308,7 +316,7 @@ class Chunk{
       }else{
         const p=wallPoint(e,.105,1.29),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
         anomaly.userData.exit=true;
-        const light=new THREE.PointLight(0xffeaa0,.65,5,2);light.position.copy(p.position);g.add(light);this.fixtures.push(light);
+        this.lightSources.push({position:p.position.clone(),color:0xffeaa0,baseIntensity:.65,intensity:.65,distance:5,decay:2});
         this.exit.position=p.position.clone();
       }
     }
@@ -352,26 +360,35 @@ class Chunk{
     this.group.clear();
   }
   update(dt){
-    if(this.game.lightState==="ON"&&this.fixtures.length){
+    if(this.game.lightState==="ON"){
       for(const fixture of this.fixtures){
-        if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
-        if(fixture.isLight&&fixture.userData.baseIntensity!==undefined)fixture.intensity=fixture.userData.baseIntensity;
+        if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)
+          fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
       }
+      for(const light of this.lightSources)light.intensity=light.baseIntensity;
     }
-    if(this.game.lightState!=="ON"&&this.fixtures.length){
-      const blackout=this.game.lightState==="BLACKOUT",flicker=Math.sin(this.game.gameTime*87+this.cx*11+this.cz*17)>-.18,scale=blackout?0:(flicker?1:.028);
+
+    if(this.game.lightState!=="ON"){
+      const blackout=this.game.lightState==="BLACKOUT";
+      const flicker=Math.sin(this.game.gameTime*87+this.cx*11+this.cz*17)>-.18;
+      const scale=blackout?0:(flicker?1:.028);
       for(const fixture of this.fixtures){
-        if(fixture.material?.emissive)fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??.8)*scale;
-        if(fixture.isLight)fixture.intensity=(fixture.userData.baseIntensity??.5)*scale;
+        if(fixture.material?.emissive)
+          fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??.8)*scale;
       }
+      for(const light of this.lightSources)light.intensity=light.baseIntensity*scale;
       return;
     }
+
     this.flickerTimer-=dt;
     if(this.flickerTimer<=0&&this.fixtures.length){
       for(let i=0;i<Math.min(2,this.fixtures.length);i++){
         const f=this.fixtures[Math.floor(Math.random()*this.fixtures.length)];
-        if(f.material?.emissive&&f.userData.baseEmissive!==undefined)f.material.emissiveIntensity=Math.random()<.55?.08:f.userData.baseEmissive;
-        if(f.isLight&&f.userData.baseIntensity!==undefined)f.intensity=Math.random()<.55?.025:f.userData.baseIntensity;
+        if(f.material?.emissive&&f.userData.baseEmissive!==undefined)
+          f.material.emissiveIntensity=Math.random()<.55?.08:f.userData.baseEmissive;
+      }
+      for(const light of this.lightSources){
+        if(Math.random()<.35)light.intensity=light.baseIntensity*(Math.random()<.55?.025:1);
       }
       this.flickerTimer=11+Math.random()*24;
     }
@@ -506,11 +523,24 @@ class WorldStreamer{
     let best=Infinity;
     for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
-      for(const light of c.fixtures)if(light.isLight){
+      for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);if(d<best)best=d;
       }
     }
     return best<18?1-best/18:0;
+  }
+  nearbyLightSources(x,z){
+    const out=[];
+    const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
+      const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
+      for(const light of c.lightSources){
+        const d=Math.hypot(light.position.x-x,light.position.z-z);
+        if(d<22)out.push({light,d});
+      }
+    }
+    out.sort((a,b)=>a.d-b.d);
+    return out;
   }
   entitySpawns(){const out=[];for(const c of this.chunks.values())if(c.entitySpawn)out.push(c);return out}
 }
@@ -663,7 +693,15 @@ export class BackroomsGame{
     room.dispose();
     this.scene.environment=this.environmentTarget.texture;
     this.scene.environmentIntensity=.012;
-    this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
+    this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
+    this.localLights=[];
+    for(let i=0;i<8;i++){
+      const light=new THREE.PointLight(0xffd34d,0,22,2);
+      light.name="dynamic_fluorescent_"+i;
+      light.visible=true;
+      this.localLights.push(light);
+      this.scene.add(light);
+    }this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
     this.ambient=new THREE.HemisphereLight(0x4c4539,0x000000,.018);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,24,25,.48,.9,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
@@ -758,10 +796,27 @@ export class BackroomsGame{
   toast(text,duration=2){
     const el=document.getElementById("toast");el.textContent=text;el.classList.remove("hidden");clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.add("hidden"),duration*1000)
   }
+  updateLocalLights(){
+    const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z);
+    for(let i=0;i<this.localLights.length;i++){
+      const target=this.localLights[i],entry=sources[i];
+      if(!entry){
+        target.intensity=0;
+        continue;
+      }
+      const source=entry.light;
+      target.visible=true;
+      target.position.copy(source.position);
+      target.color.setHex(source.color);
+      target.distance=source.distance;
+      target.decay=source.decay;
+      target.intensity=source.intensity;
+    }
+  }
   update(dt){
     this.gameTime+=dt;this.argTimer-=dt;this.scareTimer-=dt;
     if(this.introReveal<1)this.introReveal=Math.min(1,this.introReveal+dt/2.7);
-    this.player.update(dt);this.world.update(dt);this.entityManager.update(dt);this.quality.update(dt);
+    this.player.update(dt);this.world.update(dt);this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
     this.updateArgLayer(dt);
     this.updateLightEvent(dt);
     this.updateHorror(dt);
