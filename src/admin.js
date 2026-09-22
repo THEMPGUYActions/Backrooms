@@ -10,26 +10,21 @@ export class BackroomsAdmin{
     this.game=game;
     this.opened=false;
     this.ready=false;
+    this.opener=null;
+  }
+  activate(){
+    if(this.ready)return;
+    this.build();
+    this.bind();
     this.opener=document.createElement("button");
     this.opener.id="admin-open";
     this.opener.type="button";
     this.opener.textContent="ADMIN";
     this.opener.setAttribute("aria-label","Open admin panel");
     this.opener.setAttribute("aria-expanded","false");
-    this.opener.hidden=!enabled;
     document.body.appendChild(this.opener);
     this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
-    if(enabled)game.admin.enabled=true;
-    this.activate();
-  }
-
-  activate(){
-    if(this.ready)return;
-    this.build();
-    this.bind();
     this.ready=true;
-    this.opener.hidden=false;
-    this.opener.disabled=false;
   }
 
   build(){
