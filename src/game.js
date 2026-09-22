@@ -352,7 +352,8 @@ class Chunk{
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
-    if(chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.035){
+    const level1ExitSector=level.id==="1"&&this.cx%5===0&&this.cz%5===0;
+    if((level.id==="1"?level1ExitSector:chunkDistance>=level.exitAfterChunks)&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
