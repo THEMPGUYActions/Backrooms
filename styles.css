@@ -1425,6 +1425,8 @@ button,.audio-gate{
   max-width:42vw;
 }
 .audio-gate{
+  outline:none;
+  -webkit-tap-highlight-color:transparent;
   position:relative;
   z-index:2;
   min-width:min(88vw,620px);
