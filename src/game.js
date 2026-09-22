@@ -278,18 +278,18 @@ class Player{
   update(dt){
     const input=this.game.input,look=input.consumeLook();
     this.yaw-=look.x*.0021;this.pitch-=look.y*.0021;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
-    const mv=input.getMove(),run=input.wantsRun()&&(this.game.dev.godMode||this.stamina>4)&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.35:3.25;
+    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.35:3.25;
     const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw)),right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
     const oldX=this.position.x,oldZ=this.position.z;
     this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
-    if(!this.game.dev.noclip){const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;}
+    const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;
     if(run)this.stamina=Math.max(0,this.stamina-dt*15);else this.stamina=Math.min(100,this.stamina+dt*9);
     this.hydration=Math.max(0,this.hydration-dt*.48);if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
     const dark=this.game.isDark();this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;this.sanity=Math.max(0,Math.min(100,this.sanity));
-    if(!this.game.dev.godMode&&this.game.world.hazardAt(this.position.x,this.position.z)){this.health-=dt*34}
+    if(this.game.world.hazardAt(this.position.x,this.position.z)){this.health-=dt*34}
     if(this.game.world.exitAt(this.position.x,this.position.z)){this.game.reachExit();return}
-    if(!this.game.dev.godMode&&(this.health<=0||this.sanity<=0)){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
+    if(this.health<=0||this.sanity<=0){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
     const moving=Math.hypot(this.position.x-oldX,this.position.z-oldZ)>.01;
     if(moving){this.bob+=dt*(run?13:8);if(this.game.settings.shake)this.shake=Math.min(.04,this.shake+dt*.12)}else this.shake=Math.max(0,this.shake-dt*.22);
     const bob=Math.sin(this.bob)*(.018*(run?1.5:.7))*(moving?1:0);
@@ -339,11 +339,11 @@ class EntityManager{
         if(d<10&&looking)e.state="intimidated";
         if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
-        e.group.lookAt(p.position.x,1,p.position.z);if(!this.game.dev.godMode&&d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
+        e.group.lookAt(p.position.x,1,p.position.z);if(d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
       }else{
         const lightOn=p.flashlight;if(lightOn&&d<18){e.group.position.x-=dx/d*dt*2.2;e.group.position.z-=dz/d*dt*2.2}
         if(!lightOn&&d<15){e.group.position.x+=dx/d*dt*1.4;e.group.position.z+=dz/d*dt*1.4}
-        if(!this.game.dev.godMode&&d<1.1){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
+        if(d<1.1){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
       }
     }
     this.spawnForChunks();
@@ -369,7 +369,7 @@ export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
-    this.settings={shake:localStorage.getItem("br.shake")!=="0"};\n    this.dev={godMode:false,noclip:false,showEntities:true};this.startFlash=localStorage.getItem("br.flash")!=="0";
+    this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,220);this.camera.rotation.order="YXZ";
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));this.renderer.setSize(innerWidth,innerHeight);
