@@ -11,31 +11,30 @@
 <body>
   <div id="game"></div>
 
-  <section id="boot" class="screen">
-    <div class="panel">
-      <div class="eyebrow">THEMPGUY PRESENTS</div>
-      <h1>THE BACKROOMS</h1>
-      <p class="muted">A browser-first descent into places that should not exist.</p>
-      <div class="boot-grid">
-        <div><span>RENDERER</span><b>WEBGL 2</b></div>
-        <div><span>WORLD</span><b>PROCEDURAL</b></div>
-        <div><span>STREAMING</span><b>CHUNKED</b></div>
-        <div><span>ASSETS</span><b>PBR / GENERATED</b></div>
-      </div>
-      <button id="start" class="primary">ENTER THE BACKROOMS</button>
-      <p class="fine">Desktop: WASD + mouse · Shift to run · F flashlight · Esc pause<br>Mobile: left stick to move · swipe right side to look</p>
-      <p class="fine">This game uses original procedural visuals and sound. Backrooms-derived material is attributed in the repository.</p>
+  <section id="boot" class="intro-screen">
+    <div id="audio-gate" class="audio-gate" role="button" tabindex="0" aria-label="Click to enable audio">
+      <div>Click To Enable</div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Audio</div>
     </div>
+    <div id="intro-noise" class="intro-noise"></div>
+    <div class="intro-corner intro-corner-top">CAM 01&nbsp;&nbsp;REC</div>
+    <div class="intro-corner intro-corner-bottom">NO SIGNAL / INPUT REQUIRED</div>
   </section>
 
   <section id="hud" class="hidden">
     <div class="hud-top">
+      <div class="arg-hud">
+        <span id="rec-time">00:00:00</span>
+        <span id="rec-status">REC ●</span>
+        <span id="signal-state">SIGNAL UNSTABLE</span>
+      </div>
       <div class="level-readout">
         <span id="level-number">LEVEL 0</span>
         <strong id="level-name">THRESHOLD</strong>
       </div>
       <div id="status">ALONE</div>
     </div>
+    <div id="arg-message" class="arg-message hidden"></div>
 
     <div class="crosshair"></div>
 

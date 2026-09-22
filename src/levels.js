@@ -7,7 +7,7 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-0",
     next: "1",
     theme: {
-      wall: 0xc6a748,
+      wall: 0xbca349,
       wallRough: 0.82,
       floor: 0x6d5d35,
       ceiling: 0x8e7f58,
@@ -19,7 +19,7 @@ export const LEVELS = {
     cellSize: 5,
     wallHeight: 3.35,
     darkness: 0.08,
-    holeChance: 0.018,
+    holeChance: 0.010,
     pipeChance: 0,
     entity: "none",
     exitStyle: "flicker",

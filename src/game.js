@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js";
+import { RoomEnvironment } from "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/environments/RoomEnvironment.js";
 import { InputManager } from "./input.js";
 import { AudioDirector } from "./audio.js";
 import { LEVELS, levelById, cycleHash } from "./levels.js";
@@ -46,6 +47,23 @@ class Chunk{
       this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
       visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
     }
+    const loopChance=this.game.level.id==="0"?.24:this.game.level.id==="1"?.12:.07;
+    for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
+      const i=this.index(x,z);
+      if(x<CELLS-1&&rng.next()<loopChance){this.walls[i]&=~2;this.walls[this.index(x+1,z)]&=~8}
+      if(z<CELLS-1&&rng.next()<loopChance*.82){this.walls[i]&=~4;this.walls[this.index(x,z+1)]&=~1}
+    }
+    if(this.game.level.id==="0"){
+      for(let z=3;z<13;z+=5)for(let x=3;x<13;x+=5){
+        if(rng.next()<.58){
+          this.walls[this.index(x,z)]&=~(2|4);
+          if(x>0)this.walls[this.index(x-1,z)]&=~2;
+          if(z>0)this.walls[this.index(x,z-1)]&=~4;
+          if(x<CELLS-1)this.walls[this.index(x+1,z)]&=~8;
+          if(z<CELLS-1)this.walls[this.index(x,z+1)]&=~1;
+        }
+      }
+    }
     for(let x=0;x<CELLS;x++){
       const gx=this.cx*CELLS+x;
       if(canonicalOpen(this.game.seed,gx,this.cz*CELLS,"h"))this.walls[this.index(x,0)]&=~1;
@@ -82,15 +100,26 @@ class Chunk{
       if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);
       const fixtureChance=level.id==="0"?.43:.24;
       if(rngBase.next()<fixtureChance){
-        const fixture=box(g,new THREE.BoxGeometry(1.35,.07,.18),lib.light,px,level.wallHeight-.05,pz);
+        const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
+        const fixture=box(g,new THREE.BoxGeometry(1.35,.07,.18),fixtureMat,px,level.wallHeight-.05,pz);
         fixture.userData.light=true;this.fixtures.push(fixture);
         if(((x*13+z*7)%61===0)||level.id==="2"&&((x+z)%29===0)){
-          const l=new THREE.PointLight(level.theme.light,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
+          const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
+          const l=new THREE.PointLight(lightColor,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
           l.position.set(px,level.wallHeight-.2,pz);g.add(l);this.fixtures.push(l);
         }
       }
       const propRng=new RNG(this.seedKey()^Math.imul(x,92821)^Math.imul(z,31337));
       makePropSet(g,level,lib,()=>propRng.next(),px,pz);
+      if(level.id==="1"&&propRng.next()<.055){
+        const puddle=new THREE.Mesh(new THREE.CircleGeometry(cell*(.18+propRng.next()*.2),18),lib.water);
+        puddle.rotation.x=-Math.PI/2;puddle.scale.y=.55;
+        puddle.position.set(px+(propRng.next()-.5)*cell*.65,.012,pz+(propRng.next()-.5)*cell*.65);g.add(puddle);
+      }
+      if(level.id==="2"&&propRng.next()<.12){
+        const cable=new THREE.Mesh(new THREE.CylinderGeometry(.026,.026,cell*(.75+propRng.next()*.4),6),lib.cable);
+        cable.rotation.z=Math.PI/2;cable.position.set(px,level.wallHeight-.42,pz);g.add(cable);
+      }
     }
     const hm=new THREE.InstancedMesh(hGeom,lib.wall,Math.max(1,hData.length));hm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     hData.forEach((m,i)=>hm.setMatrixAt(i,m));hm.count=hData.length;hm.frustumCulled=true;g.add(hm);
@@ -284,14 +313,15 @@ class AdaptiveQuality{
 export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,140);this.camera.rotation.order="YXZ";
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));this.renderer.setSize(innerWidth,innerHeight);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
+    const room=new RoomEnvironment();this.environmentTarget=new THREE.PMREMGenerator(this.renderer).fromScene(room,0.04);room.dispose();this.scene.environment=this.environmentTarget.texture;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.28);this.scene.add(this.ambient);
+    this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.20);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffee,18,28,.48,.75,1.3);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
   }
@@ -301,21 +331,34 @@ export class BackroomsGame{
   }
   bindUI(){
     const $=id=>document.getElementById(id);
-    $("start").onclick=async()=>{await this.audio.resume();this.start()};
+    const begin=async()=>{if(!this.introActive)return;this.audio.resume().then(()=>{this.audio.clickToEnter();this.beginIntroReveal()})};
+    $("audio-gate").onclick=begin;
+    $("audio-gate").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();begin()}};
     $("resume").onclick=()=>this.togglePause(false);$("restart").onclick=()=>this.restart();$("retry").onclick=()=>this.restart();$("again-ending").onclick=()=>this.restart();
     $("quality").value=this.quality.mode;$("quality").onchange=e=>this.quality.set(e.target.value);
     $("volume").value=String(this.audio.volume);$("volume").oninput=e=>this.audio.setVolume(e.target.value);
     $("shake").checked=this.settings.shake;$("shake").onchange=e=>{this.settings.shake=e.target.checked;localStorage.setItem("br.shake",e.target.checked?"1":"0")};
     $("flashlight").checked=this.startFlash;$("flashlight").onchange=e=>{this.startFlash=e.target.checked;localStorage.setItem("br.flash",e.target.checked?"1":"0")};
   }
-  start(){
-    this.running=true;this.paused=false;this.dead=false;document.getElementById("boot").classList.add("hidden");document.getElementById("hud").classList.remove("hidden");
+  beginIntroReveal(){
+    if(!this.introActive)return;
+    this.introActive=false;
+    const boot=document.getElementById("boot");
+    boot.classList.add("booting");
+    this.player.reset();
+    this.running=true;this.paused=false;this.dead=false;this.introReveal=0;
+    document.getElementById("hud").classList.remove("hidden");
     document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
-    this.toast(this.level.objective,3);this.renderer.domElement.requestPointerLock?.();
+    setTimeout(()=>boot.classList.add("fade-out"),80);
+    setTimeout(()=>{this.toast(this.level.objective,3);this.renderer.domElement.requestPointerLock?.()},1100);
   }
+
+  start(){this.beginIntroReveal()}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
-    this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();this.start();
+    this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();
+    this.running=true;this.paused=false;this.dead=false;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
+    document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);this.toast(this.level.objective,2.4);
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);
@@ -341,7 +384,10 @@ export class BackroomsGame{
     const el=document.getElementById("toast");el.textContent=text;el.classList.remove("hidden");clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.add("hidden"),duration*1000)
   }
   update(dt){
+    this.gameTime+=dt;this.argTimer-=dt;
+    if(this.introReveal<1)this.introReveal=Math.min(1,this.introReveal+dt/2.7);
     this.player.update(dt);this.world.update(dt);this.entityManager.update(dt);this.quality.update(dt);
+    this.updateArgLayer(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
     document.getElementById("coords").textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
     document.getElementById("health-bar").style.width=Math.max(0,this.player.health)+"%";
@@ -351,6 +397,27 @@ export class BackroomsGame{
     document.getElementById("status").textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";this.flash.intensity=this.player.flashlight?18:0;
     this.flash.position.copy(this.camera.position);
   }
+  updateArgLayer(dt){
+    const t=Math.floor(this.gameTime),h=String(Math.floor(t/3600)%24).padStart(2,"0"),m=String(Math.floor(t/60)%60).padStart(2,"0"),s=String(t%60).padStart(2,"0");
+    const rec=document.getElementById("rec-time");if(rec)rec.textContent=h+":"+m+":"+s;
+    if(this.argTimer<=0&&this.running&&!this.paused){
+      this.argTimer=14+Math.random()*28;
+      const messages=this.level.id==="0"
+        ? ["AUDIO SOURCE: UNKNOWN","ROOM INDEX DESYNC","DOOR COUNT DOES NOT MATCH","FRAME DROP / 00:00:07","DO NOT TRUST THE HUM"]
+        : this.level.id==="1"
+        ? ["SIGNAL: SECONDARY CARRIER","CAMERA CLOCK DRIFT","MOTION DETECTED","NO EXIT MARKER IN RANGE"]
+        : ["POWER BUS: UNSTABLE","FEED: 03:19:XX","THERMAL SIGNATURE LOST","SOMETHING MOVED BETWEEN FRAMES"];
+      this.showArgMessage(messages[Math.floor(Math.random()*messages.length)]);
+      if(Math.random()<.46)this.audio.distantKnock();
+    }
+  }
+
+  showArgMessage(message){
+    const el=document.getElementById("arg-message");if(!el)return;
+    el.textContent=message;el.classList.remove("hidden","glitch");void el.offsetWidth;el.classList.add("glitch");
+    clearTimeout(this.argMessageTimer);this.argMessageTimer=setTimeout(()=>el.classList.add("hidden"),2300+Math.random()*2400);
+  }
+
   render(){this.renderer.render(this.scene,this.camera)}
   loop(now){const raw=(now-this.last)/1000;this.last=now;const dt=Math.min(MAX_DT,raw);if(this.running&&!this.paused)this.update(dt);this.render();requestAnimationFrame(this.loop.bind(this))}
   resize(){this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.renderer.setSize(innerWidth,innerHeight)}
