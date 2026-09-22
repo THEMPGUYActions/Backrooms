@@ -1306,25 +1306,41 @@ export class BackroomsGame{
   bindUI(){
     const $=id=>document.getElementById(id);
     this.audioGateBusy=false;
-    const begin=event=>{
+
+    const begin=async event=>{
       if(event?.isTrusted===false||!this.introActive||this.audioGateBusy)return;
       this.audioGateBusy=true;
-      const gate=$("audio-gate");
-      gate?.classList.add("busy");
-      const label=gate?.querySelector(".audio-gate-main");
-      if(label)label.textContent="SYNCING TAPE";
+      const boot=$("boot");
+      boot?.classList.add("audio-ready");
+      const overlay=$("audio-overlay");
+      if(overlay)overlay.classList.add("hidden");
       this.audio.unlockFromGesture();
+      await this.audio.testUnlock();
       this.audio.clickToEnter();
       this.beginIntroReveal();
     };
-    const gate=$("audio-gate");
-    gate?.addEventListener("pointerdown",event=>{
+
+    const boot=$("boot");
+    boot?.addEventListener("pointerdown",event=>{
+      if(event.target.closest("button,input,select,textarea,a"))return;
       event.preventDefault();
       begin(event);
     });
-    gate?.addEventListener("click",event=>{
-      if(event.detail===0)begin(event);
+    boot?.addEventListener("click",event=>{
+      if(event.detail===0&&!event.target.closest("button,input,select,textarea,a"))begin(event);
     });
+    const gate=$("audio-gate");
+    gate?.addEventListener("keydown",event=>{
+      if(event.key==="Enter"||event.key===" "){
+        event.preventDefault();
+        begin(event);
+      }
+    });
+
+    if(this.audio.isEnabled()){
+      boot?.classList.add("audio-ready");
+      $("audio-overlay")?.classList.add("hidden");
+    }
 
     $("resume")?.addEventListener("click",()=>this.togglePause(false));
     $("restart")?.addEventListener("click",()=>this.restart());
@@ -1355,6 +1371,7 @@ export class BackroomsGame{
     this.introPlaying=true;
     this.introTime=0;
     this.running=false;this.paused=true;this.dead=false;
+    this.introSequenceStarted=performance.now();
     const boot=document.getElementById("boot");
     boot.classList.add("booting");
     const gate=document.getElementById("audio-gate");
@@ -1368,6 +1385,14 @@ export class BackroomsGame{
     this.vhsPass.uniforms.intensity.value=1.15;
     this.vhsPass.uniforms.tracking.value=.85;
     this.vhsPass.uniforms.fear.value=.08;
+    setTimeout(()=>{
+      if(!this.introPlaying)return;
+      const boot=document.getElementById("boot");
+      boot?.classList.add("booting");
+      const gate=document.getElementById("audio-gate");
+      gate?.classList.add("hidden");
+      this.introTime=0;
+    },16500);
   }
 
   setLoadingProgress(progress,label,detail=""){
