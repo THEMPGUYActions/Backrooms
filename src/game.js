@@ -749,14 +749,13 @@ class EntityManager{
         box(group,new THREE.CapsuleGeometry(.12,.62,5,8),mat,.3,.45,-.18,0,-.12,-.1);
         const eye=new THREE.MeshStandardMaterial({color:0xffe7a8,emissive:0xffd36a,emissiveIntensity:5});
         box(group,new THREE.SphereGeometry(.055,8,8),eye,-.12,.86,-.42);box(group,new THREE.SphereGeometry(.055,8,8),eye,.12,.86,-.42);
-      }else if(type==="skinwalker"){
-        const mat=new THREE.MeshStandardMaterial({color:0x010101,roughness:1,metalness:0});
-        box(group,new THREE.CapsuleGeometry(.22,.98,7,10),mat,0,1.02,0);
-        box(group,new THREE.SphereGeometry(.24,12,8),mat,0,1.8,0);
-        box(group,new THREE.CapsuleGeometry(.075,.92,5,8),mat,-.22,.55,0,0,0,-.035);
-        box(group,new THREE.CapsuleGeometry(.075,.92,5,8),mat,.22,.55,0,0,0,.035);
-        box(group,new THREE.CapsuleGeometry(.055,.88,5,8),mat,-.36,1.08,0,0,0,.08);
-        box(group,new THREE.CapsuleGeometry(.055,.88,5,8),mat,.36,1.08,0,0,0,-.08);
+      }else if(type==="figure"){
+        const mat=new THREE.MeshStandardMaterial({color:0x010101,roughness:1,metalness:0,transparent:true,opacity:.82});
+        const body=box(group,new THREE.CapsuleGeometry(.16,.98,6,8),mat,0,1.05,0);
+        body.scale.set(.72,1.35,.62);
+        box(group,new THREE.SphereGeometry(.19,10,7),mat,0,1.86,0);
+        box(group,new THREE.CapsuleGeometry(.045,.92,5,7),mat,-.23,1.02,0,0,0,-.08);
+        box(group,new THREE.CapsuleGeometry(.045,.92,5,7),mat,.23,1.02,0,0,0,.08);
       }else{
         const mat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1});
         box(group,new THREE.SphereGeometry(.72,16,10),mat,0,1.4,0);
@@ -765,7 +764,7 @@ class EntityManager{
         box(group,new THREE.TorusGeometry(.28,.055,6,20,Math.PI),eyeMat,0,1.27,-.67,0,Math.PI,0);
       }
       group.scale.setScalar(.9+rng.next()*.4);this.game.scene.add(group);this.entities.push({key,type,group,state:"idle",cool:0});
-      if(type==="skinwalker")this.game.triggerFear(.06);
+      if(type==="figure")this.game.triggerFear(.02);
     }
   }
   update(dt){
@@ -780,18 +779,23 @@ class EntityManager{
         if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
         e.group.lookAt(p.position.x,1,p.position.z);if(d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
-      }else if(e.type==="skinwalker"){
+      }else if(e.type==="figure"){
         const forward=new THREE.Vector3(-Math.sin(p.yaw),0,-Math.cos(p.yaw)),to=new THREE.Vector3(dx,0,dz).normalize();
-        const looking=forward.dot(to)<-.72;
-        if(looking&&d<25){
-          e.state="frozen";
-        }else{
-          e.state="stalk";
-          if(d<32){const speed=.58;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
+        const looking=forward.dot(to)<-.78;
+        if(d<28&&!looking){
+          e.group.position.x+=dx/d*.32*dt;
+          e.group.position.z+=dz/d*.32*dt;
+          e.group.visible=true;
         }
-        if(p.flashlight&&d<16){e.group.position.x-=dx/d*.9*dt;e.group.position.z-=dz/d*.9*dt}
-        if(d<2.0){p.health-=dt*30;this.game.audio.hurt()}
-        if(d<12)this.game.triggerFear(.24*dt);
+        if(looking&&d<24)e.group.userData.seen=(e.group.userData.seen||0)+dt;
+        else e.group.userData.seen=0;
+        if(e.group.userData.seen>.35){
+          e.group.visible=false;
+          e.group.position.x+=-dx/d*1.8;
+          e.group.position.z+=-dz/d*1.8;
+          e.group.userData.seen=0;
+        }
+        if(d<18)this.game.triggerFear(.07*dt);
         e.group.lookAt(p.position.x,1.2,p.position.z);
       }else{
         const lightOn=p.flashlight;if(lightOn&&d<18){e.group.position.x-=dx/d*dt*2.2;e.group.position.z-=dz/d*dt*2.2}
