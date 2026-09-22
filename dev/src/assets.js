@@ -178,9 +178,21 @@ export function makeLibrary(level){
     water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72}),
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
+    trim:new THREE.MeshStandardMaterial({color:0xf0eee5,roughness:.62,metalness:0}),
+    trimTop:new THREE.MeshStandardMaterial({color:0xe4e0d5,roughness:.7,metalness:0}),
+    outlet:new THREE.MeshStandardMaterial({color:0xe7e4dc,roughness:.58,metalness:0}),
+    socket:new THREE.MeshStandardMaterial({color:0x2a2824,roughness:.88,metalness:0}),
+    cameraDome:new THREE.MeshStandardMaterial({color:0x252522,roughness:.55,metalness:.42}),
+    handle:new THREE.MeshStandardMaterial({color:0x8b8067,roughness:.34,metalness:.72}),
+    door:new THREE.MeshStandardMaterial({color:0xd8d2be,roughness:.73,metalness:.02}),
+    doorFrame:new THREE.MeshStandardMaterial({color:0xf0eee5,roughness:.6,metalness:0}),
+    exitDoor:new THREE.MeshStandardMaterial({color:0xd8d1bd,roughness:.68,metalness:.03,emissive:level.theme.accent,emissiveIntensity:.12}),
+    exitFrame:new THREE.MeshStandardMaterial({color:0xf3f0e4,roughness:.56,metalness:0}),
+    wallAnomaly:new THREE.MeshStandardMaterial({color:0xd2bf61,roughness:.72,metalness:0,emissive:0xffdc69,emissiveIntensity:.7}),
+    mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
-    light:new THREE.MeshStandardMaterial({color:0xffedaa,roughness:.34,metalness:0,emissive:0xffcf4a,emissiveIntensity:3.2}),
-    orangeLight:new THREE.MeshStandardMaterial({color:0xffddaa,roughness:.31,metalness:0,emissive:0xff9b52,emissiveIntensity:2.6})
+    light:new THREE.MeshStandardMaterial({color:0xfff2c6,roughness:.4,metalness:0,emissive:0xffd66b,emissiveIntensity:2.25}),
+    orangeLight:new THREE.MeshStandardMaterial({color:0xffddaa,roughness:.36,metalness:0,emissive:0xff9b52,emissiveIntensity:2.0})
   };
 }
 
