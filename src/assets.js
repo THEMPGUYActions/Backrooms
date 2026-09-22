@@ -52,7 +52,7 @@ function configureTexture(t,{color=false,repeat=1}={}){
   t.wrapS=THREE.RepeatWrapping;
   t.wrapT=THREE.RepeatWrapping;
   t.repeat.set(repeat,repeat);
-  t.anisotropy=4;
+  t.anisotropy=2;
   if(color)t.colorSpace=THREE.SRGBColorSpace;
   else t.colorSpace=THREE.NoColorSpace;
   t.needsUpdate=true;
