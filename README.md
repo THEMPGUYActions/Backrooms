@@ -13,7 +13,7 @@ The current game build includes:
 - Seeded world generation
 - Streaming chunk loading and unloading
 - Instanced wall rendering for repeated geometry
-- PBR-style procedural base, roughness and normal maps
+- PBR materials using the OpenGameArt Backrooms PBR texture pack, with procedural fallbacks
 - Three.js r186
 - ACES filmic tone mapping
 - Adaptive resolution for weaker devices
@@ -80,28 +80,28 @@ Mobile:
 
 ## Performance design
 
-The world is not generated as one giant mesh.
+The world is not generated as one giant mesh. A continuous player-following ceiling surface sits above the streamed chunks so crossing chunk boundaries cannot reveal an empty sky or a missing roof.
 
 Only nearby chunks are kept in memory. Each chunk uses a small deterministic maze grid, shared geometry, instanced wall meshes and a limited number of dynamic lights. Far chunks are detached from the scene.
 
 The renderer also adapts its pixel ratio when Auto quality is selected. This is intended to make the game usable on lower-end PCs and mobile GPUs without forcing the high-end rendering path on every device.
 
-No external texture pack is required for the core game.
+The production build bundles the required CC0 PBR maps into its generated static output.
 
 ## Procedural assets
 
-The repository generates the core environment materials at runtime instead of shipping random downloaded textures.
+The build uses the Backrooms PBR texture pack by methodical pixel from OpenGameArt.org for the environmental materials. The build downloads the CC0 maps into dist/assets/pbr/ so the deployed game serves them from the same site origin rather than depending on runtime cross-origin requests.
 
-Generated materials include:
+Used material sets include:
 
-- Carpet
+- Wallpaper
 - Painted wall
-- Concrete
-- Ceiling
-- Metal
-- Dark rubber-like materials
+- Carpet
+- Ceiling tiles
 
-Each PBR-style material has a generated base-color map, roughness map and normal map. Props such as pipes, crates, fluorescent fixtures and exit markers are also generated from primitive geometry.
+Each set supplies a base-color map, roughness map and normal map. The renderer keeps its procedural PBR materials as a fallback for local development or a temporarily unavailable asset.
+
+Props such as pipes, crates, fluorescent fixtures and exit markers are generated from primitive geometry.
 
 See assets/README.md.
 
@@ -167,7 +167,7 @@ See:
 - GAME-CONTENT-LICENSE.md
 - LICENSE
 
-The current Backrooms Wiki licensing guide states that its content is generally CC BY-SA 3.0 and provides specific requirements for game developers using wiki material:
+The Backrooms Wiki licensing guide is used for the wiki-derived setting material. The OpenGameArt texture pack used by this build is separately identified as CC0:
 
 https://backrooms-wiki.wikidot.com/licensing-guide
 
