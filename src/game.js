@@ -707,8 +707,22 @@ class Chunk{
 
         if(room.entry){
           const e=room.entry,ex=this.originX+e.x*cell+cell/2,ez=this.originZ+e.z*cell+cell/2,rot=e.side==="west"||e.side==="east"?Math.PI/2:0;
-          box(g,new THREE.BoxGeometry(2.35,.10,.16),lib.trim,ex,2.72,ez,0,rot,0);
-          if(index%3===0)box(g,new THREE.BoxGeometry(.56,.10,.04),lib.parkingLine,ex,level.wallHeight-.95,ez,0,rot,0);
+          const frameH=Math.min(3.9,level.wallHeight-.35);
+          const entryGroup=new THREE.Group();
+          entryGroup.position.set(ex,0,ez);
+          entryGroup.rotation.y=rot;
+          box(entryGroup,new THREE.BoxGeometry(.12,frameH,.18),lib.doorFrame,-1.05,frameH/2,0);
+          box(entryGroup,new THREE.BoxGeometry(.12,frameH,.18),lib.doorFrame,1.05,frameH/2,0);
+          box(entryGroup,new THREE.BoxGeometry(2.22,.12,.18),lib.doorFrame,0,frameH,0);
+          if(index%3===0){
+            const sign=box(entryGroup,new THREE.BoxGeometry(.62,.18,.05),lib.exit,0,frameH+.18,0);
+            sign.material=lib.exit;
+          }
+          if(index%2===0){
+            const door=box(entryGroup,new THREE.BoxGeometry(1.82,frameH-.18,.07),lib.door,0,(frameH-.18)/2,-.025);
+            door.rotation.y=(index%4===0?.04:-.03);
+          }
+          g.add(entryGroup);
         }
       }
     }
