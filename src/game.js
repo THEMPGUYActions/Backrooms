@@ -13,8 +13,8 @@ const VHSShader={
   uniforms:{
     tDiffuse:{value:null},
     time:{value:0},
-    intensity:{value:.78},
-    tracking:{value:.25},
+    intensity:{value:.72},
+    tracking:{value:.24},
     fear:{value:0},
     resolution:{value:new THREE.Vector2(1,1)}
   },
@@ -31,50 +31,60 @@ const VHSShader={
     float hash(vec2 p){
       return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
     }
-    float noise(vec2 p){
+    float valueNoise(vec2 p){
       vec2 i=floor(p),f=fract(p);
       f=f*f*(3.0-2.0*f);
       return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x),
                  mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x),f.y);
     }
-    vec2 barrel(vec2 uv){
-      vec2 p=uv-.5;
-      float r=dot(p,p);
-      p*=1.0+r*(.11+.045*fear);
-      return p+.5;
+    vec2 tapeWarp(vec2 uv,float t){
+      float lineBlock=floor(uv.y*resolution.y*.07);
+      float low=valueNoise(vec2(lineBlock*.43,t*1.25));
+      float hi=valueNoise(vec2(floor(uv.y*resolution.y*.34),t*6.0));
+      uv.x+=(low-.5)*.0017*tracking+(hi-.5)*.00055*tracking;
+      float tearSeed=floor(t*2.0);
+      float tearY=hash(vec2(tearSeed,41.0));
+      float tear=smoothstep(.014,0.0,abs(uv.y-tearY))*step(.84,hash(vec2(tearSeed,52.0)));
+      uv.x+=tear*.012;
+      uv.y+=tear*(hash(vec2(tearSeed,63.0))-.5)*.002;
+      return uv;
     }
     void main(){
-      vec2 uv=barrel(vUv);
+      vec2 p=vUv-.5;
+      float r=dot(p,p);
+      p*=1.0+r*(.045+.02*fear);
+      vec2 uv=tapeWarp(p+.5,time);
+
       float line=floor(uv.y*resolution.y);
-      float wobble=(noise(vec2(line*.035,time*.35))-.5)*.0018*tracking;
-      uv.x+=wobble;
+      float frame=floor(time*24.0);
+      float chroma=(.0017+.0018*fear)*intensity;
 
-      float scan=sin(uv.y*resolution.y*3.14159)*.5+.5;
-      float n=noise(uv*resolution.xy*.31+time*11.0);
-      float fine=noise(uv*resolution.xy*1.7-time*19.0);
+      vec3 center=texture2D(tDiffuse,uv).rgb;
+      vec3 left=texture2D(tDiffuse,uv-vec2(chroma,0.0)).rgb;
+      vec3 right=texture2D(tDiffuse,uv+vec2(chroma,0.0)).rgb;
+      vec3 c=vec3(left.r*.5+center.r*.5,
+                  center.g*.8+left.g*.1+right.g*.1,
+                  right.b*.5+center.b*.5);
 
-      vec2 ca=vec2(.0016+.002*fear,0.0);
-      vec3 c;
-      c.r=texture2D(tDiffuse,uv+ca).r;
-      c.g=texture2D(tDiffuse,uv).g;
-      c.b=texture2D(tDiffuse,uv-ca).b;
+      float lum=dot(c,vec3(.299,.587,.114));
+      c=mix(c,vec3(lum),.035+.04*intensity);
 
-      float luminance=dot(c,vec3(.299,.587,.114));
-      c=mix(c,vec3(luminance),.07+.06*intensity);
-      c*=vec3(1.045,.99,.89);
-      c+=vec3((n-.5)*.055*intensity);
-      c+=vec3((fine-.5)*.018*intensity);
-      c*=1.0-(scan-.5)*.045*intensity;
+      float fine=hash(floor(uv*resolution*1.08)+vec2(frame*1.31,frame*.71))-.5;
+      float coarse=valueNoise(vec2(floor(uv.x*resolution.x/9.0),floor(uv.y*resolution.y/7.0))+frame*.07)-.5;
+      c+=vec3(fine*.042*intensity+coarse*.02*intensity);
 
-      vec2 q=abs(vUv-.5)*2.0;
-      float vignette=1.0-smoothstep(.52,1.0,max(q.x,q.y));
-      c*=mix(.62,1.0,vignette);
+      float scan=.978+.022*sin((line+frame*.18)*3.14159);
+      c*=scan;
 
-      float edge=smoothstep(.92,1.0,max(q.x,q.y));
-      c*=1.0-edge*(.28+.18*fear);
+      float flutter=(hash(vec2(frame,91.0))-.5)*.014*intensity;
+      c+=flutter;
 
-      float drop=step(.997,noise(vec2(line*.12,floor(time*.7))));
-      c*=1.0-drop*(.18*intensity);
+      float dropout=step(.994,hash(vec2(floor(line/3.0),floor(time*4.0))));
+      c*=1.0-dropout*.3*intensity;
+
+      vec2 edge=abs(vUv-.5)*2.0;
+      float vignette=1.0-smoothstep(.55,1.0,max(edge.x,edge.y));
+      c*=mix(.7,1.0,vignette);
 
       gl_FragColor=vec4(max(c,0.0),1.0);
     }`
@@ -109,7 +119,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -313,7 +323,7 @@ class Chunk{
         fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
         {
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const intensity=level.id==="0"?72:42;
+          const intensity=level.id==="0"?320:level.id==="3"?220:level.id==="4"?110:170;
           this.lightSources.push({
             position:new THREE.Vector3(px+jx,level.wallHeight-.24,pz+jz),
             color:lightColor,
@@ -363,6 +373,26 @@ class Chunk{
     for(const hz of this.hazards){
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
       p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
+    }
+
+    const batteryChance=level.batteryChance??.08;
+    const batteryRng=new RNG(this.seedKey()^0x0bba71);
+    for(let i=0;i<2;i++){
+      if(batteryRng.next()>batteryChance*(i===0?1:.48))continue;
+      let bx=batteryRng.int(1,Math.max(1,cells-2)),bz=batteryRng.int(1,Math.max(1,cells-2));
+      if(this.hazards.some(h=>h.x===bx&&h.z===bz)){bx=Math.max(1,Math.min(cells-2,bx+1));bz=Math.max(1,Math.min(cells-2,bz+1))}
+      const battery=new THREE.Group();
+      battery.position.set(
+        this.originX+bx*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32),
+        .22,
+        this.originZ+bz*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32)
+      );
+      const body=box(battery,new THREE.CylinderGeometry(.105,.105,.42,10),lib.battery,0,0,0,0,0,Math.PI/2);
+      box(battery,new THREE.BoxGeometry(.052,.23,.17),lib.batteryLabel,0,0,0);
+      body.rotation.order="ZYX";
+      battery.rotation.y=batteryRng.next()*Math.PI*2;
+      g.add(battery);
+      this.batteries.push({group:battery,amount:28+batteryRng.int(0,18)});
     }
 
     const wallPoint=(e,offset=.095,y=.6)=>{
@@ -628,16 +658,14 @@ class WorldStreamer{
     for(const [key,c] of this.chunks){
       const d=Math.hypot(c.bounds.center.x-p.x,c.bounds.center.z-p.z);
       const visible=frustum.intersectsSphere(c.bounds);
-      if(visible||d<42){
-        c.group.visible=true;
-        c.hiddenSince=0;
-      }else{
-        c.group.visible=false;
-        c.hiddenSince+=dt;
-      }
-      if(c!==this.chunkAt(p.x,p.z)&&d>115&&!visible&&c.hiddenSince>5){
-        remove.push([key,c]);
-      }
+
+      // The group stays attached so visible fixtures can render at distance.
+      // Individual meshes still use Three.js frustum culling.
+      c.group.visible=true;
+      if(visible||d<55)c.hiddenSince=0;
+      else c.hiddenSince+=dt;
+
+      if(c!==this.chunkAt(p.x,p.z)&&d>155&&!visible&&c.hiddenSince>4)remove.push([key,c]);
     }
     for(const [key,c] of remove){
       this.game.scene.remove(c.group);
@@ -646,13 +674,39 @@ class WorldStreamer{
     }
   }
   collision(position,radius){
-    const chunk=this.chunkAt(position.x,position.z);if(!chunk)return position;
-    const c=chunk.cellAt(position.x,position.z),cell=this.game.level.cellSize,ox=chunk.originX+c.ix*cell,oz=chunk.originZ+c.iz*cell;
+    const chunk=this.chunkAt(position.x,position.z);
+    if(!chunk)return position;
+    const cell=this.game.level.cellSize,wallRadius=radius+.11;
     let x=position.x,z=position.z;
-    if(c.mask&8&&x-ox<radius)x=ox+radius;
-    if(c.mask&2&&ox+cell-x<radius)x=ox+cell-radius;
-    if(c.mask&1&&z-oz<radius)z=oz+radius;
-    if(c.mask&4&&oz+cell-z<radius)z=oz+cell-radius;
+
+    for(let pass=0;pass<2;pass++){
+      const baseX=Math.floor((x-chunk.originX)/cell);
+      const baseZ=Math.floor((z-chunk.originZ)/cell);
+      for(let iz=baseZ-1;iz<=baseZ+1;iz++)for(let ix=baseX-1;ix<=baseX+1;ix++){
+        if(ix<0||iz<0||ix>=chunk.gridSize()||iz>=chunk.gridSize())continue;
+        const mask=chunk.walls[chunk.index(ix,iz)];
+        const minX=chunk.originX+ix*cell,maxX=minX+cell;
+        const minZ=chunk.originZ+iz*cell,maxZ=minZ+cell;
+
+        const testWall=(x1,z1,x2,z2,nx,nz,closed)=>{
+          if(!closed)return;
+          const sx=x2-x1,sz=z2-z1,lenSq=sx*sx+sz*sz||1;
+          const t=Math.max(0,Math.min(1,((x-x1)*sx+(z-z1)*sz)/lenSq));
+          const qx=x1+sx*t,qz=z1+sz*t;
+          let dx=x-qx,dz=z-qz,dist=Math.hypot(dx,dz);
+          if(dist<wallRadius){
+            if(dist<.0001){dx=nx;dz=nz;dist=1}
+            const push=wallRadius-dist;
+            x+=dx/dist*push;z+=dz/dist*push;
+          }
+        };
+
+        testWall(minX,minZ,maxX,minZ,0,-1,(mask&1)!==0);
+        testWall(maxX,minZ,maxX,maxZ,1,0,(mask&2)!==0);
+        testWall(minX,maxZ,maxX,maxZ,0,1,(mask&4)!==0);
+        testWall(minX,minZ,minX,maxZ,-1,0,(mask&8)!==0);
+      }
+    }
     return {x,z};
   }
   hazardAt(x,z){
@@ -680,14 +734,13 @@ class WorldStreamer{
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
-      if(!c.group.visible&&Math.hypot(c.bounds.center.x-x,c.bounds.center.z-z)>60)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d<110)out.push({light,d});
+        if(d<200)out.push({light,d});
       }
     }
     out.sort((a,b)=>a.d-b.d);
-    return out;
+    return out.slice(0,this.game.localLights?.length||8);
   }
   entitySpawns(){const out=[];for(const c of this.chunks.values())if(c.entitySpawn)out.push(c);return out}
 }
