@@ -93,6 +93,10 @@ export class AudioDirector{
     this.volume=clamp(Number(v));localStorage.setItem("br.volume",this.volume);
     if(this.master)this.master.gain.setTargetAtTime(this.volume,this.ctx.currentTime,.04);
   }
+  unlockFromGesture(){
+    if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
+    if(this.ctx?.state==="suspended")this.ctx.resume().catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
+  }
   async resume(){await this.init()}
   connectFx(node,send=.3,delay=.18){
     node.connect(this.master);
