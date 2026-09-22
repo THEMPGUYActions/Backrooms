@@ -8,16 +8,16 @@ export const LEVELS = {
     next: "1",
     theme: {
       wall: 0xbca349,
-      wallRough: 0.82,
-      floor: 0x6d5d35,
-      ceiling: 0x8e7f58,
+      wallRough: 0.88,
+      floor: 0x655539,
+      ceiling: 0x9f967c,
       fog: 0x17140d,
       accent: 0xffe992,
       light: 0xffebae,
-      ambient: 0x6c5f42
+      ambient: 0x57513d
     },
     cellSize: 5,
-    wallHeight: 3.35,
+    wallHeight: 2.95,
     darkness: 0.08,
     holeChance: 0.010,
     pipeChance: 0,

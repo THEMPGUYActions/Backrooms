@@ -31,37 +31,50 @@ class Chunk{
   }
   index(x,z){return z*CELLS+x}
   buildMaze(){
-    this.walls.fill(15);
-    const visited=new Uint8Array(CELLS*CELLS),stack=[[8,8]];
-    visited[this.index(8,8)]=1;
-    const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
     const rng=new RNG((Math.imul(this.cx,73856093)^Math.imul(this.cz,19349663)^this.game.seed)|0);
-    while(stack.length){
-      const [x,z]=stack[stack.length-1],options=[];
-      for(const [dx,dz,b,ob] of dirs){
-        const nx=x+dx,nz=z+dz;
-        if(nx>=0&&nx<CELLS&&nz>=0&&nz<CELLS&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob]);
-      }
-      if(!options.length){stack.pop();continue}
-      const [nx,nz,b,ob]=rng.pick(options);
-      this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
-      visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
-    }
-    const loopChance=this.game.level.id==="0"?.24:this.game.level.id==="1"?.12:.07;
-    for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
-      const i=this.index(x,z);
-      if(x<CELLS-1&&rng.next()<loopChance){this.walls[i]&=~2;this.walls[this.index(x+1,z)]&=~8}
-      if(z<CELLS-1&&rng.next()<loopChance*.82){this.walls[i]&=~4;this.walls[this.index(x,z+1)]&=~1}
-    }
     if(this.game.level.id==="0"){
-      for(let z=3;z<13;z+=5)for(let x=3;x<13;x+=5){
-        if(rng.next()<.58){
-          this.walls[this.index(x,z)]&=~(2|4);
-          if(x>0)this.walls[this.index(x-1,z)]&=~2;
-          if(z>0)this.walls[this.index(x,z-1)]&=~4;
-          if(x<CELLS-1)this.walls[this.index(x+1,z)]&=~8;
-          if(z<CELLS-1)this.walls[this.index(x,z+1)]&=~1;
+      this.walls.fill(0);
+      for(let z=0;z<CELLS;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(CELLS-1,z)]|=2}
+      for(let x=0;x<CELLS;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,CELLS-1)]|=4}
+      for(const bx of [3,7,11]){
+        for(let z=0;z<CELLS;z++){this.walls[this.index(bx,z)]|=2;this.walls[this.index(bx+1,z)]|=8}
+        const gap=rng.int(0,3)*4+rng.int(1,2);
+        for(let z=gap;z<Math.min(gap+2,CELLS);z++){this.walls[this.index(bx,z)]&=~2;this.walls[this.index(bx+1,z)]&=~8}
+      }
+      for(const bz of [3,7,11]){
+        for(let x=0;x<CELLS;x++){this.walls[this.index(x,bz)]|=4;this.walls[this.index(x,bz+1)]|=1}
+        const gap=rng.int(0,3)*4+rng.int(1,2);
+        for(let x=gap;x<Math.min(gap+2,CELLS);x++){this.walls[this.index(x,bz)]&=~4;this.walls[this.index(x,bz+1)]&=~1}
+      }
+      for(let i=0;i<10;i++){
+        const horizontal=rng.next()<.5,x=rng.int(1,14),z=rng.int(1,14),length=rng.next()<.7?1:2;
+        if(horizontal){
+          for(let dx=0;dx<length&&x+dx<CELLS-1;dx++){this.walls[this.index(x+dx,z)]|=2;this.walls[this.index(x+dx+1,z)]|=8}
+        }else{
+          for(let dz=0;dz<length&&z+dz<CELLS-1;dz++){this.walls[this.index(x,z+dz)]|=4;this.walls[this.index(x,z+dz+1)]|=1}
         }
+      }
+    }else{
+      this.walls.fill(15);
+      const visited=new Uint8Array(CELLS*CELLS),stack=[[8,8]];
+      visited[this.index(8,8)]=1;
+      const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
+      while(stack.length){
+        const [x,z]=stack[stack.length-1],options=[];
+        for(const [dx,dz,b,ob] of dirs){
+          const nx=x+dx,nz=z+dz;
+          if(nx>=0&&nx<CELLS&&nz>=0&&nz<CELLS&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob]);
+        }
+        if(!options.length){stack.pop();continue}
+        const [nx,nz,b,ob]=rng.pick(options);
+        this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
+        visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
+      }
+      const loopChance=this.game.level.id==="1"?.12:.07;
+      for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
+        const i=this.index(x,z);
+        if(x<CELLS-1&&rng.next()<loopChance){this.walls[i]&=~2;this.walls[this.index(x+1,z)]&=~8}
+        if(z<CELLS-1&&rng.next()<loopChance*.82){this.walls[i]&=~4;this.walls[this.index(x,z+1)]&=~1}
       }
     }
     for(let x=0;x<CELLS;x++){
@@ -87,7 +100,7 @@ class Chunk{
   seedKey(){return (this.cx*73856093)^(this.cz*19349663)^this.game.seed}
   buildGeometry(){
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
-    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.11),vGeom=new THREE.BoxGeometry(.11,level.wallHeight,cell);
+    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.16),vGeom=new THREE.BoxGeometry(.16,level.wallHeight,cell);
     const hData=[],vData=[],rngBase=new RNG(this.seedKey());
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
@@ -96,15 +109,17 @@ class Chunk{
       if(mask&4)pushMat(hData,px,level.wallHeight/2,pz+cell/2);
       if(mask&8)pushMat(vData,px-cell/2,level.wallHeight/2,pz);
       if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);
-      const fixtureChance=level.id==="0"?.24:.13;
-      if(rngBase.next()<fixtureChance){
+      const fixtureChance=level.id==="0" ? (x%2===0&&z%2===0&&rngBase.next()<.92) : rngBase.next()<(level.id==="1"?.18:.12);
+      if(fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
-        const fixture=box(g,new THREE.BoxGeometry(1.35,.07,.18),fixtureMat,px,level.wallHeight-.05,pz);
-        fixture.userData.light=true;this.fixtures.push(fixture);
-        if(((x*13+z*7)%127===0)||level.id==="2"&&((x+z)%53===0)){
+        box(g,new THREE.BoxGeometry(1.55,.07,.62),lib.metal,px,level.wallHeight-.035,pz);
+        const fixture=box(g,new THREE.BoxGeometry(1.28,.025,.42),fixtureMat,px,level.wallHeight-.085,pz);
+        fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
+        if(((x/2+z/2)%4===0)||level.id==="2"&&((x+z)%7===0)){
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const l=new THREE.PointLight(lightColor,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
-          l.position.set(px,level.wallHeight-.2,pz);g.add(l);this.fixtures.push(l);
+          const intensity=level.id==="0"?2.15:1.8;
+          const l=new THREE.PointLight(lightColor,intensity,level.id==="2"?11:15,1.45);
+          l.position.set(px,level.wallHeight-.22,pz);l.userData.baseIntensity=intensity;g.add(l);this.fixtures.push(l);
         }
       }
       const propRng=new RNG(this.seedKey()^Math.imul(x,92821)^Math.imul(z,31337));
@@ -123,6 +138,15 @@ class Chunk{
     hData.forEach((m,i)=>hm.setMatrixAt(i,m));hm.count=hData.length;hm.frustumCulled=true;g.add(hm);
     const vm=new THREE.InstancedMesh(vGeom,lib.wall,Math.max(1,vData.length));vm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     vData.forEach((m,i)=>vm.setMatrixAt(i,m));vm.count=vData.length;vm.frustumCulled=true;g.add(vm);
+    if(level.id==="0"){
+      const columnGeom=new THREE.BoxGeometry(.62,level.wallHeight,.62);
+      const columnData=[],columnPoints=[[1.55,1.55],[5.55,5.55],[9.55,13.55],[13.55,9.55]];
+      for(const [cx,cz] of columnPoints){
+        const m=new THREE.Matrix4();m.makeTranslation(this.originX+cx*cell,level.wallHeight/2,this.originZ+cz*cell);columnData.push(m);
+      }
+      const columns=new THREE.InstancedMesh(columnGeom,lib.wall,columnData.length);
+      columns.instanceMatrix.setUsage(THREE.StaticDrawUsage);columnData.forEach((m,i)=>columns.setMatrixAt(i,m));columns.frustumCulled=true;g.add(columns);
+    }
     for(const hz of this.hazards){
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.33,16),lib.dark);
       p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.009,this.originZ+hz.z*cell+cell/2);g.add(p);
@@ -171,8 +195,8 @@ class Chunk{
     this.flickerTimer-=dt;
     if(this.flickerTimer<=0&&this.fixtures.length){
       const f=this.fixtures[Math.floor(Math.random()*this.fixtures.length)];
-      if(f.material?.emissive)f.material.emissiveIntensity=Math.random()<.35?.15:3;
-      if(f.isLight)f.intensity=Math.random()<.35?0.04:(this.game.level.id==="0"?.58:.42);
+      if(f.material?.emissive)f.material.emissiveIntensity=Math.random()<.35?.12:(f.userData.baseEmissive??3);
+      if(f.isLight)f.intensity=Math.random()<.35?.035:(f.userData.baseIntensity??.5);
       this.game.audio.flicker();
       this.flickerTimer=2.5+Math.random()*7;
     }
@@ -204,7 +228,7 @@ class WorldStreamer{
     if(this.library)disposeLibrary(this.library);
 
     this.size=this.game.level.cellSize*CELLS;
-    this.surfaceSize=this.size*4;
+    this.surfaceSize=1024;
     this.library=makeLibrary(this.game.level);
 
     this.floorSurface=new THREE.Mesh(
@@ -251,7 +275,7 @@ class WorldStreamer{
         texture.wrapS=THREE.RepeatWrapping;
         texture.wrapT=THREE.RepeatWrapping;
         texture.repeat.set(repeat,repeat);
-        texture.offset.set((px-this.surfaceSize/2)/tileWorld,(pz-this.surfaceSize/2)/tileWorld);
+        texture.offset.set(0,0);
       }
     }
   }
@@ -277,13 +301,6 @@ class WorldStreamer{
   update(dt){
     const p=this.game.player.position;
     this.ensureAround(p.x,p.z);
-    if(this.floorSurface&&this.ceilingSurface){
-      this.floorSurface.position.x=p.x;
-      this.floorSurface.position.z=p.z;
-      this.ceilingSurface.position.x=p.x;
-      this.ceilingSurface.position.z=p.z;
-      this.updateSurfaceTiling(p.x,p.z);
-    }
     for(const c of this.chunks.values())c.update(dt)
   }
   collision(position,radius){
@@ -311,9 +328,9 @@ class WorldStreamer{
 class Player{
   constructor(game){
     this.game=game;this.position=new THREE.Vector3(0,1.62,0);this.yaw=0;this.pitch=0;
-    this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;this.flashlight=true;this.eyeY=1.62;this.bob=0;this.shake=0;
+    this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;this.flashlight=true;this.eyeY=1.62;this.bob=0;this.shake=0;this.cameraFov=72;
   }
-  reset(){this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.health=this.stamina=this.hydration=this.sanity=100;this.flashlight=this.game.startFlash;this.game.camera.rotation.set(0,0,0,"YXZ")}
+  reset(){this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.bob=0;this.shake=0;this.cameraFov=72;this.health=this.stamina=this.hydration=this.sanity=100;this.flashlight=this.game.startFlash;this.game.camera.fov=72;this.game.camera.updateProjectionMatrix();this.game.camera.rotation.set(0,0,0,"YXZ")}
   update(dt){
     const input=this.game.input,look=input.consumeLook();
     this.yaw-=look.x*.0021;this.pitch-=look.y*.0021;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
@@ -332,8 +349,19 @@ class Player{
     const moving=Math.hypot(this.position.x-oldX,this.position.z-oldZ)>.01;
     if(moving){this.bob+=dt*(run?13:8);if(this.game.settings.shake)this.shake=Math.min(.04,this.shake+dt*.12)}else this.shake=Math.max(0,this.shake-dt*.22);
     const bob=Math.sin(this.bob)*(.018*(run?1.5:.7))*(moving?1:0);
-    this.game.camera.position.copy(this.position);this.game.camera.position.y=this.eyeY+bob;
-    this.game.camera.rotation.set(this.pitch,this.yaw,0,"YXZ");
+    const fear=1-this.sanity/100;
+    const bobY=(run?.055:.036)*Math.sin(this.bob*2);
+    const swayX=(run?.025:.015)*Math.sin(this.bob);
+    const breathing=Math.sin(this.game.gameTime*1.35)*.007;
+    const roll=Math.sin(this.bob)*(.0032+(run?.004:.0012))+Math.sin(this.game.gameTime*1.7)*.001*fear;
+    const shakeX=this.shake*Math.sin(this.game.gameTime*38)*.55;
+    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.35;
+    this.game.camera.position.copy(this.position);this.game.camera.position.addScaledVector(right,swayX+shakeX);
+    this.game.camera.position.y=this.eyeY+bobY+breathing+shakeY;
+    const targetFov=run?75:72;
+    this.cameraFov+=(targetFov-this.cameraFov)*Math.min(1,dt*8);
+    if(Math.abs(this.game.camera.fov-this.cameraFov)>.01){this.game.camera.fov=this.cameraFov;this.game.camera.updateProjectionMatrix()}
+    this.game.camera.rotation.set(this.pitch,this.yaw,roll,"YXZ");
     this.game.flash.position.copy(this.game.camera.position);
     this.game.flashTarget.position.copy(this.game.camera.position).add(new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion));
     this.game.audio.update(dt,moving,run);
@@ -374,7 +402,7 @@ class EntityManager{
       if(d>50){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
       if(e.type==="hound"){
         const forward=new THREE.Vector3(-Math.sin(p.yaw),0,-Math.cos(p.yaw)),to=new THREE.Vector3(dx,0,dz).normalize(),looking=forward.dot(to)<-.48;
-        if(d<13&&!looking&&e.state!=="chase"){e.state="chase";this.game.audio.scare();e.cool=2.7}
+        if(d<13&&!looking&&e.state!=="chase"){e.state="chase";this.game.audio.scare();this.game.triggerFear(.45);e.cool=2.7}
         if(d<10&&looking)e.state="intimidated";
         if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
@@ -414,21 +442,22 @@ export class BackroomsGame{
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
-    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,150);this.camera.rotation.order="YXZ";
+    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,touchDevice?0.85:1.05));this.renderer.setSize(innerWidth,innerHeight);
-    this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
+    this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.9;
     const room=new RoomEnvironment();
     const pmrem=new THREE.PMREMGenerator(this.renderer);
     this.environmentTarget=pmrem.fromScene(room,0.04);
     pmrem.dispose();
     room.dispose();
     this.scene.environment=this.environmentTarget.texture;
-    this.scene.environmentIntensity=.42;
+    this.scene.environmentIntensity=.24;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.20);this.scene.add(this.ambient);
-    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffee,18,28,.48,.75,1.3);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
+    this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.12);this.scene.add(this.ambient);
+    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffe8,22,30,.46,.82,1.5);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
+    this.horror=0;this.scareTimer=18+Math.random()*20;
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
   }
   mount(){
@@ -479,21 +508,32 @@ export class BackroomsGame{
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
-  die(copy){this.dead=true;this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
+  die(copy){this.dead=true;this.paused=true;this.running=false;this.triggerFear(1);document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
   togglePause(force){
     if(!this.running||this.dead)return;this.paused=force!==undefined?force:!this.paused;document.getElementById("pause").classList.toggle("hidden",!this.paused);
     if(this.paused)document.exitPointerLock?.();else{this.audio.resume();this.renderer.domElement.requestPointerLock?.()}
   }
   toggleFlashlight(){this.player.flashlight=!this.player.flashlight;this.audio.click();this.toast(this.player.flashlight?"Flashlight on":"Flashlight off",.9)}
   isDark(){if(this.level.id==="2")return true;return !this.player.flashlight}
+  triggerFear(amount=.25){this.horror=Math.max(this.horror,Math.max(0,Math.min(1,amount)));this.player.shake=Math.min(.055,this.player.shake+amount*.07)}
+  updateHorror(dt){
+    this.horror=Math.max(0,this.horror-dt*.18);
+    document.documentElement.style.setProperty("--fear",this.horror.toFixed(3));
+    document.body.classList.toggle("fear",this.horror>.08);
+    if(!this.running||this.paused||this.dead||this.scareTimer>0)return;
+    this.scareTimer=18+Math.random()*35;
+    if(Math.random()<(this.level.id==="0"?.58:.76)){this.audio.distantKnock((Math.random()<.5?-1:1)*(.85+Math.random()*1.1));this.triggerFear(this.level.id==="2"?.32:.18)}
+    if(Math.random()<.28){this.audio.ambientSting(.08+Math.random()*.08);this.triggerFear(.12)}
+  }
   toast(text,duration=2){
     const el=document.getElementById("toast");el.textContent=text;el.classList.remove("hidden");clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.add("hidden"),duration*1000)
   }
   update(dt){
-    this.gameTime+=dt;this.argTimer-=dt;
+    this.gameTime+=dt;this.argTimer-=dt;this.scareTimer-=dt;
     if(this.introReveal<1)this.introReveal=Math.min(1,this.introReveal+dt/2.7);
     this.player.update(dt);this.world.update(dt);this.entityManager.update(dt);this.quality.update(dt);
     this.updateArgLayer(dt);
+    this.updateHorror(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
     document.getElementById("coords").textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
     document.getElementById("health-bar").style.width=Math.max(0,this.player.health)+"%";
