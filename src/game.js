@@ -72,7 +72,7 @@ class Chunk{
         if(vertical){
           const cut=rng.int(x0+3,x1-3),gapStart=rng.int(z0+1,z1-1),gapLength=rng.next()<.72?1:2;
           for(let z=z0;z<=z1;z++)if(z<gapStart||z>=gapStart+gapLength)this.setEdge(cut,z,"east",false);
-          split(x0,z0,cut,x1?z1:z1,depth+1);
+          split(x0,z0,cut,z1,depth+1);
           split(cut+1,z0,x1,z1,depth+1);
         }else{
           const cut=rng.int(z0+3,z1-3),gapStart=rng.int(x0+1,x1-1),gapLength=rng.next()<.72?1:2;
@@ -558,6 +558,14 @@ class EntityManager{
         box(group,new THREE.CapsuleGeometry(.12,.62,5,8),mat,.3,.45,-.18,0,-.12,-.1);
         const eye=new THREE.MeshStandardMaterial({color:0xffe7a8,emissive:0xffd36a,emissiveIntensity:5});
         box(group,new THREE.SphereGeometry(.055,8,8),eye,-.12,.86,-.42);box(group,new THREE.SphereGeometry(.055,8,8),eye,.12,.86,-.42);
+      }else if(type==="skinwalker"){
+        const mat=new THREE.MeshStandardMaterial({color:0x010101,roughness:1,metalness:0});
+        box(group,new THREE.CapsuleGeometry(.22,.98,7,10),mat,0,1.02,0);
+        box(group,new THREE.SphereGeometry(.24,12,8),mat,0,1.8,0);
+        box(group,new THREE.CapsuleGeometry(.075,.92,5,8),mat,-.22,.55,0,0,0,-.035);
+        box(group,new THREE.CapsuleGeometry(.075,.92,5,8),mat,.22,.55,0,0,0,.035);
+        box(group,new THREE.CapsuleGeometry(.055,.88,5,8),mat,-.36,1.08,0,0,0,.08);
+        box(group,new THREE.CapsuleGeometry(.055,.88,5,8),mat,.36,1.08,0,0,0,-.08);
       }else{
         const mat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1});
         box(group,new THREE.SphereGeometry(.72,16,10),mat,0,1.4,0);
@@ -566,7 +574,7 @@ class EntityManager{
         box(group,new THREE.TorusGeometry(.28,.055,6,20,Math.PI),eyeMat,0,1.27,-.67,0,Math.PI,0);
       }
       group.scale.setScalar(.9+rng.next()*.4);this.game.scene.add(group);this.entities.push({key,type,group,state:"idle",cool:0});
-      this.game.toast(type==="hound"?"Something is moving nearby.":"There is a face in the dark.",2.4);
+      if(type==="skinwalker")this.game.triggerFear(.06);
     }
   }
   update(dt){
@@ -581,6 +589,19 @@ class EntityManager{
         if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
         e.group.lookAt(p.position.x,1,p.position.z);if(d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
+      }else if(e.type==="skinwalker"){
+        const forward=new THREE.Vector3(-Math.sin(p.yaw),0,-Math.cos(p.yaw)),to=new THREE.Vector3(dx,0,dz).normalize();
+        const looking=forward.dot(to)<-.72;
+        if(looking&&d<25){
+          e.state="frozen";
+        }else{
+          e.state="stalk";
+          if(d<32){const speed=e.state==="stalk"?.58:0;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
+        }
+        if(p.flashlight&&d<16){e.group.position.x-=dx/d*.9*dt;e.group.position.z-=dz/d*.9*dt}
+        if(d<2.0){p.health-=dt*30;this.game.audio.hurt()}
+        if(d<12)this.game.triggerFear(.24*dt);
+        e.group.lookAt(p.position.x,1.2,p.position.z);
       }else{
         const lightOn=p.flashlight;if(lightOn&&d<18){e.group.position.x-=dx/d*dt*2.2;e.group.position.z-=dz/d*dt*2.2}
         if(!lightOn&&d<15){e.group.position.x+=dx/d*dt*1.4;e.group.position.z+=dz/d*dt*1.4}
