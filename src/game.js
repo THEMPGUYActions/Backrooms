@@ -109,12 +109,12 @@ class Chunk{
       }
       const propRng=new RNG(this.seedKey()^Math.imul(x,92821)^Math.imul(z,31337));
       makePropSet(g,level,lib,()=>propRng.next(),px,pz);
-      if(level.id==="1"&&propRng.next()<.055){
+      if(level.id==="1"&&propRng.next()<.035){
         const puddle=new THREE.Mesh(new THREE.CircleGeometry(cell*(.18+propRng.next()*.2),18),lib.water);
         puddle.rotation.x=-Math.PI/2;puddle.scale.y=.55;
         puddle.position.set(px+(propRng.next()-.5)*cell*.65,.012,pz+(propRng.next()-.5)*cell*.65);g.add(puddle);
       }
-      if(level.id==="2"&&propRng.next()<.12){
+      if(level.id==="2"&&propRng.next()<.06){
         const cable=new THREE.Mesh(new THREE.CylinderGeometry(.026,.026,cell*(.75+propRng.next()*.4),6),lib.cable);
         cable.rotation.z=Math.PI/2;cable.position.set(px,level.wallHeight-.42,pz);g.add(cable);
       }
