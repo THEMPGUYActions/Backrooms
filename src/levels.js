@@ -11,10 +11,10 @@ export const LEVELS = {
       wallRough: 0.88,
       floor: 0x655539,
       ceiling: 0x9f967c,
-      fog: 0x17140d,
+      fog: 0x000000,
       accent: 0xffe992,
-      light: 0xffebae,
-      ambient: 0x57513d
+      light: 0xffd34d,
+      ambient: 0x17130a
     },
     cellSize: 5,
     wallHeight: 2.95,
@@ -39,7 +39,7 @@ export const LEVELS = {
       wallRough: 0.92,
       floor: 0x45443f,
       ceiling: 0x343632,
-      fog: 0x080a0b,
+      fog: 0x000000,
       accent: 0x8fffb0,
       light: 0xe3ead9,
       ambient: 0x39433f
@@ -67,7 +67,7 @@ export const LEVELS = {
       wallRough: 0.96,
       floor: 0x2f302f,
       ceiling: 0x252625,
-      fog: 0x050607,
+      fog: 0x000000,
       accent: 0x8f6cff,
       light: 0xb9b0ff,
       ambient: 0x2e3340
