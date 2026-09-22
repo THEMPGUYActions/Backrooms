@@ -1378,3 +1378,177 @@ body::after{
   .admin-form .admin-action{grid-column:1/-1}
   .admin-bottom>span:nth-child(2){display:none}
 }
+
+
+/* Cross-browser mobile and intro presentation */
+html{
+  min-height:100%;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+body{
+  min-height:100%;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+}
+button,.audio-gate{
+  -webkit-appearance:none;
+  appearance:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+.intro-screen{
+  width:100%;
+  width:100vw;
+  height:100%;
+  height:100dvh;
+  min-height:100svh;
+  -webkit-user-select:none;
+  user-select:none;
+}
+.intro-page{
+  width:100%;
+  width:100vw;
+  height:100%;
+  height:100dvh;
+  min-height:100svh;
+}
+.movie-title{
+  color:#e6c866;
+  text-shadow:0 0 28px rgba(230,200,102,.08);
+}
+.brand-logo{
+  width:clamp(92px,18vw,168px);
+  max-width:42vw;
+}
+.audio-gate{
+  position:relative;
+  z-index:2;
+  min-width:min(88vw,620px);
+  min-height:44px;
+  padding:14px 20px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.audio-prompt-mobile,.control-mobile{display:none}
+.audio-gate span{display:block}
+.control-row .control-pc,.control-row .control-mobile{
+  align-items:center;
+  gap:8px;
+}
+@media (pointer:coarse),(hover:none),(max-width:720px){
+  .audio-prompt-pc,.control-pc{display:none!important}
+  .audio-prompt-mobile,.control-mobile{display:inline-flex}
+  .audio-gate{
+    min-height:52px;
+    width:min(92vw,620px);
+    padding:16px 18px;
+    font-size:clamp(13px,4vw,17px);
+  }
+  .title-stack{width:100%;padding:0 20px}
+  .movie-title{
+    max-width:94vw;
+    font-size:clamp(38px,12vw,72px);
+    line-height:.98;
+  }
+  .movie-present{
+    margin-top:14px;
+    font-size:10px;
+    letter-spacing:.22em;
+  }
+  .brand-logo{
+    width:clamp(100px,30vw,154px);
+    max-width:45vw;
+  }
+  .credits-stack{
+    width:90vw;
+    gap:22px;
+    padding:0 12px;
+  }
+  .credits-line{
+    max-width:90vw;
+    font-size:9px;
+    letter-spacing:.13em;
+  }
+  .credits-line span{
+    font-size:8px;
+    letter-spacing:.1em;
+  }
+  .credits-kicker{
+    font-size:8px;
+    letter-spacing:.2em;
+  }
+  .touch-zone{
+    left:max(14px,env(safe-area-inset-left));
+    bottom:max(18px,env(safe-area-inset-bottom));
+    width:132px;
+    height:132px;
+  }
+  #stick-knob{width:58px;height:58px}
+  .touch-button{
+    right:max(14px,env(safe-area-inset-right));
+    bottom:max(18px,env(safe-area-inset-bottom));
+    width:62px;
+    height:62px;
+    min-width:62px;
+    min-height:62px;
+    touch-action:manipulation;
+  }
+  .touch-button.run{right:max(86px,calc(14px + env(safe-area-inset-right) + 72px))}
+  .look-zone{
+    width:68%;
+    height:78%;
+    touch-action:none;
+  }
+  .hud-rec{left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right))}
+  .hud-location{left:max(12px,env(safe-area-inset-left));}
+  .hud-bottom{
+    left:max(12px,env(safe-area-inset-left));
+    right:max(12px,env(safe-area-inset-right));
+    bottom:max(10px,env(safe-area-inset-bottom));
+  }
+  .hud-objective{
+    max-width:48vw;
+    overflow-wrap:anywhere;
+  }
+  .panel{
+    width:calc(100vw - 24px);
+    max-height:calc(100dvh - 24px);
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:22px 18px;
+  }
+  .screen{
+    padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  }
+  .boot-grid{grid-template-columns:1fr}
+  .pause-columns{grid-template-columns:1fr!important}
+  .pause-bottom{
+    flex-wrap:wrap;
+  }
+  .pause-button{
+    min-height:48px;
+    touch-action:manipulation;
+  }
+  select,input,button{
+    min-height:44px;
+  }
+}
+@media (max-width:380px){
+  .touch-zone{width:118px;height:118px}
+  #stick-knob{width:52px;height:52px}
+  .touch-button{width:56px;height:56px;min-width:56px;min-height:56px}
+  .touch-button.run{right:78px}
+  .hud-micro{grid-template-columns:auto 42px auto 42px auto;gap:4px;font-size:7px}
+  .movie-present{letter-spacing:.16em}
+}
+@media (prefers-reduced-motion:reduce){
+  .intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+  }
+}

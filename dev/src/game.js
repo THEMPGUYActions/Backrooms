@@ -1345,23 +1345,36 @@ export class BackroomsGame{
       if(event?.isTrusted===false||!this.introActive||this.audioGateBusy)return;
       this.audioGateBusy=true;
       try{
+        // Start/resume the AudioContext directly inside the user gesture.
+        // This is important on Safari and iOS WebKit autoplay restrictions.
+        this.audio.unlockFromGesture();
         await this.audio.init();
-        await this.audio.testUnlock();
+        if(!this.audio.isEnabled())await this.audio.testUnlock();
       }catch(error){
         console.warn("[Backrooms] Audio unlock failed:",error);
       }
-      this.audio.clickToEnter();
+      if(this.audio.isEnabled())this.audio.clickToEnter();
       if(this.mounted)this.beginIntroReveal();
       else this.pendingStart=true;
     };
 
     const audioPage=document.querySelector(".intro-audio-page");
-    audioPage?.addEventListener("pointerdown",event=>{
+    const boot=document.getElementById("boot");
+    const isAudioPageVisible=()=>{
+      if(!audioPage)return false;
+      const style=getComputedStyle(audioPage);
+      return style.visibility!=="hidden"&&Number.parseFloat(style.opacity||"0")>.5;
+    };
+    const handleAudioGesture=event=>{
+      if(!isAudioPageVisible())return;
       event.preventDefault();
+      event.stopPropagation();
       begin(event);
-    });
-    audioPage?.addEventListener("click",event=>{
-      if(event.detail===0)begin(event);
+    };
+    boot?.addEventListener("pointerdown",handleAudioGesture,{passive:false});
+    boot?.addEventListener("touchstart",handleAudioGesture,{passive:false});
+    boot?.addEventListener("click",event=>{
+      if(isAudioPageVisible()&&event.detail===0)handleAudioGesture(event);
     });
     const gate=$("audio-gate");
     gate?.addEventListener("keydown",event=>{
