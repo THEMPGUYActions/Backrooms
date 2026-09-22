@@ -220,7 +220,11 @@ export function makeLibrary(level){
     light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
     orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2}),
     battery:new THREE.MeshStandardMaterial({color:0x1c1d1b,roughness:.55,metalness:.35}),
-    batteryLabel:new THREE.MeshStandardMaterial({color:0xc9b85f,roughness:.45,metalness:.15,emissive:0x6f5b1c,emissiveIntensity:.45})
+    batteryLabel:new THREE.MeshStandardMaterial({color:0xc9b85f,roughness:.45,metalness:.15,emissive:0x6f5b1c,emissiveIntensity:.45}),
+    windowDark:new THREE.MeshStandardMaterial({color:0x121412,roughness:.9,metalness:.05}),
+    officeWood:new THREE.MeshStandardMaterial({color:0x6a6253,roughness:.86,metalness:0}),
+    officePlastic:new THREE.MeshStandardMaterial({color:0x343634,roughness:.72,metalness:.12}),
+    indicator:new THREE.MeshStandardMaterial({color:0xff8a3c,roughness:.35,metalness:.1,emissive:0xff5d14,emissiveIntensity:2.2})
   };
 }
 

@@ -834,6 +834,7 @@ class EntityManager{
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
       const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91);
       const grid=this.game.level.gridSize||CELLS,minSpawn=1,maxSpawn=Math.max(1,grid-2);const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
+      if(type==="none")continue;
       const group=new THREE.Group();group.position.set(x,0,z);
       if(type==="hound"){
         const mat=new THREE.MeshStandardMaterial({color:0x050505,roughness:.95,metalness:.05});
