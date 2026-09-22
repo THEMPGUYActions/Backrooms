@@ -1434,9 +1434,9 @@ export class BackroomsGame{
     this.vhsPass.uniforms.fear.value=0;
     document.getElementById("hud")?.classList.remove("hidden");
     const mobileControls=document.getElementById("mobile-controls");
-    const touchDevice=navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches||innerWidth<=900;
-    mobileControls?.classList.toggle("hidden",!touchDevice);
-    mobileControls?.setAttribute("aria-hidden",touchDevice?"false":"true");
+    mobileControls?.classList.add("hidden");
+    mobileControls?.classList.remove("mobile-controls-ready");
+    mobileControls?.setAttribute("aria-hidden","true");
     const boot=document.getElementById("boot");
     const audioPage=document.querySelector(".intro-audio-page");
     if(audioPage)audioPage.style.pointerEvents="none";
@@ -1464,7 +1464,17 @@ export class BackroomsGame{
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
     this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();
     this.running=true;this.paused=false;this.dead=false;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
-    document.getElementById("mobile-controls").classList.toggle("hidden",!this.isTouchLayout());this.toast(this.level.objective,2.4);
+    const mobileControls=document.getElementById("mobile-controls");
+    if(this.isTouchLayout()){
+      mobileControls?.classList.remove("hidden");
+      mobileControls?.setAttribute("aria-hidden","false");
+      requestAnimationFrame(()=>mobileControls?.classList.add("mobile-controls-ready"));
+    }else{
+      mobileControls?.classList.add("hidden");
+      mobileControls?.classList.remove("mobile-controls-ready");
+      mobileControls?.setAttribute("aria-hidden","true");
+    }
+    this.toast(this.level.objective,2.4);
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
@@ -1636,7 +1646,12 @@ export class BackroomsGame{
       this.introPlaying=false;
       this.running=true;this.paused=false;this.dead=false;
       document.getElementById("hud").classList.remove("hidden");
-      document.getElementById("mobile-controls").classList.toggle("hidden",!this.isTouchLayout());
+      const mobileControls=document.getElementById("mobile-controls");
+      if(this.isTouchLayout()){
+        mobileControls?.classList.remove("hidden");
+        mobileControls?.setAttribute("aria-hidden","false");
+        requestAnimationFrame(()=>mobileControls?.classList.add("mobile-controls-ready"));
+      }
       document.getElementById("boot").classList.add("fade-out");
         this.vhsPass.uniforms.intensity.value=.72;
       this.vhsPass.uniforms.tracking.value=.28;
