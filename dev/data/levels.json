@@ -1,0 +1,29 @@
+[
+  {
+    "id": "0",
+    "number": "LEVEL 0",
+    "name": "THRESHOLD",
+    "source": "https://backrooms-wiki.wikidot.com/level-0",
+    "license": "CC BY-SA 3.0",
+    "authors": "DivineAtlas, Robert Goerman, DrAkimoto; original concept credited on source page",
+    "adaptation": "Procedural maze, lighting, survival loop and visuals are original game adaptations by THEMPGUY."
+  },
+  {
+    "id": "1",
+    "number": "LEVEL 1",
+    "name": "HABITABLE ZONE",
+    "source": "https://backrooms-wiki.wikidot.com/level-1",
+    "license": "CC BY-SA 3.0",
+    "authors": "Praetor3005 and DivineAtlas; origin and earlier rewrites are credited on source page",
+    "adaptation": "Procedural halls, flickering, entity encounters and traversal mechanics are original game adaptations by THEMPGUY."
+  },
+  {
+    "id": "2",
+    "number": "LEVEL 2",
+    "name": "ABANDONED UTILITY HALLS",
+    "source": "https://backrooms-wiki.wikidot.com/level-2",
+    "license": "CC BY-SA 3.0",
+    "authors": "Current source page credits Greggita Mahayfaio and earlier contributors",
+    "adaptation": "Procedural utility corridors, machinery styling, blackout conditions and entity encounters are original game adaptations by THEMPGUY."
+  }
+]
