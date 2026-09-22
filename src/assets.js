@@ -167,7 +167,7 @@ export function disposeLibrary(library){
 
 export function makeLibrary(level){
   const ceiling=createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.88,scale:2,normalStrength:.24});
-  ceiling.side=THREE.DoubleSide;
+  ceiling.side=THREE.FrontSide;
   return {
     floor:createPBRMaterial({base:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:3.8,normalStrength:.35}),
@@ -189,7 +189,7 @@ export function box(parent,geometry,material,x,y,z,rx=0,ry=0,rz=0){
 }
 
 export function makePropSet(parent,level,library,rng,x,z){
-  if(rng()<.16 && level.id!=="0"){
+  if(rng()<.09 && level.id!=="0"){
     box(parent,new THREE.BoxGeometry(.8,.7,.8),library.crate,x,.35,z);
     box(parent,new THREE.BoxGeometry(.86,.06,.86),library.metal,x,.72,z);
   }
