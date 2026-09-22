@@ -12,7 +12,7 @@ export const SPACEPOTATO_LEVEL1_SOURCES = Object.freeze({
   fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png",
   wallTrim: LOCAL_SPB_ASSET_BASE + "wall_trim_texture.png",
   stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png",
-  shelf: LOCAL_SPB_ASSET_BASE + "double_sided_shelf.png"
+  shelf: LOCAL_SPB_ASSET_BASE + "
 });
 
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
@@ -194,8 +194,7 @@ export async function applySpacePotatoLevel1Assets(library,level,onProgress=()=>
     [library.level1Light,"map",SPACEPOTATO_LEVEL1_SOURCES.fluorescent,true,1,.18,"Fluorescent fixtures"],
     [library.trim,"map",SPACEPOTATO_LEVEL1_SOURCES.wallTrim,true,1,.12,"Wall trim"],
     [library.trimTop,"map",SPACEPOTATO_LEVEL1_SOURCES.wallTrim,true,1,.12,"Wall trim top"],
-    [library.stairs,"map",SPACEPOTATO_LEVEL1_SOURCES.stairs,true,1,.12,"Concrete stairs"],
-    [library.level1Shelf,"map",SPACEPOTATO_LEVEL1_SOURCES.shelf,true,1,.10,"Industrial shelf"]
+    [library.stairs,"map",SPACEPOTATO_LEVEL1_SOURCES.stairs,true,1,.12,"Concrete stairs"]
   ];
   let done=0;
   onProgress(0,"LOADING LEVEL 1 ASSETS","SpacePotato Found Footage materials");
@@ -239,7 +238,6 @@ export function makeLibrary(level){
     parkingLine:new THREE.MeshStandardMaterial({color:0xd1d0c5,roughness:.78,metalness:0}),
     warningLine:new THREE.MeshStandardMaterial({color:0xc7ac44,roughness:.76,metalness:0}),
     level1Light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.32,metalness:0,emissive:0xfff5d5,emissiveIntensity:2.4}),
-    level1Shelf:new THREE.MeshStandardMaterial({color:0x555752,roughness:.72,metalness:.18}),
     ceiling,
     metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.62,metalness:.78}),
     cable:new THREE.MeshStandardMaterial({color:0x171817,roughness:.79,metalness:.58}),
