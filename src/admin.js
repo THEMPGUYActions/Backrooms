@@ -152,6 +152,12 @@ export class BackroomsAdmin{
   }
 
   bind(){
+    window.addEventListener("keydown",event=>{
+      if(enabled&&event.code==="F2"&&!event.repeat){
+        event.preventDefault();
+        this.opened?this.close():this.open();
+      }
+    });
     this.root.querySelector("#admin-close")?.addEventListener("click",()=>this.close());
     this.root.querySelector("#admin-game")?.addEventListener("click",()=>this.close());
 
