@@ -21,8 +21,10 @@ The current game build includes:
 - Desktop pointer lock controls
 - Mobile joystick and touch-look controls
 - Flashlight with dynamic cone lighting
-- Procedural Web Audio ambience and effects
-- Footsteps, lighting faults, damage and exit audio
+- Procedural Web Audio ambience and effects with echo/reverb
+- Cinematic audio-gated intro and noclip reveal
+- Footsteps, lighting faults, damage, distant knocks and exit audio
+- ARG-style camera telemetry, signal faults and hidden messages
 - Health, stamina, hydration and sanity systems
 - Hazards and deaths
 - Data-driven level definitions
