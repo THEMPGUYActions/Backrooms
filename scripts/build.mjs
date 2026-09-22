@@ -22,7 +22,8 @@ const SPB_FILES = [
   {name:"pbr/crate/crate_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/crate/crate_color.png"},
   {name:"fluorescent_light.png",path:"src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png"},
   {name:"wall_trim_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png"},
-  {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"}
+  {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"},
+  {name:"double_sided_shelf.png",path:"src/main/resources/assets/spb-revamped/textures/block/double_sided_shelf.png"}
 ];
 
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
