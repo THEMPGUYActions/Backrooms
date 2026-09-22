@@ -77,3 +77,14 @@ Backrooms PBR texture pack by **methodical pixel**:
 https://opengameart.org/content/backrooms-pbr-texture-pack
 
 OpenGameArt lists this texture pack as **CC0**. The project uses its wallpaper, painted wall, carpet and ceiling tile PBR maps as external game assets. The source page also identifies the included maps as color, rough and normal textures.
+
+
+## OpenGameArt audio attribution
+
+The browser audio layer uses CC0 audio assets downloaded at build time from OpenGameArt:
+
+- **Footsteps** by **GboxMikeFozzy**: https://opengameart.org/content/footsteps-0
+- **Ambient horror** by **techiew**: https://opengameart.org/content/ambient-horror
+- **Electric Buzz** by **themightyglider**: https://opengameart.org/content/electric-buzz
+
+OpenGameArt lists these assets as CC0. The generated fallback effects remain original project code.

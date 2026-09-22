@@ -96,9 +96,9 @@ export async function applyOpenGameArtPBR(library,level){
     ? {wall:BACKROOMS_PBR_SOURCES.wallpaper,floor:BACKROOMS_PBR_SOURCES.carpet}
     : {wall:BACKROOMS_PBR_SOURCES.paintedWall,floor:BACKROOMS_PBR_SOURCES.carpet};
 
-  const wallRepeat=level.id==="0"?1.15:1.45;
-  const floorRepeat=level.id==="0"?3.4:3.0;
-  const ceilingRepeat=2.0;
+  const wallRepeat=level.id==="0"?2.4:3.0;
+  const floorRepeat=level.id==="0"?4.8:4.2;
+  const ceilingRepeat=1.0;
   const jobs=[
     applyRemoteTexture(library.wall,"map",source.wall.color,true,wallRepeat,.28),
     applyRemoteTexture(library.wall,"roughnessMap",source.wall.rough,false,wallRepeat,.28),

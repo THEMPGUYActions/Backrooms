@@ -154,3 +154,13 @@ h2{font-size:clamp(26px,5vw,44px)}
   .arg-hud{left:14px;top:56px;font-size:8px}
   .intro-corner{font-size:8px}
 }
+
+#vignette,#film-grain,#scanlines,#chromatic{position:fixed;inset:0;pointer-events:none;z-index:8}
+#vignette{background:radial-gradient(ellipse at center,transparent 38%,rgba(0,0,0,.28) 70%,rgba(0,0,0,.76) 100%);opacity:calc(.68 + var(--fear,0)*.22)}
+#film-grain{inset:-12%;opacity:calc(.025 + var(--fear,0)*.075);background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27160%27 height=%27160%27 viewBox=%270 0 160 160%27%3E%3Cfilter id=%27g%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.78%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23g)%27 opacity=%27.72%27/%3E%3C/svg%3E");mix-blend-mode:screen;animation:film-noise .16s steps(2,end) infinite}
+#scanlines{opacity:calc(.025 + var(--fear,0)*.035);background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,255,255,.08) 3px,transparent 4px);mix-blend-mode:screen}
+#chromatic{opacity:calc(.018 + var(--fear,0)*.055);background:linear-gradient(90deg,rgba(255,25,25,.34),transparent 16%,transparent 84%,rgba(40,120,255,.34));mix-blend-mode:screen;transition:opacity .2s ease}
+body.fear #chromatic{animation:chromatic-drift .16s steps(2,end) 2}
+@keyframes film-noise{0%{transform:translate(0,0)}25%{transform:translate(1.4%,-.8%)}50%{transform:translate(-.8%,1.1%)}75%{transform:translate(.8%,.7%)}100%{transform:translate(0,0)}}
+@keyframes chromatic-drift{0%{transform:translate(0);filter:none}35%{transform:translate(1px);filter:blur(.15px)}70%{transform:translate(-1px);filter:none}100%{transform:translate(0)}}
+.crosshair{opacity:.06}

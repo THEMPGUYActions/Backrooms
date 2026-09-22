@@ -273,6 +273,30 @@ async function checkAssetSources() {
     fail("dist PBR manifest invalid or missing: " + e.message);
   }
 }
+async function checkAudioAssets(){
+  let lock;
+  try{lock=JSON.parse(await readFile(join(root,"data/audio-assets-lock.json"),"utf8"))}catch(e){fail("data/audio-assets-lock.json is missing or invalid: "+e.message);return}
+  if(lock.license!=="CC0")fail("Audio asset lock must use CC0");
+  const entries=Object.entries(lock.files||{});
+  if(entries.length<8)fail("Audio asset lock must contain at least eight assets");
+  for(const [filename,entry] of entries){
+    if(!/^[a-z0-9_-]+\.ogg$/.test(filename))fail("Audio asset filename is unexpected: "+filename);
+    if(!entry?.url?.startsWith("https://opengameart.org/sites/default/files/"))fail("Audio asset source URL is unexpected: "+filename);
+    if(entry.license!=="CC0")fail("Audio asset is not CC0: "+filename);
+    await assertFile(join(root,"dist/assets/audio",filename),"dist audio asset");
+  }
+  try{
+    const manifest=JSON.parse(await readFile(join(root,"dist/assets/audio/manifest.json"),"utf8"));
+    if(manifest.license!=="CC0")fail("dist audio manifest license mismatch");
+    for(const [filename,entry] of entries){
+      const built=manifest.files?.[filename];
+      if(!built){fail("dist audio manifest missing asset: "+filename);continue}
+      if(built.url!==entry.url||built.license!==entry.license||built.author!==entry.author)fail("dist audio manifest metadata mismatch: "+filename);
+      if(!Number.isInteger(built.bytes)||built.bytes<=0||!/^[a-f0-9]{64}$/.test(built.sha256||""))fail("dist audio manifest checksum metadata invalid: "+filename);
+    }
+  }catch(e){fail("dist audio manifest invalid or missing: "+e.message)}
+}
+
 async function checkData() {
   try {
     const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -364,6 +388,7 @@ await checkModuleGraph(jsFiles, imports);
 await checkData();
 await checkBuildIfPresent();
 await checkAssetSources();
+await checkAudioAssets();
 await checkWorkflow();
 
 for (const file of files) {
