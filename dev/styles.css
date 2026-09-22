@@ -1810,3 +1810,92 @@ button,.audio-gate{
 
 /* Touch devices with a browser reporting a fine pointer, such as some iPads. */
 .touch-device #mobile-controls{display:block!important}
+
+/* Pre-intro loading gate */
+.loading-screen{
+  position:fixed;
+  inset:0;
+  z-index:500;
+  display:grid;
+  place-items:center;
+  background:#000;
+  color:#e6e6df;
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transition:opacity .55s ease,visibility 0s linear 0s;
+}
+.loading-screen.hidden{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .55s ease,visibility 0s linear .55s;
+}
+.loading-card{
+  width:min(520px,82vw);
+  padding:26px 24px 22px;
+  border:1px solid rgba(220,224,211,.12);
+  background:rgba(5,5,4,.94);
+  box-shadow:0 0 60px rgba(0,0,0,.8);
+  font:10px/1.4 "Courier New",ui-monospace,monospace;
+  letter-spacing:.08em;
+}
+.loading-kicker{
+  color:rgba(215,220,207,.3);
+  font-size:8px;
+  letter-spacing:.22em;
+  margin-bottom:14px;
+}
+.loading-title{
+  font-size:clamp(18px,3vw,28px);
+  letter-spacing:.12em;
+  margin-bottom:22px;
+}
+.loading-bar{
+  height:3px;
+  background:rgba(220,224,211,.08);
+  overflow:hidden;
+}
+.loading-bar i{
+  display:block;
+  width:0;
+  height:100%;
+  background:rgba(226,228,216,.72);
+  transition:width .2s ease;
+}
+.loading-meta{
+  display:flex;
+  justify-content:space-between;
+  margin-top:9px;
+  color:rgba(220,224,211,.46);
+  font-size:8px;
+}
+.loading-detail{
+  margin-top:12px;
+  color:rgba(220,224,211,.24);
+  font-size:8px;
+}
+.intro-screen:not(.intro-ready){
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+.intro-screen.intro-ready{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+}
+.intro-title-page,
+.intro-credits-page,
+.intro-audio-page{
+  animation:none;
+}
+.intro-ready .intro-title-page{
+  animation:intro-title-sequence 8.2s ease-in-out forwards;
+}
+.intro-ready .intro-credits-page{
+  animation:intro-credits-sequence 6.4s ease-in-out 8.6s forwards;
+}
+.intro-ready .intro-audio-page{
+  animation:intro-audio-sequence 1s ease 15.25s forwards;
+}
