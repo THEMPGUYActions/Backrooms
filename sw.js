@@ -1,13 +1,36 @@
-const CACHE_NAME="backrooms-assets-v3";
-const CORE=["./","./index.html","./styles.css","./src/main.js","./src/game.js","./src/assets.js","./src/audio.js","./src/levels.js","./favicon.svg"];
+const CACHE_NAME="backrooms-assets-v4";
+const CORE=[
+  "index.html",
+  "styles.css",
+  "src/main.js",
+  "src/game.js",
+  "src/assets.js",
+  "src/audio.js",
+  "src/levels.js",
+  "favicon.svg"
+];
+
+function scopeUrl(path){
+  return new URL(path,self.registration.scope).href;
+}
+
+async function cacheCore(){
+  const cache=await caches.open(CACHE_NAME);
+  await Promise.all(CORE.map(path=>
+    cache.add(scopeUrl(path)).catch(error=>{
+      console.warn("[Backrooms] Core cache skipped:",path,error);
+    })
+  ));
+}
 
 self.addEventListener("install",event=>{
-  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
+  event.waitUntil(cacheCore().then(()=>self.skipWaiting()));
 });
 
 self.addEventListener("activate",event=>{
   event.waitUntil(
-    caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key))))
+    caches.keys()
+      .then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key))))
       .then(()=>self.clients.claim())
   );
 });
@@ -22,13 +45,14 @@ self.addEventListener("fetch",event=>{
     url.pathname.includes("/assets/audio/")
   );
   if(!sameOrigin&&!url.hostname.includes("cdn.jsdelivr.net"))return;
+
   if(isAsset){
     event.respondWith(
       caches.match(request).then(cached=>{
         const network=fetch(request).then(response=>{
           if(response.ok){
             const copy=response.clone();
-            caches.open(CACHE_NAME).then(cache=>cache.put(request,copy));
+            caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});
           }
           return response;
         }).catch(()=>cached);
@@ -37,12 +61,13 @@ self.addEventListener("fetch",event=>{
     );
     return;
   }
+
   if(sameOrigin){
     event.respondWith(
       caches.match(request).then(cached=>cached||fetch(request).then(response=>{
         if(response.ok){
           const copy=response.clone();
-          caches.open(CACHE_NAME).then(cache=>cache.put(request,copy));
+          caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});
         }
         return response;
       }))
@@ -67,9 +92,9 @@ self.addEventListener("message",event=>{
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache=>
       Promise.all([
-        ...pbr.map(file=>cache.add(new URL("./assets/pbr/"+file,base))),
-        ...audio.map(file=>cache.add(new URL("./assets/audio/"+file,base)))
-      ].map(p=>p.catch(()=>null)))
+        ...pbr.map(file=>cache.add(new URL("./assets/pbr/"+file,base)).catch(()=>null)),
+        ...audio.map(file=>cache.add(new URL("./assets/audio/"+file,base)).catch(()=>null))
+      ])
     )
   );
 });
