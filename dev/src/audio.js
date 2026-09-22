@@ -132,6 +132,12 @@ export class AudioDirector{
     if(Math.random()<.06)this.tone(95,.018,"sine",.0045);
   }
   pickup(){this.tone(523,.09,"sine",.04);this.tone(659,.12,"sine",.032)}
+  intercom(){
+    this.tone(1320,.055,"square",.012);
+    setTimeout(()=>this.tone(880,.075,"square",.008),90);
+    this.noise(.7,.022,1550);
+    this.tone(196,.55,"sine",.008);
+  }
   scare(){
     this.playBuffer("ambient_horror",{gain:.24,rate:.92+Math.random()*.16,pan:(Math.random()-.5)*.24,send:.5,delay:.2});
     this.noise(.45,.08,250);this.tone(43,.5,"sawtooth",.055);this.tone(89,.28,"triangle",.028);

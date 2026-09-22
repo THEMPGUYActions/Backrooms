@@ -264,6 +264,15 @@ class Chunk{
       }
     }
 
+    if(level.id==="0"&&rngBase.next()<.18&&edges.length){
+      const e=rngBase.pick(edges),p=wallPoint(e,.108,1.48),group=new THREE.Group();
+      group.position.copy(p.position);group.rotation.y=p.rotation;
+      box(group,new THREE.BoxGeometry(.46,.3,.07),lib.intercom,0,0,0);
+      for(let i=-1;i<=1;i++)box(group,new THREE.BoxGeometry(.28,.018,.018),lib.intercomSlot,0,.075+i*.055,.041);
+      box(group,new THREE.BoxGeometry(.055,.055,.018),lib.intercomSlot,.17,-.08,.041);
+      g.add(group);
+    }
+
     if(level.id==="0"&&rngBase.next()<.3){
       const camGroup=new THREE.Group();
       camGroup.position.set(this.originX+2+12*rngBase.next(),level.wallHeight-.18,this.originZ+2+12*rngBase.next());
@@ -640,7 +649,7 @@ class AdaptiveQuality{
 export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x000000);this.camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
@@ -696,7 +705,7 @@ export class BackroomsGame{
     document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);this.toast(this.level.objective,2.4);
   }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
+    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
     this.scene.fog=new THREE.FogExp2(0x000000,this.level.id==="0"?.027:this.level.id==="1"?.043:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
@@ -732,6 +741,13 @@ export class BackroomsGame{
   }
   updateHorror(dt){
     this.horror=Math.max(0,this.horror-dt*.18);
+    if(this.running&&!this.paused&&this.level.id==="0"){
+      this.intercomTimer-=dt;
+      if(this.intercomTimer<=0){
+        this.intercomTimer=110+Math.random()*170;
+        if(Math.random()<.72){this.audio.intercom();this.triggerFear(.08);}
+      }
+    }
     document.documentElement.style.setProperty("--fear",this.horror.toFixed(3));
     document.body.classList.toggle("fear",this.horror>.08);
     if(!this.running||this.paused||this.dead||this.scareTimer>0)return;
