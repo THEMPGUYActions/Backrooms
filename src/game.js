@@ -1289,7 +1289,7 @@ export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={
       shake:localStorage.getItem("br.shake")!=="0",
       sensitivity:Math.max(.5,Math.min(2,Number(localStorage.getItem("br.sensitivity")||1)))
@@ -1334,28 +1334,29 @@ export class BackroomsGame{
     this.last=performance.now();
   }
   async mount(){
-    const loading=document.getElementById("loading");
-    this.setLoadingProgress(.04,"INITIALIZING CAMERA","Preparing the recording...");
     document.getElementById("game").appendChild(this.renderer.domElement);
     this.resize();
     this.quality.apply();
-    this.setLoadingProgress(.12,"BUILDING WORLD","Loading procedural materials...");
-    await this.world.configure((progress,label,detail)=>{
-      const p=typeof progress==="number"?Math.max(0,Math.min(1,progress)):.5;
-      this.setLoadingProgress(.12+p*.68,label||"BUILDING WORLD",detail||"Generating the environment...");
-    });
-    this.setLoadingProgress(.86,"STREAMING SPAWN","Generating the first rooms...");
-    this.world.ensureAround(0,0);
-    this.setLoadingProgress(.96,"FINALIZING","Starting camera systems...");
     this.player.reset();
     this.mounted=true;
-    this.setLoadingProgress(1,"READY","Recording ready.");
-    loading?.classList.add("hidden");
     document.getElementById("boot")?.classList.add("intro-ready");
-    if(this.pendingStart)this.beginIntroReveal();
     this.render();
     this.last=performance.now();
     requestAnimationFrame(this.loop.bind(this));
+
+    // Build the playable world behind the intro. The procedural fallback becomes
+    // playable immediately; optional PBR/found-footage assets continue loading.
+    const worldLoad=this.world.configure((progress,label,detail)=>{
+      this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
+    });
+    this.world.ensureAround(0,0);
+    this.worldReady=true;
+    if(this.pendingStart)this.beginIntroReveal();
+
+    worldLoad.catch(error=>{
+      console.error("[Backrooms] World initialization failed:",error);
+      this.toast("WORLD INITIALIZATION FAILED",5);
+    });
   }
   bindUI(){
     const $=id=>document.getElementById(id);
@@ -1421,7 +1422,7 @@ export class BackroomsGame{
     }
   }
   beginIntroReveal(){
-    if(!this.introActive||!this.mounted)return;
+    if(!this.introActive||!this.mounted||!this.worldReady)return;
     this.introActive=false;
     this.introPlaying=false;
     this.pendingStart=false;
