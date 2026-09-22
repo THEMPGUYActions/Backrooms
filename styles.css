@@ -1720,3 +1720,93 @@ button,.audio-gate{
     animation-delay:0s!important;
   }
 }
+
+
+/* Mobile controls hardening: never let the look surface own the control areas. */
+#mobile-controls{
+  z-index:300;
+  isolation:isolate;
+  pointer-events:none;
+}
+#mobile-controls .touch-zone,
+#mobile-controls .touch-button{
+  z-index:3;
+  pointer-events:auto;
+  position:absolute;
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+#mobile-controls .look-zone{
+  z-index:1;
+  pointer-events:auto;
+  touch-action:none;
+}
+#mobile-controls.paused{pointer-events:none!important}
+
+@media (max-width:900px), (pointer:coarse), (hover:none){
+  #mobile-controls:not(.hidden){display:block!important}
+  #mobile-controls .look-zone{
+    right:0;
+    top:0;
+    width:58%;
+    height:calc(100% - max(150px,calc(18px + env(safe-area-inset-bottom) + 132px)));
+  }
+}
+
+/* Portrait phones */
+@media (orientation:portrait) and (max-width:900px){
+  #mobile-controls .touch-zone{
+    left:max(12px,env(safe-area-inset-left));
+    bottom:max(14px,env(safe-area-inset-bottom));
+    width:min(132px,30vw);
+    height:min(132px,30vw);
+  }
+  #mobile-controls .touch-button{
+    right:max(12px,env(safe-area-inset-right));
+    bottom:max(14px,env(safe-area-inset-bottom));
+    width:clamp(54px,15vw,64px);
+    height:clamp(54px,15vw,64px);
+    min-width:0;
+    min-height:0;
+  }
+  #mobile-controls .touch-button.run{
+    right:calc(max(12px,env(safe-area-inset-right)) + clamp(62px,17vw,74px));
+  }
+  #mobile-controls .touch-button.pause{
+    right:max(12px,env(safe-area-inset-right));
+    bottom:calc(max(14px,env(safe-area-inset-bottom)) + clamp(62px,17vw,74px));
+  }
+}
+
+/* Landscape phones: put the controls into the side safe zones. */
+@media (orientation:landscape) and (max-height:900px){
+  #mobile-controls .touch-zone{
+    left:max(14px,env(safe-area-inset-left));
+    bottom:max(12px,env(safe-area-inset-bottom));
+    width:min(118px,22vh);
+    height:min(118px,22vh);
+  }
+  #mobile-controls #stick-knob{width:min(54px,10vh);height:min(54px,10vh)}
+  #mobile-controls .touch-button{
+    right:max(14px,env(safe-area-inset-right));
+    width:min(58px,12vh);
+    height:min(58px,12vh);
+    min-width:0;
+    min-height:0;
+  }
+  #mobile-controls .touch-button.run{
+    right:calc(max(14px,env(safe-area-inset-right)) + min(64px,13vh));
+  }
+  #mobile-controls .touch-button.pause{
+    right:max(14px,env(safe-area-inset-right));
+    bottom:calc(max(12px,env(safe-area-inset-bottom)) + min(64px,13vh));
+  }
+  #mobile-controls .look-zone{
+    width:62%;
+    height:100%;
+  }
+}
+
+/* Touch devices with a browser reporting a fine pointer, such as some iPads. */
+.touch-device #mobile-controls{display:block!important}
