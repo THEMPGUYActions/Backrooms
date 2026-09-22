@@ -117,8 +117,8 @@ class Chunk{
         fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
         if(((x/2+z/2)%4===0)||level.id==="2"&&((x+z)%7===0)){
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const intensity=level.id==="0"?2.15:1.8;
-          const l=new THREE.PointLight(lightColor,intensity,level.id==="2"?11:15,1.45);
+          const intensity=level.id==="0"?7.5:4.5;
+          const l=new THREE.PointLight(lightColor,intensity,level.id==="2"?10:12,2);
           l.position.set(px,level.wallHeight-.22,pz);l.userData.baseIntensity=intensity;g.add(l);this.fixtures.push(l);
         }
       }
@@ -246,7 +246,9 @@ class WorldStreamer{
       this.library.floor
     );
     this.floorSurface.rotation.x=-Math.PI/2;
-    this.floorSurface.position.y=0;
+    this.floorSurface.position.set(0,0,0);
+    this.floorSurface.updateMatrix();
+    this.floorSurface.matrixAutoUpdate=false;
     this.floorSurface.frustumCulled=false;
     this.floorSurface.renderOrder=-2;
 
@@ -255,7 +257,9 @@ class WorldStreamer{
       this.library.ceiling
     );
     this.ceilingSurface.rotation.x=Math.PI/2;
-    this.ceilingSurface.position.y=this.game.level.wallHeight+.08;
+    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.08,0);
+    this.ceilingSurface.updateMatrix();
+    this.ceilingSurface.matrixAutoUpdate=false;
     this.ceilingSurface.frustumCulled=false;
     this.ceilingSurface.renderOrder=-2;
 
@@ -504,7 +508,7 @@ export class BackroomsGame{
     document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);this.toast(this.level.objective,2.4);
   }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);
+    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=35+Math.random()*35;
     this.scene.fog=new THREE.FogExp2(0x000000,this.level.id==="0"?.035:this.level.id==="1"?.05:.065);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
