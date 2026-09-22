@@ -102,3 +102,7 @@ h2{font-size:clamp(26px,5vw,44px)}
 @media (pointer:fine){
   #mobile-controls{display:none!important}
 }
+
+#game::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;background:radial-gradient(circle at center,transparent 46%,rgba(0,0,0,.34) 100%);opacity:.92;mix-blend-mode:multiply}
+#game::before{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:9;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27120%27 height=%27120%27 viewBox=%270 0 120 120%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%27.7%27/%3E%3C/svg%3E");animation:noise .18s steps(2) infinite}
+@keyframes noise{0%{transform:translate(0,0)}25%{transform:translate(2%,-1%)}50%{transform:translate(-1%,2%)}75%{transform:translate(1%,1%)}100%{transform:translate(0,0)}}
