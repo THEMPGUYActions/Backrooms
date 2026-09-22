@@ -1,5 +1,4 @@
 import { BackroomsGame } from "./game.js";
-import { BackroomsAdmin } from "./admin.js";
 
 const registerCache=async()=>{
   if(!("serviceWorker" in navigator))return;
@@ -19,8 +18,15 @@ const registerCache=async()=>{
 };
 
 registerCache();
-const game = new BackroomsGame();
-game.mount();
+const game=new BackroomsGame();
+game.mount().then(async()=>{
+  if(new URLSearchParams(location.search).get("admin")!=="1")return;
+  try{
+    const {BackroomsAdmin}=await import("./admin.js");
+    window.backroomsAdmin=new BackroomsAdmin(game);
+  }catch(error){
+    console.warn("[Backrooms] Admin module unavailable:",error);
+  }
+});
 
-window.backrooms = game;
-window.backroomsAdmin = new BackroomsAdmin(game);
+window.backrooms=game;
