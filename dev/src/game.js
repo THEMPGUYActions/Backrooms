@@ -587,10 +587,10 @@ class EntityManager{
 class AdaptiveQuality{
   constructor(game){this.game=game;this.mode=localStorage.getItem("br.quality")||"auto";this.samples=[];this.cool=0}
   limits(){
-    if(this.mode==="low")return{pixel:.7,radius:1};
-    if(this.mode==="medium")return{pixel:.9,radius:1};
-    if(this.mode==="high")return{pixel:1.15,radius:1};
-    return{pixel:Math.min(devicePixelRatio,1.05),radius:1};
+    if(this.mode==="low")return{pixel:.7,radius:2};
+    if(this.mode==="medium")return{pixel:.9,radius:2};
+    if(this.mode==="high")return{pixel:1.15,radius:2};
+    return{pixel:Math.min(devicePixelRatio,1.05),radius:2};
   }
   apply(){const l=this.limits();this.game.renderer.setPixelRatio(Math.min(devicePixelRatio,l.pixel));this.game.world.radius=l.radius}
   update(dt){
