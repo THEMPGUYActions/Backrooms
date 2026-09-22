@@ -16,15 +16,15 @@ export const LEVELS = {
       light: 0xffd34d,
       ambient: 0x17130a
     },
-    cellSize: 5,
+    cellSize: 6,
     wallHeight: 2.95,
-    darkness: 0.08,
+    darkness: 0.11,
     holeChance: 0.010,
     pipeChance: 0,
     entity: "none",
-    exitStyle: "flicker",
+    exitStyle: "mixed",
     exitAfterChunks: 3,
-    objective: "Find a flickering wall and keep moving.",
+    objective: "Find a way out. Not every door is real.",
     safe: true
   },
   "1": {
