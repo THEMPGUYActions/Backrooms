@@ -88,3 +88,22 @@ The browser audio layer uses CC0 audio assets downloaded at build time from Open
 - **Electric Buzz** by **themightyglider**: https://opengameart.org/content/electric-buzz
 
 OpenGameArt lists these assets as CC0. The generated fallback effects remain original project code.
+
+
+## SpacePotato's Found Footage reference assets
+
+Level 1 also uses selected visual assets from **SpacePotatoee/MinecraftFoundFootage**, pinned to commit:
+
+https://github.com/SpacePotatoee/MinecraftFoundFootage/tree/0c46c8301fc512c318ac93e23b669355b7d4b180
+
+The build fetches only the selected Level 1 texture assets it needs from that commit at build time. The game does not copy the source mod's code or structures into the project.
+
+Selected assets:
+- concrete PBR color/normal
+- white-brick PBR color
+- crate PBR color
+- fluorescent light texture
+- wall trim texture
+- stair texture
+
+These remain third-party assets and are not relicensed under THEMPGUY's project license. See the upstream repository's license and notices for the applicable terms.
