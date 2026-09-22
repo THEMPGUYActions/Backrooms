@@ -279,6 +279,18 @@ canvas{filter:none;image-rendering:auto}
 .audio-gate:hover .audio-gate-main{text-shadow:0 0 18px rgba(226,203,115,.3)}
 .audio-gate.busy{pointer-events:none;opacity:.45}
 
+.intro-card{opacity:0;pointer-events:none}
+.intro-screen.intro-live .intro-film{display:none}
+.intro-screen.intro-live .intro-card{
+  opacity:1;pointer-events:none;
+  animation:intro-card-live 7.2s cubic-bezier(.15,.7,.2,1) both;
+}
+@keyframes intro-card-live{
+  0%{opacity:0;transform:scale(1.018)}
+  12%{opacity:.92;transform:scale(1)}
+  72%{opacity:.86;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.025)}
+}
 .intro-screen.booting .intro-card{animation:intro-boot 6.8s cubic-bezier(.15,.7,.2,1) both}
 .intro-screen.booting .intro-corner{animation:intro-corner 6.8s linear both}
 @keyframes intro-boot{
