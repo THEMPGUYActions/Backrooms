@@ -1,8 +1,84 @@
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js";
 import { AudioDirector } from "./audio.js";
 import { LEVELS, levelById, cycleHash } from "./levels.js";
 import { makeLibrary, applyOpenGameArtPBR, disposeLibrary, box, makePropSet } from "./assets.js";
+
+const VHSShader={
+  name:"BackroomsVHS",
+  uniforms:{
+    tDiffuse:{value:null},
+    time:{value:0},
+    intensity:{value:.78},
+    tracking:{value:.25},
+    fear:{value:0},
+    resolution:{value:new THREE.Vector2(1,1)}
+  },
+  vertexShader:`varying vec2 vUv;
+    void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader:`uniform sampler2D tDiffuse;
+    uniform float time;
+    uniform float intensity;
+    uniform float tracking;
+    uniform float fear;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+    float hash(vec2 p){
+      return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
+    }
+    float noise(vec2 p){
+      vec2 i=floor(p),f=fract(p);
+      f=f*f*(3.0-2.0*f);
+      return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x),
+                 mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x),f.y);
+    }
+    vec2 barrel(vec2 uv){
+      vec2 p=uv-.5;
+      float r=dot(p,p);
+      p*=1.0+r*(.11+.045*fear);
+      return p+.5;
+    }
+    void main(){
+      vec2 uv=barrel(vUv);
+      float line=floor(uv.y*resolution.y);
+      float wobble=(noise(vec2(line*.035,time*.35))-.5)*.0018*tracking;
+      uv.x+=wobble;
+
+      float scan=sin(uv.y*resolution.y*3.14159)*.5+.5;
+      float n=noise(uv*resolution.xy*.31+time*11.0);
+      float fine=noise(uv*resolution.xy*1.7-time*19.0);
+
+      vec2 ca=vec2(.0016+.002*fear,0.0);
+      vec3 c;
+      c.r=texture2D(tDiffuse,uv+ca).r;
+      c.g=texture2D(tDiffuse,uv).g;
+      c.b=texture2D(tDiffuse,uv-ca).b;
+
+      float luminance=dot(c,vec3(.299,.587,.114));
+      c=mix(c,vec3(luminance),.07+.06*intensity);
+      c*=vec3(1.045,.99,.89);
+      c+=vec3((n-.5)*.055*intensity);
+      c+=vec3((fine-.5)*.018*intensity);
+      c*=1.0-(scan-.5)*.045*intensity;
+
+      vec2 q=abs(vUv-.5)*2.0;
+      float vignette=1.0-smoothstep(.52,1.0,max(q.x,q.y));
+      c*=mix(.62,1.0,vignette);
+
+      float edge=smoothstep(.92,1.0,max(q.x,q.y));
+      c*=1.0-edge*(.28+.18*fear);
+
+      float drop=step(.997,noise(vec2(line*.12,floor(time*.7))));
+      c*=1.0-drop*(.18*intensity);
+
+      gl_FragColor=vec4(max(c,0.0),1.0);
+    }`
+};
 
 const CELLS=16;
 const BASE_RADIUS=1;
@@ -222,19 +298,19 @@ class Chunk{
       const fixtureChance=level.id==="0"?.78:level.id==="1"?.2:.13;
       if(fixtureSlot&&rngBase.next()<fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,fixtureMaterial=fixtureMat.clone();
-        const rotation=rngBase.next()<.5?0:Math.PI/2,jx=(rngBase.next()-.5)*1.05,jz=(rngBase.next()-.5)*1.05;
-        const fixture=box(g,new THREE.BoxGeometry(1.62,.026,.5),fixtureMaterial,px+jx,level.wallHeight-.105,pz+jz,0,rotation,0);
-        box(g,new THREE.BoxGeometry(1.9,.08,.66),lib.metal,px+jx,level.wallHeight-.05,pz+jz,0,rotation,0);
+        const rotation=rngBase.next()<.5?0:Math.PI/2,jx=(rngBase.next()-.5)*1.8,jz=(rngBase.next()-.5)*1.8;
+        const fixture=box(g,new THREE.BoxGeometry(3.7,.045,.72),fixtureMaterial,px+jx,level.wallHeight-.11,pz+jz,0,rotation,0);
+        box(g,new THREE.BoxGeometry(4.0,.11,.9),lib.metal,px+jx,level.wallHeight-.045,pz+jz,0,rotation,0);
         fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
-        if(rngBase.next()<.34){
+        {
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const intensity=level.id==="0"?4.2:3.1;
+          const intensity=level.id==="0"?72:42;
           this.lightSources.push({
-            position:new THREE.Vector3(px+jx,level.wallHeight-.28,pz+jz),
+            position:new THREE.Vector3(px+jx,level.wallHeight-.24,pz+jz),
             color:lightColor,
             baseIntensity:intensity,
             intensity,
-            distance:11,
+            distance:0,
             decay:2
           });
         }
@@ -320,13 +396,13 @@ class Chunk{
     const buildDoor=(entry,exitDoor)=>{
       const p=wallPoint(entry,.105,1.29),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
       const frameMat=exitDoor?lib.exitFrame:lib.doorFrame;
-      box(group,new THREE.BoxGeometry(.11,2.62,.18),frameMat,-1.02,0,0);
+      box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,-1.02,0,0);
       box(group,new THREE.BoxGeometry(.11,2.62,.18),frameMat,1.02,0,0);
-      box(group,new THREE.BoxGeometry(2.15,.11,.18),frameMat,0,1.31,0);
-      const door=box(group,new THREE.BoxGeometry(1.94,2.48,.07),(exitDoor?lib.exitDoor:lib.door).clone(),0,0,0);
+      box(group,new THREE.BoxGeometry(3.35,.16,.24),frameMat,0,1.31,0);
+      const door=box(group,new THREE.BoxGeometry(3.1,3.62,.09),(exitDoor?lib.exitDoor:lib.door).clone(),0,0,0);
       door.rotation.z=exitDoor?-0.16:-0.03;
       if(exitDoor)door.userData.exit=true;
-      box(group,new THREE.BoxGeometry(.06,.08,.035),lib.handle,.78,.02,.06);
+      box(group,new THREE.BoxGeometry(.08,.1,.045),lib.handle,.78,.02,.06);
       g.add(group);
     };
 
@@ -576,10 +652,10 @@ class WorldStreamer{
 
 class Player{
   constructor(game){
-    this.game=game;this.position=new THREE.Vector3(0,1.62,0);this.yaw=0;this.pitch=0;
-    this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;this.flashlight=true;this.eyeY=1.62;this.bob=0;this.shake=0;this.cameraFov=72;
+    this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.yaw=0;this.pitch=0;
+    this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;this.flashlight=true;this.eyeY=1.72;this.bob=0;this.shake=0;this.cameraFov=62;
   }
-  reset(){this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.bob=0;this.shake=0;this.cameraFov=72;this.health=this.stamina=this.hydration=this.sanity=100;this.flashlight=this.game.startFlash;this.game.camera.fov=72;this.game.camera.updateProjectionMatrix();this.game.camera.rotation.set(0,0,0,"YXZ")}
+  reset(){this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.bob=0;this.shake=0;this.cameraFov=62;this.health=this.stamina=this.hydration=this.sanity=100;this.flashlight=this.game.startFlash;this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();this.game.camera.rotation.set(0,0,0,"YXZ")}
   update(dt){
     const input=this.game.input,look=input.consumeLook();
     this.yaw-=look.x*.0021;this.pitch-=look.y*.0021;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
@@ -599,13 +675,13 @@ class Player{
     const stride=Math.min(1,Math.abs(mv.y));
     if(moving&&stride>.05){this.bob+=dt*(run?13:8)*stride;if(this.game.settings.shake)this.shake=Math.min(.03,this.shake+dt*.09*stride)}else this.shake=Math.max(0,this.shake-dt*.24);
     const fear=1-this.sanity/100;
-    const bobY=(run?.055:.036)*Math.sin(this.bob*2)*stride;
-    const breathing=Math.sin(this.game.gameTime*1.35)*.007;
-    const roll=Math.sin(this.bob)*(.003+(run?.0035:.001))*stride+Math.sin(this.game.gameTime*1.7)*.001*fear;
-    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.28;
+    const bobY=(run?.038:.022)*Math.sin(this.bob*2)*stride;
+    const breathing=Math.sin(this.game.gameTime*1.35)*.004;
+    const roll=Math.sin(this.bob)*(.0017+(run?.0018:.0008))*stride;
+    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.12;
     this.game.camera.position.copy(this.position);
     this.game.camera.position.y=this.eyeY+bobY+breathing+shakeY;
-    const targetFov=run?74:70;
+    const targetFov=run?67:62;
     this.cameraFov+=(targetFov-this.cameraFov)*Math.min(1,dt*8);
     if(Math.abs(this.game.camera.fov-this.cameraFov)>.01){this.game.camera.fov=this.cameraFov;this.game.camera.updateProjectionMatrix()}
     this.game.camera.rotation.set(this.pitch,this.yaw,roll,"YXZ");
@@ -722,39 +798,67 @@ export class BackroomsGame{
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
-    this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x000000);this.camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
+    this.scene=new THREE.Scene();
+    this.scene.background=new THREE.Color(0x000000);
+    this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"mediump"});
     this.renderer.setPixelRatio(1);this.renderer.setSize(Math.max(1,innerWidth),Math.max(1,innerHeight),false);
-    this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.62;
+    this.renderer.outputColorSpace=THREE.SRGBColorSpace;
+    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure=.78;
     this.scene.environment=null;
+    this.composer=new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(1);
+    this.renderPass=new RenderPass(this.scene,this.camera);
+    this.vhsPass=new ShaderPass(VHSShader);
+    this.outputPass=new OutputPass();
+    this.composer.addPass(this.renderPass);
+    this.composer.addPass(this.vhsPass);
+    this.composer.addPass(this.outputPass);
+
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
     this.localLights=[];
-    for(let i=0;i<3;i++){
-      const light=new THREE.PointLight(0xffd34d,0,22,2);
+    for(let i=0;i<4;i++){
+      const light=new THREE.PointLight(0xffd34d,0,0,2);
       light.name="dynamic_fluorescent_"+i;
       light.visible=true;
       this.localLights.push(light);
       this.scene.add(light);
     }this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0x554c3c,0x000000,.055);this.scene.add(this.ambient);
+    this.ambient=new THREE.HemisphereLight(0x5c523f,0x000000,.035);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,24,25,.48,.9,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
   }
   async mount(){
     document.getElementById("game").appendChild(this.renderer.domElement);
+    this.resize();
     this.quality.apply();
-    await this.world.configure();
+    this.setLoadingProgress(0,"MOUNTING CAMERA","Initializing the recording rig");
+    await this.world.configure((progress,label,detail)=>this.setLoadingProgress(progress,label,detail));
     this.world.ensureAround(0,0);
     this.player.reset();
+    this.setLoadingProgress(1,"TAPE READY","Level 0 / The Lobby");
+    document.getElementById("loading")?.classList.add("hidden");
     this.render();
     this.last=performance.now();
     requestAnimationFrame(this.loop.bind(this));
   }
   bindUI(){
     const $=id=>document.getElementById(id);
-    const begin=async()=>{if(!this.introActive)return;this.audio.resume().then(()=>{this.audio.clickToEnter();this.beginIntroReveal()})};
+    this.audioGateBusy=false;
+    const begin=async()=>{
+      if(!this.introActive||this.audioGateBusy)return;
+      this.audioGateBusy=true;
+      const gate=$("audio-gate");
+      gate?.classList.add("busy");
+      const label=gate?.querySelector(".audio-gate-main");
+      if(label)label.textContent="SYNCING TAPE";
+      try{await this.audio.resume();}catch(error){console.warn("[Backrooms] Audio could not start:",error)}
+      this.audio.clickToEnter();
+      this.beginIntroReveal();
+    };
     $("audio-gate").onclick=begin;
     $("audio-gate").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();begin()}};
     $("resume").onclick=()=>this.togglePause(false);$("restart").onclick=()=>this.restart();$("retry").onclick=()=>this.restart();$("again-ending").onclick=()=>this.restart();
@@ -764,16 +868,35 @@ export class BackroomsGame{
     $("flashlight").checked=this.startFlash;$("flashlight").onchange=e=>{this.startFlash=e.target.checked;localStorage.setItem("br.flash",e.target.checked?"1":"0")};
   }
   beginIntroReveal(){
-    if(!this.introActive)return;
+    if(!this.introActive||this.introPlaying)return;
     this.introActive=false;
+    this.introPlaying=true;
+    this.introTime=0;
+    this.running=false;this.paused=true;this.dead=false;
     const boot=document.getElementById("boot");
     boot.classList.add("booting");
+    const gate=document.getElementById("audio-gate");
+    if(gate)gate.classList.add("hidden");
+    const introLine=document.getElementById("intro-line");
+    if(introLine)introLine.textContent="REC 01 // UNKNOWN LOCATION";
     this.player.reset();
-    this.running=true;this.paused=false;this.dead=false;this.introReveal=0;
-    document.getElementById("hud").classList.remove("hidden");
-    document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
-    setTimeout(()=>boot.classList.add("fade-out"),80);
-    setTimeout(()=>{this.toast(this.level.objective,3);this.renderer.domElement.requestPointerLock?.()},1100);
+    this.introCameraStart=new THREE.Vector3(this.player.position.x,this.player.eyeY+1.15,this.player.position.z+4.5);
+    this.camera.position.copy(this.introCameraStart);
+    this.camera.rotation.set(-.025,.06,0,"YXZ");
+    this.vhsPass.uniforms.intensity.value=1.15;
+    this.vhsPass.uniforms.tracking.value=.85;
+    this.vhsPass.uniforms.fear.value=.08;
+  }
+
+  setLoadingProgress(progress,label,detail=""){
+    const fill=document.getElementById("loading-fill");
+    const pct=document.getElementById("loading-percent");
+    const status=document.getElementById("loading-status");
+    const info=document.getElementById("loading-detail");
+    if(fill)fill.style.width=Math.max(0,Math.min(100,progress*100))+"%";
+    if(pct)pct.textContent=Math.round(Math.max(0,Math.min(1,progress))*100).toString().padStart(2,"0");
+    if(status)status.textContent=label;
+    if(info)info.textContent=detail;
   }
 
   start(){this.beginIntroReveal()}
@@ -792,7 +915,7 @@ export class BackroomsGame{
   }
   changeLevel(id){
     if(!id){this.ending();return}
-    this.audio.exit();this.player.position.set(0,1.62,0);this.setLevel(id);this.toast("You slipped into "+this.level.number+".",3);
+    this.audio.exit();this.player.position.set(0,1.72,0);this.setLevel(id);this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
@@ -854,9 +977,53 @@ export class BackroomsGame{
       target.intensity=source.intensity;
     }
   }
+  updateIntro(dt){
+    this.introTime+=dt;
+    const t=this.introTime;
+    const duration=7.2;
+    const p=Math.max(0,Math.min(1,t/duration));
+    const ease=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+    const drift=Math.sin(t*.58)*.018;
+    const x=this.player.position.x+Math.sin(this.player.yaw+.12)*drift;
+    const z=this.player.position.z+4.5*(1-ease);
+    this.camera.position.set(x,this.player.eyeY+1.15*(1-ease)+Math.sin(t*1.15)*.008,z);
+    this.camera.rotation.set(-.025*(1-ease),.06*(1-ease)+Math.sin(t*.47)*.002,Math.sin(t*.73)*.001,"YXZ");
+    this.vhsPass.uniforms.time.value=this.gameTime;
+    this.vhsPass.uniforms.intensity.value=1.1-ease*.42;
+    this.vhsPass.uniforms.tracking.value=.85-ease*.55;
+
+    const line=document.getElementById("intro-line");
+    const sub=document.getElementById("intro-sub");
+    if(t<1.7){
+      if(line)line.textContent="REC 01 // SIGNAL ACQUIRED";
+      if(sub)sub.textContent="No GPS fix";
+    }else if(t<3.6){
+      if(line)line.textContent="LOCATION // UNKNOWN";
+      if(sub)sub.textContent="Structure does not match source records";
+    }else if(t<5.5){
+      if(line)line.textContent="LEVEL 0 // THE LOBBY";
+      if(sub)sub.textContent="Yellow wallpaper. Damp carpet. Fluorescent hum.";
+    }else{
+      if(line)line.textContent="KEEP MOVING";
+      if(sub)sub.textContent="Familiar spaces are not necessarily safe.";
+    }
+
+    if(t>=duration){
+      this.introPlaying=false;
+      this.running=true;this.paused=false;this.dead=false;
+      document.getElementById("hud").classList.remove("hidden");
+      document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
+      document.getElementById("boot").classList.add("fade-out");
+      this.vhsPass.uniforms.intensity.value=.72;
+      this.vhsPass.uniforms.tracking.value=.28;
+      this.toast(this.level.objective,3);
+    }
+  }
+
   update(dt){
     this.gameTime+=dt;this.argTimer-=dt;this.scareTimer-=dt;
-    if(this.introReveal<1)this.introReveal=Math.min(1,this.introReveal+dt/2.7);
+    this.vhsPass.uniforms.time.value=this.gameTime;
+    this.vhsPass.uniforms.fear.value=this.horror;
     this.player.update(dt);this.world.update(dt);this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
     this.updateArgLayer(dt);
     this.updateLightEvent(dt);
@@ -891,23 +1058,25 @@ export class BackroomsGame{
     clearTimeout(this.argMessageTimer);this.argMessageTimer=setTimeout(()=>el.classList.add("hidden"),2300+Math.random()*2400);
   }
 
-  render(){this.syncRendererViewport();this.renderer.render(this.scene,this.camera)}
-  loop(now){const raw=(now-this.last)/1000;this.last=now;const dt=Math.min(MAX_DT,raw);if(this.running&&!this.paused)this.update(dt);this.render();requestAnimationFrame(this.loop.bind(this))}
-  syncRendererViewport(){
-    const canvas=this.renderer.domElement;
-    const cssWidth=Math.max(1,canvas.clientWidth||innerWidth);
-    const cssHeight=Math.max(1,canvas.clientHeight||innerHeight);
-    this.renderer.setViewport(0,0,cssWidth,cssHeight);
-    this.renderer.setScissor(0,0,cssWidth,cssHeight);
-    this.renderer.setScissorTest(false);
+  render(){this.vhsPass.uniforms.resolution.value.set(Math.max(1,this.renderer.domElement.clientWidth||innerWidth),Math.max(1,this.renderer.domElement.clientHeight||innerHeight));this.composer.render()}
+  loop(now){
+    const raw=(now-this.last)/1000;this.last=now;
+    const dt=Math.min(MAX_DT,raw);
+    if(this.introPlaying)this.updateIntro(dt);
+    else if(this.running&&!this.paused)this.update(dt);
+    this.render();
+    requestAnimationFrame(this.loop.bind(this));
   }
   resize(){
-    const width=Math.max(1,this.renderer.domElement.clientWidth||innerWidth);
-    const height=Math.max(1,this.renderer.domElement.clientHeight||innerHeight);
+    const canvas=this.renderer.domElement;
+    const width=Math.max(1,canvas.clientWidth||innerWidth);
+    const height=Math.max(1,canvas.clientHeight||innerHeight);
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width,height,false);
-    this.syncRendererViewport();
+    this.composer.setPixelRatio(1);
+    this.composer.setSize(width,height);
     this.camera.aspect=width/height;
     this.camera.updateProjectionMatrix();
+    this.vhsPass.uniforms.resolution.value.set(width,height);
   }
 }
