@@ -1341,19 +1341,11 @@ export class BackroomsGame{
     const $=id=>document.getElementById(id);
     this.audioGateBusy=false;
 
-    const begin=async event=>{
-      if(event?.isTrusted===false||!this.introActive||this.audioGateBusy)return;
-      this.audioGateBusy=true;
-      try{
-        // Start/resume the AudioContext directly inside the user gesture.
-        // This is important on Safari and iOS WebKit autoplay restrictions.
-        this.audio.unlockFromGesture();
-        await this.audio.init();
-        if(!this.audio.isEnabled())await this.audio.testUnlock();
-      }catch(error){
-        console.warn("[Backrooms] Audio unlock failed:",error);
-      }
-      if(this.audio.isEnabled())this.audio.clickToEnter();
+    const begin=event=>{
+      if(event?.isTrusted===false||!this.introActive)return;
+      // Never make the game transition wait on Web Audio. Safari/WebKit can leave
+      // AudioContext.resume() pending indefinitely on some iOS states.
+      this.audio.unlockFromGesture();
       if(this.mounted)this.beginIntroReveal();
       else this.pendingStart=true;
     };
