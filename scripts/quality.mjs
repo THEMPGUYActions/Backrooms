@@ -200,14 +200,17 @@ async function checkModuleGraph(jsFiles, imports) {
 async function checkAssetSources() {
   const assetsPath = join(root, "src/assets.js");
   const source = await readFile(assetsPath, "utf8");
-  for (const url of REQUIRED_PBR_ASSETS) {
-    if (!source.includes(url)) fail("src/assets.js missing required OpenGameArt PBR source: " + url);
+  if (!source.includes('const OPEN_GAME_ART_PACK = "' + OPEN_GAME_ART_PACK + '";')) {
+    fail("src/assets.js must pin the OpenGameArt pack base URL");
   }
-  const assetUrlPattern = /https:\/\/opengameart\.org\/sites\/default\/files\/oga-textures\/175228\/[^"']+/g;
-  for (const match of source.matchAll(assetUrlPattern)) {
-    if (!String(match[0]).startsWith(OPEN_GAME_ART_PACK)) {
-      fail("src/assets.js contains an unexpected OpenGameArt asset origin: " + match[0]);
+  for (const url of REQUIRED_PBR_ASSETS) {
+    const filename = url.slice(OPEN_GAME_ART_PACK.length);
+    if (!source.includes('"' + filename + '"')) {
+      fail("src/assets.js missing required OpenGameArt PBR map filename: " + filename);
     }
+  }
+  if ((source.match(/opengameart\.org/g) || []).length < REQUIRED_PBR_ASSETS.length) {
+    fail("src/assets.js does not reference the expected OpenGameArt PBR asset set");
   }
 }
 
