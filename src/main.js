@@ -20,12 +20,14 @@ const registerCache=async()=>{
 registerCache();
 const game=new BackroomsGame();
 game.mount().then(async()=>{
+  /* DEV_ADMIN_START */
   if(new URLSearchParams(location.search).get("admin")!=="1")return;
   try{
     const {BackroomsAdmin}=await import("./admin.js");
     window.backroomsAdmin=new BackroomsAdmin(game);
     window.backroomsAdmin.activate();
   }catch(error){
+  /* DEV_ADMIN_END */
     console.warn("[Backrooms] Admin module unavailable:",error);
   }
 });
