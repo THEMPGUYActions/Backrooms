@@ -44,6 +44,7 @@ function tex(canvas,color=true){
   const t=new THREE.CanvasTexture(canvas);
   t.wrapS=THREE.RepeatWrapping;t.wrapT=THREE.RepeatWrapping;t.anisotropy=2;
   if(color)t.colorSpace=THREE.SRGBColorSpace;
+  t.userData.backroomsOwned=true;
   return t;
 }
 
@@ -78,6 +79,8 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
   try{
     const texture=await loadRemoteTexture(url,color);
     texture.repeat.set(repeat,repeat);
+    const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:material.normalMap;
+    if(previous?.userData?.backroomsOwned)previous.dispose();
     if(kind==="map")material.map=texture;
     else if(kind==="roughnessMap")material.roughnessMap=texture;
     else material.normalMap=texture;
