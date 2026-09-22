@@ -1,9 +1,7 @@
+import * as THREE from "three";
 import { LEVELS } from "./levels.js";
 
 const enabled = new URLSearchParams(location.search).get("admin") === "1";
-if(!enabled){
-  export default null;
-}
 
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 
