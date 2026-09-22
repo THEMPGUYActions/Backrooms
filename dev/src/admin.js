@@ -11,6 +11,15 @@ export class BackroomsAdmin{
     this.opened=false;
     this.build();
     this.bind();
+    this.opener=document.createElement("button");
+    this.opener.id="admin-open";
+    this.opener.type="button";
+    this.opener.textContent="ADMIN";
+    this.opener.setAttribute("aria-label","Open admin panel");
+    this.opener.setAttribute("aria-expanded","false");
+    this.opener.hidden=!enabled;
+    document.body.appendChild(this.opener);
+    this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
     if(enabled){
       game.admin.enabled=true;
       setTimeout(()=>this.open(),350);
@@ -153,11 +162,15 @@ export class BackroomsAdmin{
 
   bind(){
     window.addEventListener("keydown",event=>{
-      if(enabled&&event.key==="-"&&!event.repeat){
+      const code=event.code;
+      const key=event.key;
+      const toggle=code==="Minus"||code==="Equal"||code==="NumpadSubtract"||code==="NumpadAdd"||code==="Backquote"||key==="-"||key==="=";
+      if(enabled&&toggle&&!event.repeat){
         event.preventDefault();
+        event.stopPropagation();
         this.opened?this.close():this.open();
       }
-    });
+    },true);
     this.root.querySelector("#admin-close")?.addEventListener("click",()=>this.close());
     this.root.querySelector("#admin-game")?.addEventListener("click",()=>this.close());
 
@@ -296,10 +309,18 @@ export class BackroomsAdmin{
     this.root.classList.remove("hidden");
     this.update();
     document.exitPointerLock?.();
+    if(this.opener){
+      this.opener.hidden=true;
+      this.opener.setAttribute("aria-expanded","true");
+    }
   }
 
   close(){
     this.opened=false;
     this.root.classList.add("hidden");
+    if(this.opener){
+      this.opener.hidden=!enabled;
+      this.opener.setAttribute("aria-expanded","false");
+    }
   }
 }
