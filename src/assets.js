@@ -1,4 +1,4 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js";
+import * as THREE from "three";
 
 function noise2d(x,y,s){
   let n=(Math.imul((x+s)|0,374761393)+Math.imul((y+s)|0,668265263))|0;
