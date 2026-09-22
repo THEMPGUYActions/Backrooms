@@ -22,7 +22,7 @@ const SPB_ASSET_FILES = [
   "fluorescent_light.png",
   "wall_trim_texture.png",
   "newstairs_texture.png",
-  "double_sided_shelf.png"
+  "
 ];
 const PBR_ASSET_FILES = [
   "wallpaper_color.png",
