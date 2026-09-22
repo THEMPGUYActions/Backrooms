@@ -29,9 +29,9 @@ class Chunk{
     this.buildMaze();this.buildGeometry();
   }
   index(x,z){return z*this.gridSize()+x}
-  gridSize(){return this.game.level.gridSize||5}
+  gridSize(){return this.game.level.gridSize||CELLS}
   setEdge(x,z,side,open=false){
-    const here=this.index(x,z);
+    const cells=this.gridSize(),here=this.index(x,z);
     if(side==="north"){
       this.walls[here]=open?this.walls[here]&~1:this.walls[here]|1;
       if(z>0){
@@ -59,51 +59,64 @@ class Chunk{
     }
   }
   buildMaze(){
-    const cells=this.gridSize();
+    const cells=this.gridSize(),level=this.game.level;
     const rng=new RNG((Math.imul(this.cx,73856093)^Math.imul(this.cz,19349663)^this.game.seed)|0);
-    this.walls.fill(this.game.level.id==="0"?0:15);
-    for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
-    for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
+    this.walls.fill(15);
 
-    if(this.game.level.id==="0"){
-      const split=(x0,z0,x1,z1,depth)=>{
-        const w=x1-x0+1,h=z1-z0+1;
-        if(depth>=3||w<7||h<7||(depth>0&&rng.next()<.28))return;
-        const vertical=(w>h+2)?true:(h>w+2?false:rng.next()<.5);
-        if(vertical){
-          const cut=rng.int(x0+3,x1-3),gapStart=rng.int(z0+1,z1-1),gapLength=rng.next()<.72?1:2;
-          for(let z=z0;z<=z1;z++)if(z<gapStart||z>=gapStart+gapLength)this.setEdge(cut,z,"east",false);
-          split(x0,z0,cut,z1,depth+1);
-          split(cut+1,z0,x1,z1,depth+1);
-        }else{
-          const cut=rng.int(z0+3,z1-3),gapStart=rng.int(x0+1,x1-1),gapLength=rng.next()<.72?1:2;
-          for(let x=x0;x<=x1;x++)if(x<gapStart||x>=gapStart+gapLength)this.setEdge(x,cut,"south",false);
-          split(x0,z0,x1,cut,depth+1);
-          split(x0,cut+1,x1,z1,depth+1);
+    if(level.id==="0"){
+      const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
+      if(mega){
+        this.walls.fill(0);
+        for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
+        for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
+
+        const partitions=rng.int(0,3);
+        for(let i=0;i<partitions;i++){
+          const vertical=rng.next()<.5;
+          if(vertical){
+            const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);
+            for(let z=1;z<cells-1;z++)if(Math.abs(z-gap)>0)this.setEdge(x,z,"east",false);
+          }else{
+            const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);
+            for(let x=1;x<cells-1;x++)if(Math.abs(x-gap)>0)this.setEdge(x,z,"south",false);
+          }
         }
-      };
-      split(1,1,14,14,0);
-
-      const stubs=rng.int(7,12);
-      for(let i=0;i<stubs;i++){
-        const vertical=rng.next()<.5,x=rng.int(1,14),z=rng.int(1,14),length=rng.int(1,4);
-        for(let k=0;k<length;k++){
-          const xx=vertical?x:x+k,zz=vertical?z:z+k;
-          if(xx<1||xx>14||zz<1||zz>14)continue;
-          this.setEdge(xx,zz,vertical?"east":"south",false);
+      }else{
+        const visited=new Uint8Array(cells*cells),stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob,side] of [[0,-1,1,4,"north"],[1,0,2,8,"east"],[0,1,4,1,"south"],[-1,0,8,2,"west"]]){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob,side]);
+          }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
+        }
+        const loopChance=.18;
+        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+          if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"south",true);
         }
       }
 
-      if(rng.next()<.35){
-        const vertical=rng.next()<.5,line=rng.int(3,12),span=rng.int(4,8),start=rng.int(2,13-span);
-        for(let k=0;k<span;k++){
-          const x=vertical?line:start+k,z=vertical?start+k:line;
-          this.setEdge(x,z,vertical?"east":"south",false);
-        }
+      if(cells>=5){
+        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
+        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
+        if((this.cz%2)===0)this.setEdge(0,2,"west",true);
+        if((this.cx%2)===0)this.setEdge(cells-1,2,"east",true);
+      }
+      if(this.cx===0&&this.cz===0){
+        this.setEdge(2,2,"north",true);this.setEdge(2,2,"east",true);
+        this.setEdge(2,2,"south",true);this.setEdge(2,2,"west",true);
       }
     }else{
-      const visited=new Uint8Array(cells*cells),stack=[[8,8]];
-      visited[this.index(8,8)]=1;
+      const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
+      visited[this.index(Math.floor(cells/2),Math.floor(cells/2))]=1;
       const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
       while(stack.length){
         const [x,z]=stack[stack.length-1],options=[];
@@ -116,7 +129,7 @@ class Chunk{
         this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
         visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
       }
-      const loopChance=this.game.level.id==="1"?.12:.07;
+      const loopChance=level.id==="1"?.12:.07;
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
         if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true);
@@ -134,20 +147,16 @@ class Chunk{
       if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v"))this.setEdge(cells-1,z,"east",true);
     }
 
-    if(this.game.level.id==="0"){
-      const spawnMask=this.walls[this.index(8,8)];
-      if((spawnMask&15)===15)this.setEdge(8,8,rng.pick(["north","east","south","west"]),true);
-    }
-
-    const level=this.game.level,rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
+    const rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-      if(rng2.next()<level.holeChance&&Math.hypot(x-8,z-8)>2.5)this.hazards.push({x,z});
+      if(rng2.next()<level.holeChance&&Math.hypot(x-(cells-1)/2,z-(cells-1)/2)>1.7)this.hazards.push({x,z});
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz);
+    const minCell=1,maxCell=Math.max(1,cells-2);
     if(chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.035){
       const candidates=[];
-      for(let z=2;z<=13;z++)for(let x=2;x<=13;x++){
+      for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
         if(mask&1)candidates.push({x,z,side:"north"});
         if(mask&2)candidates.push({x,z,side:"east"});
@@ -163,7 +172,7 @@ class Chunk{
 
     if(level.id==="0"&&rng2.next()<.55){
       const candidates=[];
-      for(let z=2;z<=13;z++)for(let x=2;x<=13;x++){
+      for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
         if(mask&1)candidates.push({x,z,side:"north"});
         if(mask&2)candidates.push({x,z,side:"east"});
@@ -173,6 +182,7 @@ class Chunk{
       if(candidates.length)this.falseDoors.push(rng2.pick(candidates));
     }
   }
+
   seedKey(){return (this.cx*73856093)^(this.cz*19349663)^this.game.seed}
   buildGeometry(){
     const cells=this.gridSize();
@@ -242,7 +252,7 @@ class Chunk{
     if(level.id==="0"){
       const columnGeom=new THREE.BoxGeometry(.72,level.wallHeight,.72),columnData=[],columnCount=3+rngBase.int(0,4);
       for(let i=0;i<columnCount;i++){
-        const cx=1.2+rngBase.next()*13.6,cz=1.2+rngBase.next()*13.6;
+        const cx=.75+rngBase.next()*(cells-1.5),cz=.75+rngBase.next()*(cells-1.5);
         columnData.push(new THREE.Matrix4().makeTranslation(this.originX+cx*cell,level.wallHeight/2,this.originZ+cz*cell));
       }
       const columns=new THREE.InstancedMesh(columnGeom,lib.wall,columnData.length);
@@ -285,7 +295,7 @@ class Chunk{
 
     if(level.id==="0"&&rngBase.next()<.3){
       const camGroup=new THREE.Group();
-      camGroup.position.set(this.originX+2+12*rngBase.next(),level.wallHeight-.18,this.originZ+2+12*rngBase.next());
+      camGroup.position.set(this.originX+cell*.5+cell*(cells-1)*rngBase.next(),level.wallHeight-.18,this.originZ+cell*.5+cell*(cells-1)*rngBase.next());
       const dome=new THREE.Mesh(new THREE.SphereGeometry(.17,10,6,0,Math.PI*2,0,Math.PI/2),lib.cameraDome);dome.scale.y=.65;camGroup.add(dome);
       box(camGroup,new THREE.BoxGeometry(.06,.06,.045),lib.socket,0,-.055,-.11);
       g.add(camGroup);
@@ -595,7 +605,7 @@ class EntityManager{
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
       const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91);
-      const x=c.originX+rng.int(2,14)*cell+cell/2,z=c.originZ+rng.int(2,14)*cell+cell/2,type=this.game.level.entity;
+      const minSpawn=1,maxSpawn=Math.max(1,this.game.level.gridSize?this.game.level.gridSize-2:14);const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
       const group=new THREE.Group();group.position.set(x,0,z);
       if(type==="hound"){
         const mat=new THREE.MeshStandardMaterial({color:0x050505,roughness:.95,metalness:.05});
