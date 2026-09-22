@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#090806">
   <meta name="description" content="The Backrooms by THEMPGUY. A procedural browser horror game.">
-  <title>The Backrooms</title>
+  <title>The Backrooms // CAM 01</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <script type="importmap">
   {
@@ -19,50 +20,78 @@
 </head>
 <body>
   <div id="game"></div>
+
+  <section id="loading" class="loading-screen">
+    <div class="loading-shell">
+      <div class="loading-top">
+        <span>CAM 01</span>
+        <span>ARCHIVE // 1991</span>
+      </div>
+      <div class="loading-title">THE BACKROOMS</div>
+      <div id="loading-status" class="loading-status">MOUNTING CAMERA</div>
+      <div class="loading-detail" id="loading-detail">Initializing the recording rig</div>
+      <div class="loading-track"><i id="loading-fill"></i></div>
+      <div class="loading-bottom">
+        <span>LEVEL 0 // THE LOBBY</span>
+        <span id="loading-percent">00</span><span>%</span>
+      </div>
+    </div>
+  </section>
   <div id="vignette" aria-hidden="true"></div>
   <div id="film-grain" aria-hidden="true"></div>
   <div id="scanlines" aria-hidden="true"></div>
   <div id="chromatic" aria-hidden="true"></div>
 
   <section id="boot" class="intro-screen">
-    <div id="audio-gate" class="audio-gate" role="button" tabindex="0" aria-label="Click to enable audio">
-      <div>Click To Enable</div>
-      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Audio</div>
+    <div class="intro-corner intro-corner-top">
+      <span>CAM 01</span><span>REC ●</span><span>SPB / 01</span>
     </div>
-    <div id="intro-noise" class="intro-noise"></div>
-    <div class="intro-corner intro-corner-top">CAM 01&nbsp;&nbsp;REC</div>
-    <div class="intro-corner intro-corner-bottom">NO SIGNAL / INPUT REQUIRED</div>
+    <div class="intro-card">
+      <div class="intro-eyebrow">FOUND FOOTAGE // UNVERIFIED</div>
+      <div class="intro-title">THE BACKROOMS</div>
+      <div id="intro-line" class="intro-line">REC 01 // SIGNAL ACQUIRED</div>
+      <div id="intro-sub" class="intro-sub">No GPS fix</div>
+      <button id="audio-gate" class="audio-gate" type="button" aria-label="Click to enable audio">
+        <span class="audio-gate-main">ENABLE AUDIO</span>
+        <span class="audio-gate-small">PRESS ONCE TO BEGIN RECORDING</span>
+      </button>
+    </div>
+    <div class="intro-corner intro-corner-bottom">
+      <span>TRACKING: --</span><span>BAT 84%</span><span>DATE: UNKNOWN</span>
+    </div>
   </section>
 
   <section id="hud" class="hidden">
-    <div class="hud-top">
-      <div class="arg-hud">
+    <div class="hud-rec">
+      <div class="rec-left">
+        <span class="rec-dot"></span>
+        <span>REC</span>
         <span id="rec-time">00:00:00</span>
-        <span id="rec-status">REC ●</span>
-        <span id="signal-state">SIGNAL UNSTABLE</span>
       </div>
-      <div class="level-readout">
-        <span id="level-number">LEVEL 0</span>
-        <strong id="level-name">THRESHOLD</strong>
+      <div class="rec-center">CAM 01 // LEVEL 0</div>
+      <div class="rec-right">
+        <span id="status">LIGHT ON</span>
+        <span>BAT 84%</span>
       </div>
-      <div id="status">ALONE</div>
+    </div>
+    <div class="hud-location">
+      <span id="level-number">LEVEL 0</span>
+      <strong id="level-name">THE LOBBY</strong>
     </div>
     <div id="arg-message" class="arg-message hidden"></div>
-
     <div class="crosshair"></div>
-
     <div class="hud-bottom">
-      <div class="meters">
-        <div class="meter"><span>HEALTH</span><div class="bar"><i id="health-bar"></i></div></div>
-        <div class="meter"><span>STAMINA</span><div class="bar"><i id="stamina-bar"></i></div></div>
-        <div class="meter"><span>HYDRATION</span><div class="bar"><i id="hydration-bar"></i></div></div>
-        <div class="meter"><span>SANITY</span><div class="bar"><i id="sanity-bar"></i></div></div>
-      </div>
-      <div class="readouts">
-        <span id="objective">Find a way out.</span>
+      <div class="hud-micro">
+        <span>HP</span><div class="micro-bar"><i id="health-bar"></i></div>
+        <span>ST</span><div class="micro-bar"><i id="stamina-bar"></i></div>
         <span id="coords">0 : 0</span>
       </div>
+      <div class="hud-objective">
+        <span>OBJECTIVE</span>
+        <strong id="objective">Find a way out.</strong>
+      </div>
     </div>
+    <div class="tape-noise" aria-hidden="true"></div>
   </section>
 
   <section id="mobile-controls" class="hidden" aria-hidden="true">
