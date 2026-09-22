@@ -172,6 +172,8 @@ async function checkModuleGraph(jsFiles, imports) {
         continue;
       }
 
+      if (specifier.startsWith("node:")) continue;
+
       if (isScheme(specifier)) {
         validateRemote(specifier, context);
         continue;
