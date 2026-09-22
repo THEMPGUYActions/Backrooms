@@ -109,8 +109,25 @@ export class AudioDirector{
     return !!this.ctx&&this.ctx.state==="running";
   }
   unlockFromGesture(){
-    if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
-    if(this.ctx?.state==="suspended")this.ctx.resume().catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
+    try{
+      if(!this.ctx){
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        if(!Ctx)return;
+        // Construct the context synchronously from the user gesture.
+        this.ctx=new Ctx();
+      }
+      if(this.ctx.state==="suspended"){
+        const resume=this.ctx.resume();
+        Promise.resolve(resume).then(()=>{
+          if(this.isEnabled()&&this.ready)this.clickToEnter();
+        }).catch(error=>console.warn("[Backrooms] Audio resume failed:",error));
+      }else if(this.isEnabled()&&this.ready){
+        this.clickToEnter();
+      }
+      if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
+    }catch(error){
+      console.warn("[Backrooms] Audio unlock failed:",error);
+    }
   }
   async resume(){await this.init()}
   connectFx(node,send=.3,delay=.18){
