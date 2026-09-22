@@ -3,7 +3,7 @@ import { BackroomsGame } from "./game.js";
 const registerCache=async()=>{
   if(!("serviceWorker" in navigator))return;
   try{
-    const registration=await navigator.serviceWorker.register("../sw.js",{scope:"./"});
+    const registration=await navigator.serviceWorker.register("./sw.js",{scope:"./"});
     await navigator.serviceWorker.ready;
     registration.active?.postMessage({type:"WARM_ASSETS"});
   }catch(error){

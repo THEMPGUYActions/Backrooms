@@ -37,7 +37,7 @@ export class InputManager {
     });
 
     this.game.renderer.domElement.addEventListener("click", () => {
-      if(matchMedia("(pointer:fine)").matches && !this.game.paused) this.game.renderer.domElement.requestPointerLock?.();
+      if(matchMedia("(pointer:fine)").matches && !this.game.paused){const lock=this.game.renderer.domElement.requestPointerLock?.();lock?.catch(()=>{});}
     });
 
     const stick = document.getElementById("stick-zone");
