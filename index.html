@@ -71,7 +71,7 @@
       <div class="rec-center">CAM 01 // LEVEL 0</div>
       <div class="rec-right">
         <span id="status">LIGHT ON</span>
-        <span>BAT 84%</span>
+        <span id="flash-battery">BAT 100%</span>
         <span class="tape-mark">SP</span>
       </div>
     </div>
@@ -106,47 +106,76 @@
   </section>
 
   <section id="pause" class="screen hidden">
-    <div class="panel compact vhs-panel">
-      <div class="vhs-panel-top"><span>CAM 01</span><span>PAUSE // FRAME HOLD</span><span>TRACK 02</span></div>
-      <div class="eyebrow">SYSTEM PAUSED</div>
-      <h2>FRAME HELD</h2>
-      <p class="muted pause-copy">The recording is paused. The room is not.</p>
-
-      <div class="settings">
-        <label>QUALITY
-          <select id="quality">
-            <option value="auto">Auto</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label>VOLUME
-          <input id="volume" type="range" min="0" max="1" step="0.02" value="0.65">
-        </label>
-        <label>LOOK SENSITIVITY
-          <input id="sensitivity" type="range" min="0.5" max="2" step="0.05" value="1">
-        </label>
-        <label class="check"><input id="shake" type="checkbox" checked> Camera shake</label>
-        <label class="check"><input id="flashlight" type="checkbox" checked> Flashlight starts on</label>
+    <div class="vhs-pause">
+      <div class="pause-head">
+        <span>CAM 01</span>
+        <span>PAUSE</span>
+        <span>FRAME HOLD</span>
       </div>
 
-      <div class="controls-title">CONTROLS</div>
-      <div class="controls-grid">
-        <div><b>MOVE</b><span>W A S D</span></div>
-        <div><b>LOOK</b><span>MOUSE / TOUCH</span></div>
-        <div><b>RUN</b><span>SHIFT / HOLD RUN</span></div>
-        <div><b>LIGHT</b><span>F / FLASH BUTTON</span></div>
-        <div><b>PAUSE</b><span>ESC / PAUSE</span></div>
-        <div><b>TOUCH</b><span>LEFT STICK + LOOK AREA</span></div>
+      <div class="pause-title">RECORDING PAUSED</div>
+      <div class="pause-sub">The camera is still rolling. Movement is stopped.</div>
+
+      <div class="pause-columns">
+        <div class="pause-section">
+          <div class="pause-section-title">SETTINGS</div>
+
+          <label class="pause-row">
+            <span>QUALITY</span>
+            <select id="quality">
+              <option value="auto">AUTO</option>
+              <option value="low">LOW</option>
+              <option value="medium">MEDIUM</option>
+              <option value="high">HIGH</option>
+            </select>
+          </label>
+
+          <label class="pause-row">
+            <span>VOLUME</span>
+            <input id="volume" type="range" min="0" max="1" step="0.02" value="0.65">
+          </label>
+
+          <label class="pause-row">
+            <span>LOOK SPEED</span>
+            <input id="sensitivity" type="range" min="0.5" max="2" step="0.05" value="1">
+          </label>
+
+          <label class="pause-check">
+            <input id="shake" type="checkbox" checked>
+            <span>CAMERA SHAKE</span>
+          </label>
+
+          <label class="pause-check">
+            <input id="flashlight" type="checkbox" checked>
+            <span>START WITH FLASHLIGHT</span>
+          </label>
+        </div>
+
+        <div class="pause-section">
+          <div class="pause-section-title">CONTROLS</div>
+
+          <div class="control-list">
+            <div class="control-row"><span>MOVE</span><kbd>W A S D</kbd></div>
+            <div class="control-row"><span>LOOK</span><kbd>MOUSE / TOUCH</kbd></div>
+            <div class="control-row"><span>RUN</span><kbd>SHIFT</kbd><small>HOLD</small></div>
+            <div class="control-row"><span>LIGHT</span><kbd>F</kbd><small>FLASHLIGHT</small></div>
+            <div class="control-row"><span>PAUSE</span><kbd>ESC</kbd><small>MENU</small></div>
+            <div class="control-row"><span>TOUCH</span><kbd>LEFT STICK</kbd><small>LOOK RIGHT SIDE</small></div>
+          </div>
+        </div>
       </div>
 
-      <div class="pause-buttons">
-        <button id="resume" class="primary">RESUME</button>
-        <button id="fullscreen" class="secondary">FULLSCREEN</button>
-        <button id="restart" class="secondary">RESTART RUN</button>
+      <div class="pause-bottom">
+        <button id="resume" class="pause-button">RESUME</button>
+        <button id="fullscreen" class="pause-button">FULLSCREEN</button>
+        <button id="restart" class="pause-button danger">RESTART RUN</button>
       </div>
-      <p class="fine">Settings are saved locally on this device.</p>
+
+      <div class="pause-footer">
+        <span id="pause-level">LEVEL 0</span>
+        <span>THE BACKROOMS</span>
+        <span>ESC TO RESUME</span>
+      </div>
     </div>
   </section>
 
@@ -165,7 +194,7 @@
       <h1>YOU FOUND A WAY OUT</h1>
       <p class="muted">You reached the current edge of this build. The Backrooms are larger than what is implemented here, and the world is designed to keep expanding.</p>
       <div class="boot-grid">
-        <div><span>LEVELS</span><b>0 · 1 · 2</b></div>
+        <div><span>LEVELS</span><b>0 · 1 · 2 · 3 · 4</b></div>
         <div><span>WORLD</span><b>INFINITE-STYLE</b></div>
         <div><span>GENERATION</span><b>SEEDED</b></div>
         <div><span>PERFORMANCE</span><b>ADAPTIVE</b></div>
