@@ -56,6 +56,7 @@ async function downloadSpacePotatoAsset(entry){
   if(!data.length||data.length>MAX_SPB_BYTES)throw new Error("Invalid SpacePotato asset size for "+entry.name);
   if(data.length<8||!data.subarray(0,8).equals(PNG_SIGNATURE))throw new Error("SpacePotato asset is not a PNG: "+entry.name);
   const sha256=createHash("sha256").update(data).digest("hex");
+  await mkdir(join(spbDir, entry.name, ".."), { recursive: true });
   await writeFile(join(spbDir,entry.name),data);
   return {url,source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,bytes:data.length,sha256};
 }
