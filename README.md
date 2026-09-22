@@ -1,166 +1,184 @@
 # The Backrooms
 
-A browser-based Backrooms game built with HTML, CSS, and JavaScript.
+A production-minded browser Backrooms game by THEMPGUY.
 
-Explore the Backrooms, move through different levels, and see how far you can get before the place gets you.
+The game is static-host friendly: the playable build is HTML, CSS and JavaScript and can be published directly to GitHub Pages or another static host.
 
-> **Status:** In development
+## Current build
 
-## About
+The current game build includes:
 
-**The Backrooms** is an ongoing game project by **THEMPGUY**.
+- First-person 3D exploration
+- Procedurally generated maze chunks
+- Seeded world generation
+- Streaming chunk loading and unloading
+- Instanced wall rendering for repeated geometry
+- PBR-style procedural base, roughness and normal maps
+- Three.js r186
+- ACES filmic tone mapping
+- Adaptive resolution for weaker devices
+- Low / Medium / High / Auto quality modes
+- Desktop pointer lock controls
+- Mobile joystick and touch-look controls
+- Flashlight with dynamic cone lighting
+- Procedural Web Audio ambience and effects
+- Footsteps, lighting faults, damage and exit audio
+- Health, stamina, hydration and sanity systems
+- Hazards and deaths
+- Data-driven level definitions
+- Level 0, Level 1 and Level 2 gameplay
+- Hound and Smiler gameplay representations
+- Local settings persistence
+- No backend, database or server required
 
-The goal is to build a playable Backrooms experience directly in the browser, with levels being added over time. The project is intended to grow as more locations, mechanics, entities, and other Backrooms content are implemented.
-
-Levels may be based on entries from the [Backrooms Wiki](https://backrooms-wiki.wikidot.com/) and other Backrooms material where permitted by the applicable license.
-
-This project is **not affiliated with or endorsed by the Backrooms Wiki, Wikidot, or any other Backrooms community/project**.
+The generator is intentionally deterministic from a world seed. Chunks can be regenerated from coordinates without storing the entire map, which keeps memory use bounded.
 
 ## Levels
 
-More levels will be added as development continues.
+### Level 0 - "Threshold"
 
-The planned level system is intended to support:
+Yellow maze-like spaces, damp carpet, fluorescent fixtures, darkness, hazards and a flickering route forward.
 
-- Main numbered levels
-- Sub-levels
-- Unnumbered levels
-- Different environments and layouts
-- Level-specific hazards
-- Entities and encounters
-- Entrances and exits
-- Level-specific mechanics
+Source:
+https://backrooms-wiki.wikidot.com/level-0
 
-### Current levels
+### Level 1 - "Habitable Zone"
 
-The level list will be updated as playable levels are added.
+A rougher and less forgiving environment with flickering events, supplies, industrial details and hostile encounters.
 
-- [ ] Level 0
-- [ ] Level 1
-- [ ] More levels coming
+Source:
+https://backrooms-wiki.wikidot.com/level-1
 
-The exact implementation of a level may differ from its source material to make it work as a game.
+### Level 2 - "Abandoned Utility Halls"
 
-## Backrooms Wiki
+Tighter utility corridors with concrete, pipes, unstable lighting and a heavier industrial atmosphere.
 
-The [Backrooms Wiki](https://backrooms-wiki.wikidot.com/) is a major reference for levels and other material used as inspiration for this project.
+Source:
+https://backrooms-wiki.wikidot.com/level-2
 
-The Backrooms Wiki is a collaborative fiction project containing levels, entities, objects, tales, groups, canons, and other material. Individual pages can have their own licensing and attribution requirements, so source material is credited according to the license that applies to it.
+More levels can be added without rewriting the renderer. Level metadata lives in src/levels.js and data/levels.json.
 
-When a level or other content is adapted from a specific wiki page, the project should provide attribution to the original creator(s) and source page where required.
+## Controls
 
-**Backrooms Wiki:** https://backrooms-wiki.wikidot.com/
+Desktop:
 
-## Features
+- W A S D to move
+- Mouse to look
+- Shift to run
+- F to toggle the flashlight
+- Esc to pause
+- R + Shift to restart
 
-The game is being developed around a simple browser-first experience.
+Mobile:
 
-Planned and developing features include:
+- Left stick to move
+- Swipe the right side of the screen to look
+- RUN toggles sprint while held
+- The flashlight button toggles the light
 
-- First-person exploration
-- Multiple Backrooms levels
-- Level transitions
-- Atmospheric environments
-- Entity encounters
-- Level-specific gameplay
-- Browser-based gameplay
-- More content added over time
+## Performance design
 
-Features may change during development.
+The world is not generated as one giant mesh.
 
-## Running the Game
+Only nearby chunks are kept in memory. Each chunk uses a small deterministic maze grid, shared geometry, instanced wall meshes and a limited number of dynamic lights. Far chunks are detached from the scene.
 
-Clone the repository:
+The renderer also adapts its pixel ratio when Auto quality is selected. This is intended to make the game usable on lower-end PCs and mobile GPUs without forcing the high-end rendering path on every device.
 
-```bash
+No external texture pack is required for the core game.
+
+## Procedural assets
+
+The repository generates the core environment materials at runtime instead of shipping random downloaded textures.
+
+Generated materials include:
+
+- Carpet
+- Painted wall
+- Concrete
+- Ceiling
+- Metal
+- Dark rubber-like materials
+
+Each PBR-style material has a generated base-color map, roughness map and normal map. Props such as pipes, crates, fluorescent fixtures and exit markers are also generated from primitive geometry.
+
+See assets/README.md.
+
+## Audio
+
+The core ambience and sound effects are synthesised with the Web Audio API. This keeps the project completely static and avoids shipping large audio binaries.
+
+The game starts audio after a user gesture, which is required by modern browser autoplay policies.
+
+## Development
+
+Clone the repository and run a local web server:
+
+~~~bash
 git clone https://github.com/THEMPGUYActions/Backrooms.git
 cd Backrooms
-```
-
-Then open the game's HTML entry point in a browser.
-
-For development, a local web server is recommended instead of opening files directly with `file://`.
-
-For example:
-
-```bash
-python -m http.server
-```
+python -m http.server 8000
+~~~
 
 Then open:
 
-```
-http://localhost:8000
-```
+http://localhost:8000/
 
-## Project Structure
+For Node-based QA/build checks:
 
-The structure of the project may change as development continues.
+~~~bash
+npm run check
+npm run build
+~~~
 
-Typical project files include:
+## GitHub Pages
 
-```text
-Backrooms/
-├── index.html
-├── css/
-├── js/
-├── assets/
-├── levels/
-├── README.md
-└── LICENSE
-```
+Production is the main branch.
 
-Not every directory listed above may exist yet.
+The GitHub Actions workflow:
 
-## Contributing
+1. Runs source-quality checks.
+2. Builds the static site into dist/.
+3. Uploads a GitHub Pages artifact.
+4. Deploys main to GitHub Pages.
 
-Contributions are welcome as long as they follow the project's license and do not introduce material that cannot legally be redistributed with the project.
+The dev branch runs the same QA/build pipeline and publishes a downloadable CI artifact for testing without replacing production.
 
-If you are adding content based on an existing Backrooms Wiki page or another creator's work:
+After GitHub Pages is enabled for the repository with GitHub Actions as the publishing source, the production site will use:
 
-1. Check the source material's license.
-2. Keep the required attribution.
-3. Keep any required source links.
-4. Do not remove existing creator credits.
-5. Make it clear when content has been modified.
-6. Do not assume that content from different Backrooms sources has the same license.
+https://thempguyactions.github.io/Backrooms/
 
-For larger changes, opening an issue first is recommended.
+GitHub Pages documentation:
+https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
 
-## License
+## Branches
 
-Original material in this repository created by **THEMPGUY** is licensed under:
+- main = production
+- dev = active development
 
-**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0).**
+The dev branch is where new game systems should land first. Production changes should be promoted to main only after the QA workflow passes.
 
-You may copy, share, and adapt the covered material for **NonCommercial** purposes, provided that the license requirements are followed.
+## Attribution and licensing
 
-Commercial or monetized use is not permitted under this license.
+This project uses Backrooms Wiki-derived material for identifiable levels and entities. The project intentionally does not bundle the wiki's photographs, page artwork, music or other third-party media.
 
-This includes using the covered material in a deployment that is primarily intended for commercial advantage or monetary compensation. This project also does not grant permission to add advertising, sponsored content, paid promotions, affiliate monetization, or other monetization to a deployment of the covered material.
+See:
 
-For the complete license terms, see [LICENSE](./LICENSE).
+- ATTRIBUTION.md
+- GAME-CONTENT-LICENSE.md
+- LICENSE
 
-**License:** https://creativecommons.org/licenses/by-nc-sa/4.0/
+The current Backrooms Wiki licensing guide states that its content is generally CC BY-SA 3.0 and provides specific requirements for game developers using wiki material:
 
-### Important: third-party content
+https://backrooms-wiki.wikidot.com/licensing-guide
 
-Not every file or piece of content in this repository is necessarily owned by THEMPGUY.
+The current image-use guide also describes compatible media licenses and attribution requirements:
 
-Third-party material, including Backrooms Wiki-derived material, remains subject to the license that applies to that material. Where a source has different licensing requirements, those requirements take precedence for that source material.
+https://backrooms-wiki.wikidot.com/image-use-policy
 
-Do not assume that the CC BY-NC-SA 4.0 license applies to third-party material merely because it appears in this repository.
+Original project material that is not derived from third-party Backrooms content remains subject to the applicable repository license.
 
-## Attribution
+## Disclaimer
 
-**The Backrooms** is a fictional setting with many different interpretations and communities.
+This is an independent fan game project. It is not affiliated with or endorsed by the Backrooms Wiki, Wikidot, or other Backrooms projects.
 
-This project uses Backrooms-related material and may incorporate or adapt content from sources such as the [Backrooms Wiki](https://backrooms-wiki.wikidot.com/). Appropriate attribution will be provided for third-party material according to the applicable source license.
-
-This project is an independent game project and is not an official Backrooms Wiki game.
-
-## Copyright
-
-Copyright © 2026 **THEMPGUY**
-
-For licensing questions or requests for additional permission, contact **THEMPGUY**.
+Copyright © 2026 THEMPGUY.
