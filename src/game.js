@@ -531,7 +531,7 @@ class Player{
     this.game.camera.rotation.set(this.pitch,this.yaw,roll,"YXZ");
     this.game.flash.position.copy(this.game.camera.position);
     this.game.flashTarget.position.copy(this.game.camera.position).add(new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion));
-    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState);
+    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,Math.hypot(this.position.x-oldX,this.position.z-oldZ));
   }
 }
 
