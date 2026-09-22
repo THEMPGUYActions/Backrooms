@@ -1434,9 +1434,15 @@ export class BackroomsGame{
     this.vhsPass.uniforms.fear.value=0;
     document.getElementById("hud")?.classList.remove("hidden");
     const mobileControls=document.getElementById("mobile-controls");
-    mobileControls?.classList.add("hidden");
-    mobileControls?.classList.remove("mobile-controls-ready");
-    mobileControls?.setAttribute("aria-hidden","true");
+    if(this.isTouchLayout()){
+      mobileControls?.classList.remove("hidden");
+      mobileControls?.setAttribute("aria-hidden","false");
+      requestAnimationFrame(()=>mobileControls?.classList.add("mobile-controls-ready"));
+    }else{
+      mobileControls?.classList.add("hidden");
+      mobileControls?.classList.remove("mobile-controls-ready");
+      mobileControls?.setAttribute("aria-hidden","true");
+    }
     const boot=document.getElementById("boot");
     const audioPage=document.querySelector(".intro-audio-page");
     if(audioPage)audioPage.style.pointerEvents="none";
