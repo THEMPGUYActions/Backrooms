@@ -135,6 +135,9 @@ await writeFile(join(spbDir,"manifest.json"),JSON.stringify(spbManifest,null,2)+
 const audioManifest={pack:audioLock.pack,license:audioLock.license,files:{}};
 for(const filename of Object.keys(audioLock.files))audioManifest.files[filename]=await downloadAudioAsset(filename);
 await writeFile(join(audioDir,"manifest.json"),JSON.stringify(audioManifest,null,2)+"\n","utf8");
+const builtMain=await readFile(join(dist,"src","main.js"),"utf8");
+await writeFile(join(dist,"src","main.js"),builtMain.replace(/\s*\/\* DEV_ADMIN_START \*\/[\s\S]*?\/\* DEV_ADMIN_END \*\//g,""),"utf8");
+await rm(join(dist,"src","admin.js"),{force:true});
 await writeFile(join(dist,".nojekyll"),"","utf8");
 
 console.log("Downloaded and checksum-verified "+PBR_FILES.length+" CC0 OpenGameArt PBR maps.");
