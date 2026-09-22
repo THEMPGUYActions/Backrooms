@@ -1,5 +1,32 @@
 import * as THREE from "three";
 
+const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
+
+export const BACKROOMS_PBR_SOURCES = Object.freeze({
+  wallpaper: {
+    color: LOCAL_PBR_ASSET_BASE + "wallpaper_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "wallpaper_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "wallpaper_normal.png"
+  },
+  carpet: {
+    color: LOCAL_PBR_ASSET_BASE + "carpet_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "carpet_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "carpet_normal.png"
+  },
+  paintedWall: {
+    color: LOCAL_PBR_ASSET_BASE + "painted_wall_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "painted_wall_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "painted_wall_normal.png"
+  },
+  ceiling: {
+    color: LOCAL_PBR_ASSET_BASE + "ceiling_tiles_color.png",
+    rough: LOCAL_PBR_ASSET_BASE + "ceiling_tiles_rough.png",
+    normal: LOCAL_PBR_ASSET_BASE + "ceiling_tiles_normal.png"
+  }
+});
+
+const remoteTextureCache = new Map();
+
 function noise2d(x,y,s){
   let n=(Math.imul((x+s)|0,374761393)+Math.imul((y+s)|0,668265263))|0;
   n=Math.imul(n^(n>>>13),1274126177);
@@ -17,7 +44,73 @@ function tex(canvas,color=true){
   const t=new THREE.CanvasTexture(canvas);
   t.wrapS=THREE.RepeatWrapping;t.wrapT=THREE.RepeatWrapping;t.anisotropy=2;
   if(color)t.colorSpace=THREE.SRGBColorSpace;
+  t.userData.backroomsOwned=true;
   return t;
+}
+
+function configureTexture(t,{color=false,repeat=1}={}){
+  t.wrapS=THREE.RepeatWrapping;
+  t.wrapT=THREE.RepeatWrapping;
+  t.repeat.set(repeat,repeat);
+  t.anisotropy=4;
+  if(color)t.colorSpace=THREE.SRGBColorSpace;
+  else t.colorSpace=THREE.NoColorSpace;
+  t.needsUpdate=true;
+  return t;
+}
+
+function loadRemoteTexture(url,color=false){
+  if(remoteTextureCache.has(url))return remoteTextureCache.get(url);
+  const promise=new Promise((resolve,reject)=>{
+    const loader=new THREE.TextureLoader();
+    loader.setCrossOrigin("anonymous");
+    loader.load(
+      url,
+      texture=>resolve(configureTexture(texture,{color,repeat:1})),
+      undefined,
+      error=>reject(error||new Error("Texture failed to load"))
+    );
+  });
+  remoteTextureCache.set(url,promise);
+  return promise;
+}
+
+async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength){
+  try{
+    const texture=await loadRemoteTexture(url,color);
+    texture.repeat.set(repeat,repeat);
+    const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:material.normalMap;
+    if(previous?.userData?.backroomsOwned)previous.dispose();
+    if(kind==="map")material.map=texture;
+    else if(kind==="roughnessMap")material.roughnessMap=texture;
+    else material.normalMap=texture;
+    if(kind==="normalMap")material.normalScale.set(normalStrength,normalStrength);
+    material.needsUpdate=true;
+  }catch(error){
+    console.warn("[Backrooms] OpenGameArt texture unavailable, keeping procedural fallback:",url,error);
+  }
+}
+
+export async function applyOpenGameArtPBR(library,level){
+  const source=level.id==="0"
+    ? {wall:BACKROOMS_PBR_SOURCES.wallpaper,floor:BACKROOMS_PBR_SOURCES.carpet}
+    : {wall:BACKROOMS_PBR_SOURCES.paintedWall,floor:BACKROOMS_PBR_SOURCES.carpet};
+
+  const wallRepeat=level.id==="0"?1.15:1.45;
+  const floorRepeat=level.id==="0"?3.4:3.0;
+  const ceilingRepeat=2.0;
+  const jobs=[
+    applyRemoteTexture(library.wall,"map",source.wall.color,true,wallRepeat,.28),
+    applyRemoteTexture(library.wall,"roughnessMap",source.wall.rough,false,wallRepeat,.28),
+    applyRemoteTexture(library.wall,"normalMap",source.wall.normal,false,wallRepeat,.28),
+    applyRemoteTexture(library.floor,"map",source.floor.color,true,floorRepeat,.16),
+    applyRemoteTexture(library.floor,"roughnessMap",source.floor.rough,false,floorRepeat,.16),
+    applyRemoteTexture(library.floor,"normalMap",source.floor.normal,false,floorRepeat,.16),
+    applyRemoteTexture(library.ceiling,"map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25),
+    applyRemoteTexture(library.ceiling,"roughnessMap",BACKROOMS_PBR_SOURCES.ceiling.rough,false,ceilingRepeat,.25),
+    applyRemoteTexture(library.ceiling,"normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,ceilingRepeat,.25)
+  ];
+  await Promise.allSettled(jobs);
 }
 
 function normalFromHeight(size,seed){
@@ -55,12 +148,31 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
   return m;
 }
 
+export function disposeMaterial(material){
+  if(!material)return;
+  for(const key of ["map","roughnessMap","normalMap","metalnessMap","aoMap","emissiveMap","alphaMap"]){
+    const texture=material[key];
+    if(texture && texture.userData?.backroomsOwned)texture.dispose();
+  }
+  material.dispose();
+}
+
+export function disposeLibrary(library){
+  if(!library)return;
+  for(const [key,material] of Object.entries(library)){
+    if(material?.isMaterial && key!=="exit")disposeMaterial(material);
+  }
+  if(library.exit?.isMaterial)disposeMaterial(library.exit);
+}
+
 export function makeLibrary(level){
+  const ceiling=createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.88,scale:2,normalStrength:.24});
+  ceiling.side=THREE.DoubleSide;
   return {
     floor:createPBRMaterial({base:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:3.8,normalStrength:.35}),
     concrete:createPBRMaterial({base:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
-    ceiling:createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.88,scale:4,normalStrength:.24}),
+    ceiling,
     metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.62,metalness:.78}),
     cable:new THREE.MeshStandardMaterial({color:0x171817,roughness:.79,metalness:.58}),
     water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72}),

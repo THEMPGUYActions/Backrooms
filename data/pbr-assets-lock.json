@@ -1,0 +1,68 @@
+{
+  "pack": "Backrooms PBR texture pack",
+  "author": "methodical pixel",
+  "source": "https://opengameart.org/content/backrooms-pbr-texture-pack",
+  "license": "CC0",
+  "files": {
+    "wallpaper_color.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/wallpaper_color.png",
+      "bytes": 1000957,
+      "sha256": "69eaa896aa3f8ae6e447d1c1c66980e8e2dccfc9067701021d11257bc6d017d3"
+    },
+    "wallpaper_rough.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/wallpaper_rough.png",
+      "bytes": 630302,
+      "sha256": "cecbaa56e17cfeef7af15bd3951bfd198c6e2a66165270e64ba6ee62b996fec2"
+    },
+    "wallpaper_normal.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/wallpaper_normal.png",
+      "bytes": 1947548,
+      "sha256": "840d71f10326427a821c36f5052b8891c6f9d853e50b83d7af069810d4df3aeb"
+    },
+    "painted_wall_color.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/painted_wall_color.png",
+      "bytes": 224164,
+      "sha256": "5196d538c15f5d1c11279afe4850f3d7cc9054e421629f03ca15627d22598197"
+    },
+    "painted_wall_rough.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/painted_wall_rough.png",
+      "bytes": 261243,
+      "sha256": "7e5340740a0bd5684c46b4353a5fee5a573ec60c5ce9b414094af4dbe059304c"
+    },
+    "painted_wall_normal.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/painted_wall_normal.png",
+      "bytes": 725207,
+      "sha256": "ce836b4b5fa9af4b8b9e1f365f391f34c7c843399ae6e052db9069d65b30d4f7"
+    },
+    "carpet_color.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/carpet_color.png",
+      "bytes": 2083243,
+      "sha256": "277c49ba71487232af46cdc38d6d294864d4df6bc710675bd034d5d568a525c0"
+    },
+    "carpet_rough.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/carpet_rough.png",
+      "bytes": 579095,
+      "sha256": "433afcd0f6f3c8a544c2261b5ff363ba0d10c7255df98e1c2890de28c34c6706"
+    },
+    "carpet_normal.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/carpet_normal.png",
+      "bytes": 2801820,
+      "sha256": "87a1685a4c7ee1ba2c9191e4df877ed419dd6ec6c3eb266b72bfc62fe14cb790"
+    },
+    "ceiling_tiles_color.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/ceiling_tiles_color.png",
+      "bytes": 753702,
+      "sha256": "07356bb693f632584e62f552417fa160a5dc2ccf287bb8a3231abf1218325552"
+    },
+    "ceiling_tiles_rough.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/ceiling_tiles_rough.png",
+      "bytes": 302436,
+      "sha256": "b0dbd5f3742f073c67bf048817bb9d7fa0e4ad6e03f726f66943de67b06a1b2b"
+    },
+    "ceiling_tiles_normal.png": {
+      "url": "https://opengameart.org/sites/default/files/oga-textures/175228/ceiling_tiles_normal.png",
+      "bytes": 1477964,
+      "sha256": "428331376995df7e02c07e391acfcf885170eee38bd6e8c3e277f24de9b50d95"
+    }
+  }
+}
