@@ -85,7 +85,7 @@ await mkdir(dist, { recursive: true });
 await mkdir(pbrDir,{recursive:true});
 await mkdir(audioDir,{recursive:true});
 
-for (const path of ["index.html", "styles.css", "src", "data"]) {
+for (const path of ["index.html", "styles.css", "favicon.svg", "src", "data"]) {
   await cp(join(root, path), join(dist, path), { recursive: true });
 }
 
