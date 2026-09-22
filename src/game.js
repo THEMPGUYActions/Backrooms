@@ -1358,12 +1358,17 @@ export class BackroomsGame{
     // configure() returns as soon as the fallback geometry exists; optional visual
     // enhancements continue in the background and can never block starting the game.
     try{
-      await this.world.configure((progress,label,detail)=>{
+      // configure() creates the procedural fallback synchronously before any
+      // remote asset work. Start the playable world from that fallback now.
+      const worldLoad=this.world.configure((progress,label,detail)=>{
         this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
       });
       this.world.ensureAround(0,0);
       this.worldReady=true;
       if(this.pendingStart)this.beginIntroReveal();
+      worldLoad.catch(error=>{
+        console.warn("[Backrooms] Optional world assets failed:",error);
+      });
     }catch(error){
       console.error("[Backrooms] World initialization failed:",error);
       this.toast("WORLD INITIALIZATION FAILED",5);
@@ -1433,7 +1438,19 @@ export class BackroomsGame{
     }
   }
   beginIntroReveal(){
-    if(!this.introActive||!this.mounted||!this.worldReady)return;
+    if(!this.introActive||!this.mounted)return;
+    // The procedural fallback is enough to start. If startup was triggered
+    // before mount finished, finish the initial chunk setup here instead of
+    // leaving the tap waiting on a readiness flag.
+    if(!this.worldReady){
+      try{
+        this.world.ensureAround(this.player.position.x,this.player.position.z);
+        this.worldReady=true;
+      }catch(error){
+        console.error("[Backrooms] Initial world setup failed:",error);
+        return;
+      }
+    }
     this.introActive=false;
     this.introPlaying=false;
     this.pendingStart=false;
