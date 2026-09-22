@@ -725,6 +725,7 @@ class WorldStreamer{
     }
   }
   collision(position,radius){
+    if(this.game.admin?.noclip)return {x:position.x,z:position.z};
     const chunk=this.chunkAt(position.x,position.z);
     if(!chunk)return position;
     const cell=this.game.level.cellSize,wallRadius=radius+.11;
@@ -831,9 +832,16 @@ class Player{
       this.flashBattery=Math.max(0,this.flashBattery-dt*(run?.46:.31));
       if(this.flashBattery<=0)this.flashlight=false;
     }
-    this.hydration=Math.max(0,this.hydration-dt*.48);if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
-    const dark=this.game.isDark();this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;this.sanity=Math.max(0,Math.min(100,this.sanity));
-    if(this.game.world.hazardAt(this.position.x,this.position.z)){this.health-=dt*34}
+    this.hydration=Math.max(0,this.hydration-dt*.48);
+    const dark=this.game.isDark();
+    if(!this.game.admin?.god){
+      if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
+      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;
+      if(this.game.world.hazardAt(this.position.x,this.position.z))this.health-=dt*34;
+    }else{
+      this.health=100;this.sanity=100;
+    }
+    this.sanity=Math.max(0,Math.min(100,this.sanity));
     if(this.game.world.exitAt(this.position.x,this.position.z)){this.game.reachExit();return}
     if(this.health<=0||this.sanity<=0){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
     const distance=Math.hypot(this.position.x-oldX,this.position.z-oldZ);
@@ -945,7 +953,7 @@ class EntityManager{
       }else{
         const lightOn=p.flashlight;if(lightOn&&d<18){e.group.position.x-=dx/d*dt*2.2;e.group.position.z-=dz/d*dt*2.2}
         if(!lightOn&&d<15){e.group.position.x+=dx/d*dt*1.4;e.group.position.z+=dz/d*dt*1.4}
-        if(d<1.1){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
+        if(d<1.1&&!this.game.admin?.god){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
       }
     }
     this.spawnForChunks();
@@ -998,6 +1006,7 @@ class AdaptiveQuality{
 export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
+    this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={
       shake:localStorage.getItem("br.shake")!=="0",

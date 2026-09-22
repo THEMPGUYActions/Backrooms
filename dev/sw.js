@@ -7,6 +7,7 @@ const CORE=[
   "src/assets.js",
   "src/audio.js",
   "src/levels.js",
+  "src/admin.js",
   "favicon.svg"
 ];
 
