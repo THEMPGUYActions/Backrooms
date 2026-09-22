@@ -902,17 +902,23 @@ class WorldStreamer{
     this.game.scene.add(this.floorSurface,this.ceilingSurface);
 
     this.updateSurfaceTiling();
-    try{
-      await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
-    }catch(error){
-      console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
-    }
-    try{
-      await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
-    }catch(error){
-      console.warn("[Backrooms] Level 1 Found Footage asset enhancement failed; fallback remains active.",error);
-    }
-    this.updateSurfaceTiling();
+
+    // The procedural fallback is complete at this point. Do not make startup
+    // depend on remote texture downloads or external asset hosts.
+    void (async()=>{
+      try{
+        await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+      }catch(error){
+        console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
+      }
+      try{
+        await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
+      }catch(error){
+        console.warn("[Backrooms] Level 1 Found Footage asset enhancement failed; fallback remains active.",error);
+      }
+      this.updateSurfaceTiling();
+    })();
+
     return true;
   }
 
