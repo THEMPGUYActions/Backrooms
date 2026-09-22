@@ -1049,17 +1049,19 @@ class WorldStreamer{
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    const view=this._lightViewPosition||(this._lightViewPosition=new THREE.Vector3());
+    const margin=THREE.MathUtils.degToRad(7);
+    const verticalFov=THREE.MathUtils.degToRad(camera?.getEffectiveFOV?.()??camera?.fov??62);
+    const horizontalFov=2*Math.atan(Math.tan(verticalFov*.5)*(camera?.aspect||1));
+    const halfV=verticalFov*.5+margin,halfH=horizontalFov*.5+margin;
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d>180)continue;
-        // Point lights are omnidirectional, so Three.js does not treat them as
-        // camera-visible objects for our local-light pool. Explicitly cull them
-        // against the camera frustum so lights behind/outside the FOV are removed
-        // from the active GPU light slots instead of illuminating the scene.
-        const inFov=frustum?frustum.containsPoint(light.position):true;
-        if(!inFov)continue;
+        camera?.matrixWorldInverse?.applyToVector3(view.copy(light.position));
+        if(view.z>=-0.05||-view.z>camera.far+20)continue;
+        if(Math.abs(Math.atan2(view.x,-view.z))>halfH)continue;
+        if(Math.abs(Math.atan2(view.y,-view.z))>halfV)continue;
         out.push({light,d});
       }
     }
@@ -1332,13 +1334,24 @@ export class BackroomsGame{
     this.last=performance.now();
   }
   async mount(){
+    const loading=document.getElementById("loading");
+    this.setLoadingProgress(.04,"INITIALIZING CAMERA","Preparing the recording...");
     document.getElementById("game").appendChild(this.renderer.domElement);
     this.resize();
     this.quality.apply();
-    await this.world.configure();
+    this.setLoadingProgress(.12,"BUILDING WORLD","Loading procedural materials...");
+    await this.world.configure((progress,label,detail)=>{
+      const p=typeof progress==="number"?Math.max(0,Math.min(1,progress)):.5;
+      this.setLoadingProgress(.12+p*.68,label||"BUILDING WORLD",detail||"Generating the environment...");
+    });
+    this.setLoadingProgress(.86,"STREAMING SPAWN","Generating the first rooms...");
     this.world.ensureAround(0,0);
+    this.setLoadingProgress(.96,"FINALIZING","Starting camera systems...");
     this.player.reset();
     this.mounted=true;
+    this.setLoadingProgress(1,"READY","Recording ready.");
+    loading?.classList.add("hidden");
+    document.getElementById("boot")?.classList.add("intro-ready");
     if(this.pendingStart)this.beginIntroReveal();
     this.render();
     this.last=performance.now();
