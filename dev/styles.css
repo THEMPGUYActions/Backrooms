@@ -143,12 +143,13 @@ h2{font-size:clamp(26px,5vw,44px)}
 }
 .brand-logo{
   width:clamp(64px,10vw,104px);height:auto;
-  margin-top:0;opacity:0;transform:translateY(18px) scale(.72);
+  max-height:0;margin:0 0 0;opacity:0;transform:translateY(-10px) scale(.72);
   filter:drop-shadow(0 0 22px rgba(200,180,91,.12));
   animation:brand-logo-reveal 1.25s cubic-bezier(.16,1,.3,1) 2.25s forwards;
 }
-.title-stack:has(.brand-logo){
-  animation:title-stack-shift 1.25s cubic-bezier(.16,1,.3,1) 2.25s forwards;
+.movie-title,.movie-present{
+  transform:translateY(-1px);
+  animation:title-text-push 1.25s cubic-bezier(.16,1,.3,1) 2.25s forwards;
 }
 .credits-stack{
   width:min(520px,82vw);display:flex;flex-direction:column;
@@ -184,13 +185,13 @@ h2{font-size:clamp(26px,5vw,44px)}
   100%{opacity:1;visibility:visible}
 }
 @keyframes brand-logo-reveal{
-  0%{opacity:0;transform:translateY(18px) scale(.72)}
-  45%{opacity:1;transform:translateY(0) scale(1.04)}
-  100%{opacity:1;transform:translateY(0) scale(1)}
+  0%{opacity:0;max-height:0;margin-bottom:0;transform:translateY(-10px) scale(.72)}
+  45%{opacity:1;max-height:110px;margin-bottom:18px;transform:translateY(0) scale(1.04)}
+  100%{opacity:1;max-height:110px;margin-bottom:18px;transform:translateY(0) scale(1)}
 }
-@keyframes title-stack-shift{
-  0%{transform:translateY(0)}
-  100%{transform:translateY(3.7vh)}
+@keyframes title-text-push{
+  0%{transform:translateY(-1px)}
+  100%{transform:translateY(1.9vh)}
 }
 
 .arg-hud{
@@ -244,54 +245,6 @@ canvas{filter:none;image-rendering:auto}
   background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,255,255,.025) 3px 4px);
   opacity:.35;mix-blend-mode:screen;pointer-events:none
 }
-.intro-card{position:relative;width:min(740px,88vw);padding:30px}
-.intro-eyebrow,.intro-line,.intro-sub{
-  font-family:"Courier New",ui-monospace,monospace;text-transform:uppercase
-}
-.intro-eyebrow{font-size:9px;letter-spacing:.28em;color:rgba(220,214,201,.32);margin-bottom:18px}
-.intro-title{
-  font-size:clamp(38px,7vw,84px);line-height:.9;font-weight:700;letter-spacing:.12em;
-  color:#ddd5c3;text-shadow:0 0 40px rgba(215,190,105,.1)
-}
-.intro-line{margin-top:38px;font-size:11px;letter-spacing:.16em;color:#cabd92}
-.intro-sub{margin-top:8px;font-size:9px;letter-spacing:.09em;color:rgba(220,214,201,.38)}
-.audio-gate{
-  margin-top:34px;padding:0;border:0;background:transparent;color:#e5ddc9;
-  font-family:"Courier New",ui-monospace,monospace;text-align:left;
-  display:grid;gap:7px;letter-spacing:.14em;animation:gate-flicker 7s steps(1,end) infinite
-}
-.audio-gate-main{font-size:12px}
-.audio-gate-small{font-size:8px;letter-spacing:.2em;color:rgba(220,214,201,.28)}
-.audio-gate:hover .audio-gate-main{text-shadow:0 0 18px rgba(226,203,115,.3)}
-.audio-gate.busy{pointer-events:none;opacity:.45}
-
-.intro-card{opacity:0;pointer-events:none}
-.intro-screen.intro-live .intro-film{display:none}
-.intro-screen.intro-live .intro-card{
-  opacity:1;pointer-events:none;
-  animation:intro-card-live 7.2s cubic-bezier(.15,.7,.2,1) both;
-}
-@keyframes intro-card-live{
-  0%{opacity:0;transform:scale(1.018)}
-  12%{opacity:.92;transform:scale(1)}
-  72%{opacity:.86;transform:scale(1)}
-  100%{opacity:0;transform:scale(1.025)}
-}
-.intro-screen.booting .intro-card{animation:intro-boot 6.8s cubic-bezier(.15,.7,.2,1) both}
-.intro-screen.booting .intro-corner{animation:intro-corner 6.8s linear both}
-@keyframes intro-boot{
-  0%{opacity:1;transform:scale(1)}
-  18%{opacity:.92;transform:scale(1.01)}
-  54%{opacity:.72;transform:scale(1.018)}
-  100%{opacity:0;transform:scale(1.045)}
-}
-@keyframes intro-corner{
-  0%{opacity:.2}
-  20%{opacity:.5}
-  60%{opacity:.25}
-  100%{opacity:0}
-}
-
 .hud-rec{
   position:absolute;left:16px;right:16px;top:14px;
   display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
