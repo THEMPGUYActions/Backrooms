@@ -75,10 +75,10 @@ class Chunk{
           const vertical=rng.next()<.5;
           if(vertical){
             const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);
-            for(let z=1;z<cells-1;z++)if(Math.abs(z-gap)>0)this.setEdge(x,z,"east",false);
+            for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false);
           }else{
             const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);
-            for(let x=1;x<cells-1;x++)if(Math.abs(x-gap)>0)this.setEdge(x,z,"south",false);
+            for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false);
           }
         }
       }else{
@@ -605,7 +605,7 @@ class EntityManager{
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
       const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91);
-      const minSpawn=1,maxSpawn=Math.max(1,this.game.level.gridSize?this.game.level.gridSize-2:14);const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
+      const grid=this.game.level.gridSize||CELLS,minSpawn=1,maxSpawn=Math.max(1,grid-2);const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
       const group=new THREE.Group();group.position.set(x,0,z);
       if(type==="hound"){
         const mat=new THREE.MeshStandardMaterial({color:0x050505,roughness:.95,metalness:.05});
