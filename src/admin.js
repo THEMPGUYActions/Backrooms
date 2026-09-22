@@ -9,8 +9,7 @@ export class BackroomsAdmin{
   constructor(game){
     this.game=game;
     this.opened=false;
-    this.build();
-    this.bind();
+    this.ready=false;
     this.opener=document.createElement("button");
     this.opener.id="admin-open";
     this.opener.type="button";
@@ -20,10 +19,17 @@ export class BackroomsAdmin{
     this.opener.hidden=!enabled;
     document.body.appendChild(this.opener);
     this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
-    if(enabled){
-      game.admin.enabled=true;
-      setTimeout(()=>this.open(),350);
-    }
+    if(enabled)game.admin.enabled=true;
+    this.activate();
+  }
+
+  activate(){
+    if(this.ready)return;
+    this.build();
+    this.bind();
+    this.ready=true;
+    this.opener.hidden=false;
+    this.opener.disabled=false;
   }
 
   build(){
@@ -165,7 +171,7 @@ export class BackroomsAdmin{
       const code=event.code;
       const key=event.key;
       const toggle=code==="Minus"||code==="Equal"||code==="NumpadSubtract"||code==="NumpadAdd"||code==="Backquote"||key==="-"||key==="=";
-      if(enabled&&toggle&&!event.repeat){
+      if(this.ready&&enabled&&toggle&&!event.repeat){
         event.preventDefault();
         event.stopPropagation();
         this.opened?this.close():this.open();
