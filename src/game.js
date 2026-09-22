@@ -201,9 +201,9 @@ class Chunk{
           pushMat(vData,px+cell/2,level.wallHeight/2,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
         }
       };
-      if(mask&1&&(z===0||!(this.walls[this.index(x,z-1)]&4)))addEdge("north");
+      if(mask&1&&z>0&&!(this.walls[this.index(x,z-1)]&4))addEdge("north");
       if(mask&4&&(z===CELLS-1||!(this.walls[this.index(x,z+1)]&1)))addEdge("south");
-      if(mask&8&&(x===0||!(this.walls[this.index(x-1,z)]&2)))addEdge("west");
+      if(mask&8&&x>0&&!(this.walls[this.index(x-1,z)]&2))addEdge("west");
       if(mask&2&&(x===CELLS-1||!(this.walls[this.index(x+1,z)]&8)))addEdge("east");
 
       const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
