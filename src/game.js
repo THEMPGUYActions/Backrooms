@@ -1327,6 +1327,10 @@ export class BackroomsGame{
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,0,10,.36,.54,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
     this.bindUI();
+    const introControls=document.getElementById("mobile-controls");
+    introControls?.classList.add("hidden");
+    introControls?.setAttribute("aria-hidden","true");
+    introControls?.style.setProperty("display","none","important");
     addEventListener("resize",()=>this.resize());
     document.addEventListener("visibilitychange",()=>{
       if(document.hidden&&this.running&&!this.paused&&!this.dead)this.togglePause(true);
@@ -1380,7 +1384,7 @@ export class BackroomsGame{
     };
     const handleAudioGesture=event=>{
       if(!isAudioPageVisible())return;
-      event.preventDefault();
+      if(event.type==="touchend"||event.type==="pointerdown"||event.type==="pointerup")event.preventDefault();
       event.stopPropagation();
       begin(event);
     };
@@ -1438,11 +1442,13 @@ export class BackroomsGame{
     if(this.isTouchLayout()){
       mobileControls?.classList.remove("hidden");
       mobileControls?.setAttribute("aria-hidden","false");
+      mobileControls?.style.removeProperty("display");
       requestAnimationFrame(()=>mobileControls?.classList.add("mobile-controls-ready"));
     }else{
       mobileControls?.classList.add("hidden");
       mobileControls?.classList.remove("mobile-controls-ready");
       mobileControls?.setAttribute("aria-hidden","true");
+      mobileControls?.style.setProperty("display","none","important");
     }
     const boot=document.getElementById("boot");
     const audioPage=document.querySelector(".intro-audio-page");
