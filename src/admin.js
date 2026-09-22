@@ -153,7 +153,7 @@ export class BackroomsAdmin{
 
   bind(){
     window.addEventListener("keydown",event=>{
-      if(enabled&&event.code==="F2"&&!event.repeat){
+      if(enabled&&event.key==="-"&&!event.repeat){
         event.preventDefault();
         this.opened?this.close():this.open();
       }
