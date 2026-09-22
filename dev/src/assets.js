@@ -2,6 +2,17 @@ import * as THREE from "three";
 THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
+const LOCAL_SPB_ASSET_BASE = new URL("../assets/spb-ff/", import.meta.url).href;
+
+export const SPACEPOTATO_LEVEL1_SOURCES = Object.freeze({
+  concreteColor: LOCAL_SPB_ASSET_BASE + "pbr/concrete/concrete_color.png",
+  concreteNormal: LOCAL_SPB_ASSET_BASE + "pbr/concrete/concrete_normal.png",
+  brickColor: LOCAL_SPB_ASSET_BASE + "pbr/bricks/bricks_color.png",
+  crateColor: LOCAL_SPB_ASSET_BASE + "pbr/crate/crate_color.png",
+  fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png",
+  wallTrim: LOCAL_SPB_ASSET_BASE + "wall_trim_texture.png",
+  stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png"
+});
 
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
   wallpaper: {
@@ -170,6 +181,30 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
   return m;
 }
 
+export async function applySpacePotatoLevel1Assets(library,level,onProgress=()=>{}){
+  if(level.id!=="1")return false;
+  const maps=[
+    [library.floor,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete floor"],
+    [library.floor,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete floor normal"],
+    [library.concrete,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete walls"],
+    [library.concrete,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete wall normal"],
+    [library.maintenanceWall,"map",SPACEPOTATO_LEVEL1_SOURCES.brickColor,true,2.4,.20,"White brick corridors"],
+    [library.crate,"map",SPACEPOTATO_LEVEL1_SOURCES.crateColor,true,1,.16,"Wooden crates"],
+    [library.level1Light,"map",SPACEPOTATO_LEVEL1_SOURCES.fluorescent,true,1,.18,"Fluorescent fixtures"],
+    [library.trim,"map",SPACEPOTATO_LEVEL1_SOURCES.wallTrim,true,1,.12,"Wall trim"],
+    [library.trimTop,"map",SPACEPOTATO_LEVEL1_SOURCES.wallTrim,true,1,.12,"Wall trim top"],
+    [library.stairs,"map",SPACEPOTATO_LEVEL1_SOURCES.stairs,true,1,.12,"Concrete stairs"]
+  ];
+  let done=0;
+  onProgress(0,"LOADING LEVEL 1 ASSETS","SpacePotato Found Footage materials");
+  await Promise.all(maps.map(async([material,kind,url,color,repeat,normalStrength,label])=>{
+    await applyRemoteTexture(material,kind,url,color,repeat,normalStrength);
+    done++;
+    onProgress(done/maps.length,"LOADING LEVEL 1 ASSETS",label);
+  }));
+  return true;
+}
+
 export function disposeMaterial(material){
   if(!material)return;
   for(const key of ["map","roughnessMap","normalMap","metalnessMap","aoMap","emissiveMap","alphaMap"]){
@@ -190,12 +225,17 @@ export function disposeLibrary(library){
 export function makeLibrary(level){
   const ceiling=createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.9,scale:2,normalStrength:.24});
   ceiling.side=THREE.FrontSide;
-  ceiling.emissive=new THREE.Color(0x5a5850);
+  ceiling.color.setHex(level.theme.ceiling);
+  ceiling.emissive=new THREE.Color(level.id==="0"?0x776621:0x5a5850);
   ceiling.emissiveIntensity=level.id==="0"?.055:.028;
   return {
-    floor:createPBRMaterial({base:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
+    floor:createPBRMaterial({base:level.id==="1"?0x676963:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:3.8,normalStrength:.35}),
-    concrete:createPBRMaterial({base:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
+    concrete:createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
+    maintenanceWall:createPBRMaterial({base:0xe4e3dc,seed:117+Number(level.id),rough:.9,scale:2.4,normalStrength:.28}),
+    stairs:new THREE.MeshStandardMaterial({color:0x8b8d89,roughness:.88,metalness:0}),
+    parkingLine:new THREE.MeshStandardMaterial({color:0xd1d0c5,roughness:.78,metalness:0}),
+    level1Light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.32,metalness:0,emissive:0xfff5d5,emissiveIntensity:2.4}),
     ceiling,
     metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.62,metalness:.78}),
     cable:new THREE.MeshStandardMaterial({color:0x171817,roughness:.79,metalness:.58}),
