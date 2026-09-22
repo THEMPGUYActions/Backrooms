@@ -204,7 +204,7 @@ class WorldStreamer{
     if(this.library)disposeLibrary(this.library);
 
     this.size=this.game.level.cellSize*CELLS;
-    this.surfaceSize=this.size*3;
+    this.surfaceSize=this.size*4;
     this.library=makeLibrary(this.game.level);
 
     this.floorSurface=new THREE.Mesh(
@@ -252,7 +252,6 @@ class WorldStreamer{
         texture.wrapT=THREE.RepeatWrapping;
         texture.repeat.set(repeat,repeat);
         texture.offset.set((px-this.surfaceSize/2)/tileWorld,(pz-this.surfaceSize/2)/tileWorld);
-        texture.needsUpdate=true;
       }
     }
   }
