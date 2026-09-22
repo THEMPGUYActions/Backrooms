@@ -45,8 +45,9 @@ export const LEVELS = {
       light: 0xf0f0e8,
       ambient: 0x32352f
     },
-    cellSize: 7.2,
-    wallHeight: 4.4,
+    gridSize: 10,
+    cellSize: 8.0,
+    wallHeight: 5.0,
     darkness: 0.24,
     holeChance: 0,
     pipeChance: 0.14,
@@ -63,7 +64,8 @@ export const LEVELS = {
     crateChance: 0.20,
     roomChance: 0.82,
     roomMin: 2,
-    roomMax: 5
+    roomMax: 5,
+    shelfChance: 0.34
   },
   "2": {
     id: "2",
