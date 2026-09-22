@@ -700,7 +700,8 @@ class Player{
   reset(){this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.bob=0;this.shake=0;this.cameraFov=62;this.health=this.stamina=this.hydration=this.sanity=100;this.flashlight=this.game.startFlash;this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();this.game.camera.rotation.set(0,0,0,"YXZ")}
   update(dt){
     const input=this.game.input,look=input.consumeLook();
-    this.yaw-=look.x*.0021;this.pitch-=look.y*.0021;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
+    const sensitivity=this.game.settings.sensitivity||1;
+    this.yaw-=look.x*.0021*sensitivity;this.pitch-=look.y*.0021*sensitivity;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
     const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?4.75:2.85;
     const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw)),right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
@@ -854,7 +855,11 @@ export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
-    this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
+    this.settings={
+      shake:localStorage.getItem("br.shake")!=="0",
+      sensitivity:Math.max(.5,Math.min(2,Number(localStorage.getItem("br.sensitivity")||1)))
+    };
+    this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(0x000000);
     this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
@@ -886,7 +891,12 @@ export class BackroomsGame{
     this.ambient=new THREE.HemisphereLight(0x5c523f,0x000000,.035);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,24,25,.48,.9,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
-    this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
+    this.bindUI();
+    addEventListener("resize",()=>this.resize());
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden&&this.running&&!this.paused&&!this.dead)this.togglePause(true);
+    });
+    this.last=performance.now();
   }
   async mount(){
     document.getElementById("game").appendChild(this.renderer.domElement);
@@ -905,24 +915,48 @@ export class BackroomsGame{
   bindUI(){
     const $=id=>document.getElementById(id);
     this.audioGateBusy=false;
-    const begin=async()=>{
-      if(!this.introActive||this.audioGateBusy)return;
+    const begin=event=>{
+      if(event?.isTrusted===false||!this.introActive||this.audioGateBusy)return;
       this.audioGateBusy=true;
       const gate=$("audio-gate");
       gate?.classList.add("busy");
       const label=gate?.querySelector(".audio-gate-main");
       if(label)label.textContent="SYNCING TAPE";
-      try{await this.audio.resume();}catch(error){console.warn("[Backrooms] Audio could not start:",error)}
+      this.audio.unlockFromGesture();
       this.audio.clickToEnter();
       this.beginIntroReveal();
     };
-    $("audio-gate").onclick=begin;
-    $("audio-gate").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();begin()}};
-    $("resume").onclick=()=>this.togglePause(false);$("restart").onclick=()=>this.restart();$("retry").onclick=()=>this.restart();$("again-ending").onclick=()=>this.restart();
-    $("quality").value=this.quality.mode;$("quality").onchange=e=>this.quality.set(e.target.value);
-    $("volume").value=String(this.audio.volume);$("volume").oninput=e=>this.audio.setVolume(e.target.value);
-    $("shake").checked=this.settings.shake;$("shake").onchange=e=>{this.settings.shake=e.target.checked;localStorage.setItem("br.shake",e.target.checked?"1":"0")};
-    $("flashlight").checked=this.startFlash;$("flashlight").onchange=e=>{this.startFlash=e.target.checked;localStorage.setItem("br.flash",e.target.checked?"1":"0")};
+    const gate=$("audio-gate");
+    gate?.addEventListener("pointerdown",event=>{
+      event.preventDefault();
+      begin(event);
+    });
+    gate?.addEventListener("click",event=>{
+      if(event.detail===0)begin(event);
+    });
+
+    $("resume")?.addEventListener("click",()=>this.togglePause(false));
+    $("restart")?.addEventListener("click",()=>this.restart());
+    $("retry")?.addEventListener("click",()=>this.restart());
+    $("again-ending")?.addEventListener("click",()=>this.restart());
+    $("fullscreen")?.addEventListener("click",()=>this.toggleFullscreen());
+
+    const quality=$("quality");
+    if(quality){quality.value=this.quality.mode;quality.onchange=e=>this.quality.set(e.target.value)}
+    const volume=$("volume");
+    if(volume){volume.value=String(this.audio.volume);volume.oninput=e=>this.audio.setVolume(e.target.value)}
+    const shake=$("shake");
+    if(shake){shake.checked=this.settings.shake;shake.onchange=e=>{this.settings.shake=e.target.checked;localStorage.setItem("br.shake",e.target.checked?"1":"0")}}
+    const flashlight=$("flashlight");
+    if(flashlight){flashlight.checked=this.startFlash;flashlight.onchange=e=>{this.startFlash=e.target.checked;localStorage.setItem("br.flash",e.target.checked?"1":"0")}}
+    const sensitivity=$("sensitivity");
+    if(sensitivity){
+      sensitivity.value=String(this.settings.sensitivity);
+      sensitivity.oninput=e=>{
+        this.settings.sensitivity=Math.max(.5,Math.min(2,Number(e.target.value)));
+        localStorage.setItem("br.sensitivity",String(this.settings.sensitivity));
+      };
+    }
   }
   beginIntroReveal(){
     if(!this.introActive||this.introPlaying)return;
@@ -978,8 +1012,27 @@ export class BackroomsGame{
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
   die(copy){this.lightState="BLACKOUT";this.dead=true;this.paused=true;this.running=false;this.triggerFear(1);document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
   togglePause(force){
-    if(!this.running||this.dead)return;this.paused=force!==undefined?force:!this.paused;document.getElementById("pause").classList.toggle("hidden",!this.paused);
-    if(this.paused)document.exitPointerLock?.();else{this.audio.resume();const lock=this.renderer.domElement.requestPointerLock?.();lock?.catch(()=>{})}
+    if(!this.running||this.dead||this.introPlaying)return;
+    this.paused=force!==undefined?force:!this.paused;
+    const pause=document.getElementById("pause");
+    pause?.classList.toggle("hidden",!this.paused);
+    const mobile=document.getElementById("mobile-controls");
+    mobile?.classList.toggle("paused",this.paused);
+    if(this.paused){
+      document.exitPointerLock?.();
+    }else{
+      this.audio.resume().catch(()=>{});
+      const lock=this.renderer.domElement.requestPointerLock?.();
+      lock?.catch(()=>{});
+    }
+  }
+  async toggleFullscreen(){
+    try{
+      if(document.fullscreenElement)await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen?.();
+    }catch(error){
+      console.warn("[Backrooms] Fullscreen unavailable:",error);
+    }
   }
   toggleFlashlight(){this.player.flashlight=!this.player.flashlight;this.audio.click();this.toast(this.player.flashlight?"Flashlight on":"Flashlight off",.9)}
   isDark(){if(this.level.id==="2")return true;if(this.lightState==="BLACKOUT")return true;return !this.player.flashlight}
@@ -1086,12 +1139,19 @@ export class BackroomsGame{
     this.updateLightEvent(dt);
     this.updateHorror(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
-    document.getElementById("coords").textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
-    document.getElementById("health-bar").style.width=Math.max(0,this.player.health)+"%";
-    document.getElementById("stamina-bar").style.width=Math.max(0,this.player.stamina)+"%";
-    document.getElementById("hydration-bar").style.width=Math.max(0,this.player.hydration)+"%";
-    document.getElementById("sanity-bar").style.width=Math.max(0,this.player.sanity)+"%";
-    document.getElementById("status").textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";this.flash.intensity=this.player.flashlight?18:0;
+    const coords=document.getElementById("coords");if(coords)coords.textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
+    for(const [id,value] of [
+      ["health-bar",this.player.health],
+      ["stamina-bar",this.player.stamina],
+      ["hydration-bar",this.player.hydration],
+      ["sanity-bar",this.player.sanity]
+    ]){
+      const bar=document.getElementById(id);
+      if(bar)bar.style.width=Math.max(0,value)+"%";
+    }
+    const status=document.getElementById("status");
+    if(status)status.textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";
+    this.flash.intensity=this.player.flashlight?18:0;
     this.flash.position.copy(this.camera.position);
   }
   updateArgLayer(dt){
