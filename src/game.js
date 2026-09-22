@@ -1436,7 +1436,8 @@ export class BackroomsGame{
     if(info)info.textContent=detail;
   }
 
-  isTouchLayout(){return navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches||innerWidth<=900}\n  start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
+  isTouchLayout(){return navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches||innerWidth<=900}
+  start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
     this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();
