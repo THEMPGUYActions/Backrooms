@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v4";
+const CACHE_NAME="backrooms-assets-v5";
 const CORE=[
   "index.html",
   "styles.css",
@@ -65,13 +65,13 @@ self.addEventListener("fetch",event=>{
 
   if(sameOrigin){
     event.respondWith(
-      caches.match(request).then(cached=>cached||fetch(request).then(response=>{
+      fetch(request).then(response=>{
         if(response.ok){
           const copy=response.clone();
           caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});
         }
         return response;
-      }))
+      }).catch(()=>caches.match(request))
     );
   }
 });

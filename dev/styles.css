@@ -1092,6 +1092,8 @@ body::after{
   .pause-footer{padding:8px 15px}
 }
 
+#admin-open{position:fixed;top:14px;right:14px;z-index:290;min-width:68px;height:40px;padding:0 12px;border:1px solid rgba(220,224,211,.16);border-radius:0;background:rgba(5,6,5,.88);color:rgba(230,233,221,.62);font:8px "Courier New",monospace;letter-spacing:.18em;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}#admin-open:hover{background:rgba(220,224,211,.08);color:rgba(233,236,225,.82)}#admin-open:active{transform:translateY(1px)}#admin-open[hidden]{display:none}@media(max-width:720px){#admin-open{top:10px;right:10px;min-width:76px;height:46px;font-size:9px}}
+
 /* Dev admin interface */
 .admin-overlay{
   position:fixed;
