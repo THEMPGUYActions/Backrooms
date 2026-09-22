@@ -93,6 +93,21 @@ export class AudioDirector{
     this.volume=clamp(Number(v));localStorage.setItem("br.volume",this.volume);
     if(this.master)this.master.gain.setTargetAtTime(this.volume,this.ctx.currentTime,.04);
   }
+  async testUnlock(){
+    if(!this.ctx)return false;
+    try{
+      if(this.ctx.state==="suspended")await this.ctx.resume();
+      const buffer=this.ctx.createBuffer(1,1,this.ctx.sampleRate);
+      const source=this.ctx.createBufferSource();
+      source.buffer=buffer;
+      source.connect(this.ctx.destination);
+      source.start();
+      return this.ctx.state==="running";
+    }catch{return false}
+  }
+  isEnabled(){
+    return !!this.ctx&&this.ctx.state==="running";
+  }
   unlockFromGesture(){
     if(!this.ready)this.init().catch(error=>console.warn("[Backrooms] Audio init failed:",error));
     if(this.ctx?.state==="suspended")this.ctx.resume().catch(error=>console.warn("[Backrooms] Audio resume failed:",error));

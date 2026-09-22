@@ -41,23 +41,37 @@
   <div id="scanlines" aria-hidden="true"></div>
   <div id="chromatic" aria-hidden="true"></div>
 
-  <section id="boot" class="intro-screen">
+  <section id="boot" class="intro-screen" aria-label="The Backrooms introduction">
+    <div class="intro-film intro-film-title">
+      <div class="movie-title">The Backrooms</div>
+      <div class="movie-present">THEMPGUY Presents</div>
+    </div>
+    <div class="intro-film intro-film-credits">
+      <div class="credits-kicker">A FOUND FOOTAGE EXPERIENCE</div>
+      <div class="credits-main">Credits:</div>
+      <div class="credits-line">THEMPGUY<br>GAME / CODE / DIRECTION</div>
+      <div class="credits-line">THE BACKROOMS WIKI<br>REFERENCE / LORE</div>
+      <div class="credits-line">SPACEPOTATO<br>FOUND FOOTAGE REFERENCE</div>
+    </div>
     <div class="intro-corner intro-corner-top">
-      <span>CAM 01</span><span>REC ●</span><span>SPB / 01</span>
+      <span>CAM 01</span><span>REC ●</span><span>ARCHIVE</span>
     </div>
     <div class="intro-card">
       <div class="intro-eyebrow">FOUND FOOTAGE // UNVERIFIED</div>
       <div class="intro-title">THE BACKROOMS</div>
       <div id="intro-line" class="intro-line">REC 01 // SIGNAL ACQUIRED</div>
       <div id="intro-sub" class="intro-sub">No GPS fix</div>
-      <button id="audio-gate" class="audio-gate" type="button" aria-label="Click to enable audio">
-        <span class="audio-gate-main">ENABLE AUDIO</span>
-        <span class="audio-gate-small">CLICK ONCE TO BEGIN RECORDING</span>
-      </button>
+      <div id="audio-gate" class="audio-gate" role="button" tabindex="0" aria-label="Click anywhere to enable audio">
+        <span class="audio-gate-main">Click anywhere to enable audio.</span>
+        <span class="audio-gate-small">AUDIO CHECK // SILENT TEST SIGNAL</span>
+      </div>
       <div class="intro-controls-hint">WASD MOVE · MOUSE LOOK · SHIFT RUN · F LIGHT · ESC PAUSE</div>
     </div>
     <div class="intro-corner intro-corner-bottom">
       <span>TRACKING: --</span><span>BAT 84%</span><span>DATE: UNKNOWN</span>
+    </div>
+    <div id="audio-overlay" class="audio-overlay" aria-hidden="false">
+      <span>Click anywhere to enable audio.</span>
     </div>
   </section>
 

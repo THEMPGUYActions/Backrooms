@@ -1,5 +1,4 @@
 import { BackroomsGame } from "./game.js";
-import { BackroomsAdmin } from "./admin.js";
 
 const registerCache=async()=>{
   if(!("serviceWorker" in navigator))return;
@@ -19,8 +18,8 @@ const registerCache=async()=>{
 };
 
 registerCache();
-const game = new BackroomsGame();
-game.mount();
+const game=new BackroomsGame();
+game.mount().then(async()=>{
+});
 
-window.backrooms = game;
-window.backroomsAdmin = new BackroomsAdmin(game);
+window.backrooms=game;

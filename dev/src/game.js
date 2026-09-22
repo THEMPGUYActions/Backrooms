@@ -132,7 +132,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -172,17 +172,28 @@ class Chunk{
     this.walls.fill(15);this.rooms=[];
 
     if(level.id==="1"){
-      const macro=smoothNoise2D(this.cx*(level.zoneScale||.24),this.cz*(level.zoneScale||.24),this.game.seed^0x51a3);
-      const zoneRoll=cycleHash(this.game.seed,this.cx*37,this.cz*61,101);
-      this.zone=(this.cx===0&&this.cz===0)||macro>(level.hallChance||.58)||zoneRoll<.10?"halls":"corridors";
+      // Mirrors the reference mod's Level 1 layout model:
+      // 10x10 cells at 8 blocks each, a world-space Perlin-like split between
+      // giant Halls and tighter maze Corridors, plus occasional 3x3 rooms.
+      const worldX=this.cx*cells*level.cellSize;
+      const worldZ=this.cz*cells*level.cellSize;
+      const macro=smoothNoise2D(worldX*.002,worldZ*.002,this.game.seed^0x51a3);
+      const noise=macro-.5;
+      const forceStart=this.cx===0&&this.cz===0;
+      const hall=forceStart||noise>.0;
+      this.zone=hall?"halls":"corridors";
 
-      if(this.zone==="halls"){
+      if(hall){
         this.walls.fill(0);
         for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
         for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
+
+        // Large open warehouse / parking-lot sectors. Partitions are sparse,
+        // with long sightlines and only a couple of openings, like the reference.
         const partitions=rng.int(0,2);
         for(let i=0;i<partitions;i++){
-          if(rng.next()<.5){
+          const vertical=rng.next()<.5;
+          if(vertical){
             const x=rng.int(2,cells-3),gap=rng.int(2,cells-3);
             for(let z=1;z<cells-1;z++)if(Math.abs(z-gap)>1)this.setEdge(x,z,"east",false);
           }else{
@@ -190,9 +201,22 @@ class Chunk{
             for(let x=1;x<cells-1;x++)if(Math.abs(x-gap)>1)this.setEdge(x,z,"south",false);
           }
         }
+
+        // Keep neighboring Hall sectors connected through several wide openings.
+        for(let x=0;x<cells;x+=2){
+          if(canonicalOpen(this.game.seed,this.cx*cells+x,this.cz*cells,"h",.16))this.setEdge(x,0,"north",true);
+          if(canonicalOpen(this.game.seed,this.cx*cells+x,this.cz*cells+cells,"h",.16))this.setEdge(x,cells-1,"south",true);
+        }
+        for(let z=1;z<cells;z+=2){
+          if(canonicalOpen(this.game.seed,this.cx*cells,this.cz*cells+z,"v",.16))this.setEdge(0,z,"west",true);
+          if(canonicalOpen(this.game.seed,this.cx*cells+cells,this.cz*cells+z,"v",.16))this.setEdge(cells-1,z,"east",true);
+        }
       }else{
-        const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
-        visited[this.index(stack[0][0],stack[0][1])]=1;
+        // SpacePotato's Level1MazeGenerator is a randomized depth-first maze
+        // over a 10x10 grid with 8-block cells. Keep that topology here.
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
         const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
         while(stack.length){
           const [x,z]=stack[stack.length-1],options=[];
@@ -202,19 +226,25 @@ class Chunk{
           }
           if(!options.length){stack.pop();continue}
           const [nx,nz,b,ob]=rng.pick(options);
-          this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
-          visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
         }
+
+        // A few loops prevent the corridors from feeling like a perfect tree.
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.11)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.09)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.045)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.045)this.setEdge(x,z,"south",true);
         }
-        const roomCount=rng.int(level.roomMin||2,level.roomMax||5);
+
+        // Reference mod occasionally places a 3x3 structure in the maze.
+        const roomCount=rng.next()<.88?1:0;
         for(let i=0;i<roomCount;i++){
           let room=null;
-          for(let attempt=0;attempt<12&&!room;attempt++){
-            const w=rng.int(2,3),h=rng.int(2,3),x=rng.int(1,cells-w-1),z=rng.int(1,cells-h-1);
-            const candidate={x,z,w,h,type:rng.next()<.28?"office":rng.next()<.5?"storage":"utility"};
+          for(let attempt=0;attempt<18&&!room;attempt++){
+            const w=3,h=3,x=rng.int(1,cells-w-1),z=rng.int(1,cells-h-1);
+            const candidate={x,z,w,h,type:rng.next()<.125?"storage":rng.pick(["office","utility","infirmary","rubber"])};
             const overlap=this.rooms.some(other=>candidate.x<other.x+other.w+1&&candidate.x+candidate.w+1>other.x&&candidate.z<other.z+other.h+1&&candidate.z+candidate.h+1>other.z);
             if(!overlap)room=candidate;
           }
@@ -230,6 +260,21 @@ class Chunk{
           else{room.entry={side:"west",x:room.x,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"west",true)}
           this.rooms.push(room);
         }
+      }
+
+      // Match the reference mod's roughly 400-block generation sectors and
+      // put the stairwell/exit family well away from spawn.
+      if(cells>=5){
+        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
+        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
+        if(this.cz%2===0)this.setEdge(0,2,"west",true);
+        if(this.cx%2===0)this.setEdge(cells-1,2,"east",true);
+      }
+      if(forceStart){
+        this.setEdge(2,2,"north",true);
+        this.setEdge(2,2,"east",true);
+        this.setEdge(2,2,"south",true);
+        this.setEdge(2,2,"west",true);
       }
     }else if(level.id==="0"){
       const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
@@ -307,7 +352,8 @@ class Chunk{
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
-    if(chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.035){
+    const level1ExitSector=level.id==="1"&&this.cx%5===0&&this.cz%5===0;
+    if((level.id==="1"?level1ExitSector:chunkDistance>=level.exitAfterChunks)&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
@@ -594,9 +640,20 @@ class Chunk{
     const addLight=(x,z,rotation=0,scale=1,baseIntensity=this.zone==="halls"?150:105)=>{
       const fixture=box(g,new THREE.BoxGeometry(3.15*scale,.055,.44*scale),lib.level1Light,x,level.wallHeight-.14,z,0,rotation,0);
       fixture.userData.light=true;fixture.userData.baseEmissive=2.4;this.fixtures.push(fixture);
-      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:0,decay:2});
+      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:this.zone==="halls"?34:24,decay:2});
       return fixture;
     };
+
+    if(this.cx===0&&this.cz===0){
+      const sx=2.8,sz=7.2,stepW=3.2,stepD=.48,stepH=.17;
+      for(let i=0;i<7;i++){
+        box(g,new THREE.BoxGeometry(stepW,stepH*(i+1),stepD),lib.stairs,sx,stepH*(i+.5),sz-i*stepD);
+      }
+      for(const side of [-1,1]){
+        const rail=box(g,new THREE.BoxGeometry(.07,1.3,3.6),lib.metal,sx+side*1.82,.67,sz-1.45,0,0,side*.02);
+        rail.rotation.x=side*.035;
+      }
+    }
 
     if(this.zone==="halls"){
       for(let i=0;i<3+rng.int(2,7);i++){
@@ -604,7 +661,7 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.95,level.wallHeight,.95),lib.concrete,p.x,level.wallHeight/2,p.z);
         box(g,new THREE.BoxGeometry(1.16,.10,1.16),lib.metal,p.x,.54,p.z);
         for(const side of [[.50,.0,.08,1.0],[0,.50,1.0,.08],[-.50,0,.08,1.0],[0,-.50,1.0,.08]]){
-          if(rng.next()<.55)box(g,new THREE.BoxGeometry(side[2],.045,side[3]),lib.parkingLine,p.x+side[0],.70,p.z+side[1]);
+          if(rng.next()<.55)box(g,new THREE.BoxGeometry(side[2],.045,side[3]),lib.warningLine,p.x+side[0],.70,p.z+side[1]);
         }
       }
 
@@ -617,6 +674,15 @@ class Chunk{
         const p=randomCell();
         const puddle=box(g,new THREE.CircleGeometry(.75+rng.next()*1.6,18),lib.water,p.x,.016,p.z,-Math.PI/2);
         puddle.scale.y=.45+rng.next()*.60;
+      }
+
+      if(rng.next()<.82){
+        const beamY=level.wallHeight-.17;
+        for(let i=0;i<3;i++){
+          const beam=box(g,new THREE.BoxGeometry(size*.88,.12,.16),lib.metal,
+            this.originX+size*.5,beamY+i*.16,this.originZ+size*(.27+i*.23),0,0,0);
+          beam.rotation.y=rng.next()<.5?0:Math.PI/2;
+        }
       }
 
       if(rng.next()<.70){
@@ -633,9 +699,10 @@ class Chunk{
       const crates=rng.next()<level.crateChance?1+rng.int(0,2):0;
       for(let i=0;i<crates;i++){
         const p=randomCell();
-        box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
+        const crate=box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
         box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
         box(g,new THREE.BoxGeometry(.055,.84,.055),lib.metal,p.x-.32,.4,p.z);
+        this.crates.push({group:crate,unseen:0});
       }
 
       if(rng.next()<.32){
@@ -662,6 +729,9 @@ class Chunk{
           box(desk,new THREE.BoxGeometry(1.5,.12,.72),lib.officeWood,0,.78,0);
           for(const sx of [-.6,.6])for(const sz of [-.24,.24])box(desk,new THREE.BoxGeometry(.07,.77,.07),lib.officeWood,sx,.385,sz);
           box(desk,new THREE.BoxGeometry(.78,.48,.06),lib.officePlastic,0,1.07,-.02);
+          box(desk,new THREE.BoxGeometry(.55,.08,.50),lib.officeWood,0,.47,.72);
+          box(desk,new THREE.BoxGeometry(.08,.52,.08),lib.officeWood,-.23,.26,.72);
+          box(desk,new THREE.BoxGeometry(.08,.52,.08),lib.officeWood,.23,.26,.72);
           g.add(desk);
         }else if(room.type==="storage"){
           for(let i=0;i<1+rng.int(0,2);i++){const ox=(rng.next()-.5)*room.w*cell*.38,oz=(rng.next()-.5)*room.h*cell*.38;box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz)}
@@ -672,8 +742,22 @@ class Chunk{
 
         if(room.entry){
           const e=room.entry,ex=this.originX+e.x*cell+cell/2,ez=this.originZ+e.z*cell+cell/2,rot=e.side==="west"||e.side==="east"?Math.PI/2:0;
-          box(g,new THREE.BoxGeometry(2.35,.10,.16),lib.trim,ex,2.72,ez,0,rot,0);
-          if(index%3===0)box(g,new THREE.BoxGeometry(.56,.10,.04),lib.parkingLine,ex,level.wallHeight-.95,ez,0,rot,0);
+          const frameH=Math.min(3.9,level.wallHeight-.35);
+          const entryGroup=new THREE.Group();
+          entryGroup.position.set(ex,0,ez);
+          entryGroup.rotation.y=rot;
+          box(entryGroup,new THREE.BoxGeometry(.12,frameH,.18),lib.doorFrame,-1.05,frameH/2,0);
+          box(entryGroup,new THREE.BoxGeometry(.12,frameH,.18),lib.doorFrame,1.05,frameH/2,0);
+          box(entryGroup,new THREE.BoxGeometry(2.22,.12,.18),lib.doorFrame,0,frameH,0);
+          if(index%3===0){
+            const sign=box(entryGroup,new THREE.BoxGeometry(.62,.18,.05),lib.exit,0,frameH+.18,0);
+            sign.material=lib.exit;
+          }
+          if(index%2===0){
+            const door=box(entryGroup,new THREE.BoxGeometry(1.82,frameH-.18,.07),lib.door,0,(frameH-.18)/2,-.025);
+            door.rotation.y=(index%4===0?.04:-.03);
+          }
+          g.add(entryGroup);
         }
       }
     }
@@ -700,6 +784,36 @@ class Chunk{
     this.group.clear();
   }
   update(dt){
+    if(this.game.level.id==="1"&&this.zone==="halls"){
+      const state=this.game.lightState;
+      if(state!=="ON"&&this.lastLightState==="ON"&&Math.random()<.34){
+        const cell=this.game.level.cellSize;
+        const bx=this.originX+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
+        const bz=this.originZ+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
+        const crate=box(this.group,new THREE.BoxGeometry(.9,.8,.9),this.world.library.crate,bx,.4,bz);
+        crate.userData.appearedAt=this.game.gameTime;
+        this.crates.push({group:crate,unseen:0});
+      }
+      for(let i=this.crates.length-1;i>=0;i--){
+        const item=this.crates[i];
+        if(!item.group.parent){this.crates.splice(i,1);continue}
+        const dx=this.game.player.position.x-item.group.position.x,dz=this.game.player.position.z-item.group.position.z,d=Math.hypot(dx,dz);
+        if(d<24){
+          const forward=new THREE.Vector3(-Math.sin(this.game.player.viewYaw),0,-Math.cos(this.game.player.viewYaw));
+          const to=new THREE.Vector3(-dx,0,-dz).normalize();
+          if(forward.dot(to)>.35)item.unseen=0;else item.unseen+=dt;
+          if(item.unseen>18){
+            item.group.removeFromParent();
+            item.group.geometry?.dispose();
+            this.crates.splice(i,1);
+          }
+        }
+      }
+      this.lastLightState=state;
+    }else{
+      this.lastLightState=this.game.lightState;
+    }
+
     if(this.game.lightState==="ON"){
       for(const fixture of this.fixtures){
         if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)
@@ -1227,25 +1341,45 @@ export class BackroomsGame{
   bindUI(){
     const $=id=>document.getElementById(id);
     this.audioGateBusy=false;
-    const begin=event=>{
+
+    const begin=async event=>{
       if(event?.isTrusted===false||!this.introActive||this.audioGateBusy)return;
       this.audioGateBusy=true;
-      const gate=$("audio-gate");
-      gate?.classList.add("busy");
-      const label=gate?.querySelector(".audio-gate-main");
-      if(label)label.textContent="SYNCING TAPE";
-      this.audio.unlockFromGesture();
+      const boot=$("boot");
+      boot?.classList.add("audio-ready");
+      const overlay=$("audio-overlay");
+      if(overlay)overlay.classList.add("hidden");
+      try{
+        await this.audio.init();
+        await this.audio.testUnlock();
+      }catch(error){
+        console.warn("[Backrooms] Audio unlock failed:",error);
+      }
       this.audio.clickToEnter();
       this.beginIntroReveal();
     };
-    const gate=$("audio-gate");
-    gate?.addEventListener("pointerdown",event=>{
+
+    const boot=$("boot");
+    boot?.addEventListener("pointerdown",event=>{
+      if(event.target.closest("button,input,select,textarea,a"))return;
       event.preventDefault();
       begin(event);
     });
-    gate?.addEventListener("click",event=>{
-      if(event.detail===0)begin(event);
+    boot?.addEventListener("click",event=>{
+      if(event.detail===0&&!event.target.closest("button,input,select,textarea,a"))begin(event);
     });
+    const gate=$("audio-gate");
+    gate?.addEventListener("keydown",event=>{
+      if(event.key==="Enter"||event.key===" "){
+        event.preventDefault();
+        begin(event);
+      }
+    });
+
+    if(this.audio.isEnabled()){
+      boot?.classList.add("audio-ready");
+      $("audio-overlay")?.classList.add("hidden");
+    }
 
     $("resume")?.addEventListener("click",()=>this.togglePause(false));
     $("restart")?.addEventListener("click",()=>this.restart());
@@ -1276,8 +1410,9 @@ export class BackroomsGame{
     this.introPlaying=true;
     this.introTime=0;
     this.running=false;this.paused=true;this.dead=false;
+    this.introSequenceStarted=performance.now();
     const boot=document.getElementById("boot");
-    boot.classList.add("booting");
+    boot.classList.remove("booting");
     const gate=document.getElementById("audio-gate");
     if(gate)gate.classList.add("hidden");
     const introLine=document.getElementById("intro-line");
@@ -1289,6 +1424,14 @@ export class BackroomsGame{
     this.vhsPass.uniforms.intensity.value=1.15;
     this.vhsPass.uniforms.tracking.value=.85;
     this.vhsPass.uniforms.fear.value=.08;
+    setTimeout(()=>{
+      if(!this.introPlaying)return;
+      const boot=document.getElementById("boot");
+      boot?.classList.add("intro-live");
+      const gate=document.getElementById("audio-gate");
+      gate?.classList.add("hidden");
+      this.introTime=0;
+    },16500);
   }
 
   setLoadingProgress(progress,label,detail=""){
@@ -1311,7 +1454,7 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
-    this.scene.fog=new THREE.FogExp2(0x000000,this.level.id==="0"?.027:this.level.id==="1"?.043:.058);
+    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x676a64:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.028:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
@@ -1370,7 +1513,7 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      this.lightEventTimer=this.level.id==="1"?2.8+Math.random()*8.5:1.3+Math.random()*2.5;
+      this.lightEventTimer=this.level.id==="1"?16+Math.random()*24:1.3+Math.random()*2.5;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{

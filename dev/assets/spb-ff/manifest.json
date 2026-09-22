@@ -1,0 +1,55 @@
+{
+  "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+  "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+  "files": {
+    "pbr/concrete/concrete_color.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/pbr/concrete/concrete_color.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 710031,
+      "sha256": "2ba9cb1e8856fe1d4471014096fda385b3c0cea6c5e4a11b0bb87293e6448745"
+    },
+    "pbr/concrete/concrete_normal.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/pbr/concrete/concrete_normal.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 2127275,
+      "sha256": "6aeae49385d41b5f8af0f48ca094261eaf52c6722de6f6416dc69a6ee5e7a798"
+    },
+    "pbr/bricks/bricks_color.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/pbr/bricks/bricks_color.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 2401078,
+      "sha256": "eb26705ac506e93168ca926bec9a8096a72e0b06820af56edf5aa8d2e9b4d1b0"
+    },
+    "pbr/crate/crate_color.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/pbr/crate/crate_color.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 1322027,
+      "sha256": "bc92ddbf7f62721deb1dd5cfefcf7b899492a309feb93ff0846b1163c3ce87cc"
+    },
+    "fluorescent_light.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 100,
+      "sha256": "36e5ee486aa635dd89107bd68e72be1d3908127d05e0a45365c9bb9ea8f3a2cb"
+    },
+    "wall_trim_texture.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 125,
+      "sha256": "8289df53f7779b30d8e1e2d3021193e3412d6cb4b5232c5e44da01aa9350fafd"
+    },
+    "newstairs_texture.png": {
+      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png",
+      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
+      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
+      "bytes": 145370,
+      "sha256": "1f5312d3fe9ac117975e8ac805ac7d7f81001e9230f88fab8d17410c95f25fc9"
+    }
+  }
+}
