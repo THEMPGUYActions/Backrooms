@@ -47,7 +47,7 @@ jobs:
         if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: backrooms-preview-\${{ github.event.pull_request.number || github.run_number }}
+          name: backrooms-preview-${{ github.event.pull_request.number || github.run_number }}
           path: dist
           if-no-files-found: error
           retention-days: 7
@@ -74,12 +74,12 @@ jobs:
       - name: Publish main to Pages root
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./dist
           keep_files: true
           force_orphan: false
-          full_commit_message: "deploy: production \${{ github.sha }}"
+          full_commit_message: "deploy: production ${{ github.sha }}"
 
   deploy-dev:
     name: Publish development
@@ -103,8 +103,8 @@ jobs:
       - name: Publish dev to /dev/
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./dist
           destination_dir: dev
-          full_commit_message: "deploy: dev \${{ github.sha }}"
+          full_commit_message: "deploy: dev ${{ github.sha }}"
