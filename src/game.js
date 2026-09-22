@@ -1349,8 +1349,12 @@ export class BackroomsGame{
       boot?.classList.add("audio-ready");
       const overlay=$("audio-overlay");
       if(overlay)overlay.classList.add("hidden");
-      this.audio.unlockFromGesture();
-      await this.audio.testUnlock();
+      try{
+        await this.audio.init();
+        await this.audio.testUnlock();
+      }catch(error){
+        console.warn("[Backrooms] Audio unlock failed:",error);
+      }
       this.audio.clickToEnter();
       this.beginIntroReveal();
     };
