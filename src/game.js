@@ -133,6 +133,11 @@ class Chunk{
       if(canonicalOpen(this.game.seed,this.cx*CELLS+CELLS,gz,"v"))this.setEdge(CELLS-1,z,"east",true);
     }
 
+    if(this.game.level.id==="0"){
+      const spawnMask=this.walls[this.index(8,8)];
+      if((spawnMask&15)===15)this.setEdge(8,8,rng.pick(["north","east","south","west"]),true);
+    }
+
     const level=this.game.level,rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
     for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
       if(rng2.next()<level.holeChance&&Math.hypot(x-8,z-8)>2.5)this.hazards.push({x,z});
@@ -596,7 +601,7 @@ class EntityManager{
           e.state="frozen";
         }else{
           e.state="stalk";
-          if(d<32){const speed=e.state==="stalk"?.58:0;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
+          if(d<32){const speed=.58;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
         }
         if(p.flashlight&&d<16){e.group.position.x-=dx/d*.9*dt;e.group.position.z-=dz/d*.9*dt}
         if(d<2.0){p.health-=dt*30;this.game.audio.hurt()}
