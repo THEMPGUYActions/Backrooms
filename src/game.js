@@ -100,6 +100,15 @@ class Chunk{
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
     this.originX=cx*world.size-world.size/2;this.originZ=cz*world.size-world.size/2;
     this.group=new THREE.Group();this.group.name="chunk_"+cx+"_"+cz;
+    this.bounds=new THREE.Sphere(
+      new THREE.Vector3(
+        this.originX+world.size*.5,
+        this.game.level.wallHeight*.5,
+        this.originZ+world.size*.5
+      ),
+      Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
+    );
+    this.hiddenSince=0;
     this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
@@ -397,7 +406,7 @@ class Chunk{
       const p=wallPoint(entry,.105,1.29),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
       const frameMat=exitDoor?lib.exitFrame:lib.doorFrame;
       box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,-1.02,0,0);
-      box(group,new THREE.BoxGeometry(.11,2.62,.18),frameMat,1.02,0,0);
+      box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,1.02,0,0);
       box(group,new THREE.BoxGeometry(3.35,.16,.24),frameMat,0,1.31,0);
       const door=box(group,new THREE.BoxGeometry(3.1,3.62,.09),(exitDoor?lib.exitDoor:lib.door).clone(),0,0,0);
       door.rotation.z=exitDoor?-0.16:-0.03;
@@ -602,7 +611,39 @@ class WorldStreamer{
   update(dt){
     const p=this.game.player.position;
     this.ensureAround(p.x,p.z);
-    for(const c of this.chunks.values())c.update(dt)
+    this.updateVisibility(dt);
+    for(const c of this.chunks.values()){
+      if(c.group.visible||Math.hypot(c.bounds.center.x-p.x,c.bounds.center.z-p.z)<38)c.update(dt);
+    }
+  }
+
+  updateVisibility(dt){
+    const camera=this.game.camera;
+    camera.updateMatrixWorld();
+    const frustum=new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
+    );
+    const p=this.game.player.position;
+    const remove=[];
+    for(const [key,c] of this.chunks){
+      const d=Math.hypot(c.bounds.center.x-p.x,c.bounds.center.z-p.z);
+      const visible=frustum.intersectsSphere(c.bounds);
+      if(visible||d<42){
+        c.group.visible=true;
+        c.hiddenSince=0;
+      }else{
+        c.group.visible=false;
+        c.hiddenSince+=dt;
+      }
+      if(c!==this.chunkAt(p.x,p.z)&&d>115&&!visible&&c.hiddenSince>5){
+        remove.push([key,c]);
+      }
+    }
+    for(const [key,c] of remove){
+      this.game.scene.remove(c.group);
+      c.dispose();
+      this.chunks.delete(key);
+    }
   }
   collision(position,radius){
     const chunk=this.chunkAt(position.x,position.z);if(!chunk)return position;
@@ -632,16 +673,17 @@ class WorldStreamer{
         const d=Math.hypot(light.position.x-x,light.position.z-z);if(d<best)best=d;
       }
     }
-    return best<18?1-best/18:0;
+    return best<45?1-best/45:0;
   }
   nearbyLightSources(x,z){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
+      if(!c.group.visible&&Math.hypot(c.bounds.center.x-x,c.bounds.center.z-z)>60)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d<22)out.push({light,d});
+        if(d<45)out.push({light,d});
       }
     }
     out.sort((a,b)=>a.d-b.d);
