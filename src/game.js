@@ -276,7 +276,7 @@ class Chunk{
         this.setEdge(2,2,"south",true);
         this.setEdge(2,2,"west",true);
       }
-    }    }else if(level.id==="0"){
+    }else if(level.id==="0"){
       const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
       if(mega){
         this.walls.fill(0);
