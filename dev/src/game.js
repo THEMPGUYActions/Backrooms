@@ -192,6 +192,16 @@ class Chunk{
     this.group.clear();
   }
   update(dt){
+    if(this.game.lightState!=="ON"&&this.fixtures.length){
+      const blackout=this.game.lightState==="BLACKOUT";
+      const flicker=Math.sin(this.game.gameTime*88+this.cx*7+this.cz*11)>-.15;
+      const scale=blackout?0:(flicker?1:.035);
+      for(const fixture of this.fixtures){
+        if(fixture.material?.emissive)fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??3)*scale;
+        if(fixture.isLight)fixture.intensity=(fixture.userData.baseIntensity??.5)*scale;
+      }
+      return;
+    }
     this.flickerTimer-=dt;
     if(this.flickerTimer<=0&&this.fixtures.length){
       const f=this.fixtures[Math.floor(Math.random()*this.fixtures.length)];
@@ -228,7 +238,7 @@ class WorldStreamer{
     if(this.library)disposeLibrary(this.library);
 
     this.size=this.game.level.cellSize*CELLS;
-    this.surfaceSize=1024;
+    this.surfaceSize=4096;
     this.library=makeLibrary(this.game.level);
 
     this.floorSurface=new THREE.Mesh(
@@ -253,14 +263,14 @@ class WorldStreamer{
 
     const library=this.library;
     applyOpenGameArtPBR(library,this.game.level)
-      .then(()=>this.updateSurfaceTiling(this.game.player.position.x,this.game.player.position.z))
+      .then(()=>this.updateSurfaceTiling())
       .catch(error=>{
         console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
       });
-    this.updateSurfaceTiling(0,0);
+    this.updateSurfaceTiling();
   }
 
-  updateSurfaceTiling(px,pz){
+  updateSurfaceTiling(){
     const surfaces=[
       {material:this.library?.floor,tileWorld:3.2},
       {material:this.library?.ceiling,tileWorld:1.6}
@@ -347,18 +357,16 @@ class Player{
     if(this.game.world.exitAt(this.position.x,this.position.z)){this.game.reachExit();return}
     if(this.health<=0||this.sanity<=0){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
     const moving=Math.hypot(this.position.x-oldX,this.position.z-oldZ)>.01;
-    if(moving){this.bob+=dt*(run?13:8);if(this.game.settings.shake)this.shake=Math.min(.04,this.shake+dt*.12)}else this.shake=Math.max(0,this.shake-dt*.22);
-    const bob=Math.sin(this.bob)*(.018*(run?1.5:.7))*(moving?1:0);
+    const stride=Math.min(1,Math.abs(mv.y));
+    if(moving&&stride>.05){this.bob+=dt*(run?13:8)*stride;if(this.game.settings.shake)this.shake=Math.min(.03,this.shake+dt*.09*stride)}else this.shake=Math.max(0,this.shake-dt*.24);
     const fear=1-this.sanity/100;
-    const bobY=(run?.055:.036)*Math.sin(this.bob*2);
-    const swayX=(run?.025:.015)*Math.sin(this.bob);
+    const bobY=(run?.055:.036)*Math.sin(this.bob*2)*stride;
     const breathing=Math.sin(this.game.gameTime*1.35)*.007;
-    const roll=Math.sin(this.bob)*(.0032+(run?.004:.0012))+Math.sin(this.game.gameTime*1.7)*.001*fear;
-    const shakeX=this.shake*Math.sin(this.game.gameTime*38)*.55;
-    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.35;
-    this.game.camera.position.copy(this.position);this.game.camera.position.addScaledVector(right,swayX+shakeX);
+    const roll=Math.sin(this.bob)*(.003+(run?.0035:.001))*stride+Math.sin(this.game.gameTime*1.7)*.001*fear;
+    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.28;
+    this.game.camera.position.copy(this.position);
     this.game.camera.position.y=this.eyeY+bobY+breathing+shakeY;
-    const targetFov=run?75:72;
+    const targetFov=run?74:70;
     this.cameraFov+=(targetFov-this.cameraFov)*Math.min(1,dt*8);
     if(Math.abs(this.game.camera.fov-this.cameraFov)>.01){this.game.camera.fov=this.cameraFov;this.game.camera.updateProjectionMatrix()}
     this.game.camera.rotation.set(this.pitch,this.yaw,roll,"YXZ");
@@ -442,22 +450,22 @@ export class BackroomsGame{
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
-    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
+    this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x000000);this.camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,touchDevice?0.85:1.05));this.renderer.setSize(innerWidth,innerHeight);
-    this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.9;
+    this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.72;
     const room=new RoomEnvironment();
     const pmrem=new THREE.PMREMGenerator(this.renderer);
     this.environmentTarget=pmrem.fromScene(room,0.04);
     pmrem.dispose();
     room.dispose();
     this.scene.environment=this.environmentTarget.texture;
-    this.scene.environmentIntensity=.24;
+    this.scene.environmentIntensity=.055;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.12);this.scene.add(this.ambient);
-    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffe8,22,30,.46,.82,1.5);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
-    this.horror=0;this.scareTimer=18+Math.random()*20;
+    this.ambient=new THREE.HemisphereLight(0x5f5a4f,0x000000,.035);this.scene.add(this.ambient);
+    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffee,30,24,.5,.88,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
+    this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=35+Math.random()*35;
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
   }
   mount(){
@@ -497,7 +505,7 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);
-    this.scene.fog=new THREE.FogExp2(this.level.theme.fog,this.level.id==="0"?.012:this.level.id==="1"?.018:.024);
+    this.scene.fog=new THREE.FogExp2(0x000000,this.level.id==="0"?.035:this.level.id==="1"?.05:.065);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     document.getElementById("level-number").textContent=this.level.number;document.getElementById("level-name").textContent=this.level.name;document.getElementById("objective").textContent=this.level.objective;
@@ -508,7 +516,7 @@ export class BackroomsGame{
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
-  die(copy){this.dead=true;this.paused=true;this.running=false;this.triggerFear(1);document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
+  die(copy){this.lightState="BLACKOUT";this.dead=true;this.paused=true;this.running=false;this.triggerFear(1);document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
   togglePause(force){
     if(!this.running||this.dead)return;this.paused=force!==undefined?force:!this.paused;document.getElementById("pause").classList.toggle("hidden",!this.paused);
     if(this.paused)document.exitPointerLock?.();else{this.audio.resume();this.renderer.domElement.requestPointerLock?.()}
@@ -516,6 +524,20 @@ export class BackroomsGame{
   toggleFlashlight(){this.player.flashlight=!this.player.flashlight;this.audio.click();this.toast(this.player.flashlight?"Flashlight on":"Flashlight off",.9)}
   isDark(){if(this.level.id==="2")return true;return !this.player.flashlight}
   triggerFear(amount=.25){this.horror=Math.max(this.horror,Math.max(0,Math.min(1,amount)));this.player.shake=Math.min(.055,this.player.shake+amount*.07)}
+  updateLightEvent(dt){
+    if(!this.running||this.paused||this.dead)return;
+    this.lightEventTimer-=dt;
+    if(this.lightState!=="ON"){
+      if(this.lightEventTimer<=0){this.lightState="ON";this.lightEventTimer=42+Math.random()*45}
+      return;
+    }
+    if(this.lightEventTimer>0)return;
+    if(this.level.id==="0"&&Math.random()<.42){
+      this.lightState="BLACKOUT";this.lightEventTimer=1.3+Math.random()*2.5;this.audio.lightsOut();this.triggerFear(.48);
+    }else{
+      this.lightState="FLICKER";this.lightEventTimer=.7+Math.random()*1.7;this.audio.flicker();this.triggerFear(.16);
+    }
+  }
   updateHorror(dt){
     this.horror=Math.max(0,this.horror-dt*.18);
     document.documentElement.style.setProperty("--fear",this.horror.toFixed(3));
@@ -533,6 +555,7 @@ export class BackroomsGame{
     if(this.introReveal<1)this.introReveal=Math.min(1,this.introReveal+dt/2.7);
     this.player.update(dt);this.world.update(dt);this.entityManager.update(dt);this.quality.update(dt);
     this.updateArgLayer(dt);
+    this.updateLightEvent(dt);
     this.updateHorror(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
     document.getElementById("coords").textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
