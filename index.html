@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#090806">
+  <meta name="description" content="The Backrooms by THEMPGUY. A procedural browser horror game.">
+  <title>The Backrooms</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="game"></div>
+
+  <section id="boot" class="screen">
+    <div class="panel">
+      <div class="eyebrow">THEMPGUY PRESENTS</div>
+      <h1>THE BACKROOMS</h1>
+      <p class="muted">A browser-first descent into places that should not exist.</p>
+      <div class="boot-grid">
+        <div><span>RENDERER</span><b>WEBGL 2</b></div>
+        <div><span>WORLD</span><b>PROCEDURAL</b></div>
+        <div><span>STREAMING</span><b>CHUNKED</b></div>
+        <div><span>ASSETS</span><b>PBR / GENERATED</b></div>
+      </div>
+      <button id="start" class="primary">ENTER THE BACKROOMS</button>
+      <p class="fine">Desktop: WASD + mouse · Shift to run · F flashlight · Esc pause<br>Mobile: left stick to move · swipe right side to look</p>
+      <p class="fine">This game uses original procedural visuals and sound. Backrooms-derived material is attributed in the repository.</p>
+    </div>
+  </section>
+
+  <section id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="level-readout">
+        <span id="level-number">LEVEL 0</span>
+        <strong id="level-name">THRESHOLD</strong>
+      </div>
+      <div id="status">ALONE</div>
+    </div>
+
+    <div class="crosshair"></div>
+
+    <div class="hud-bottom">
+      <div class="meters">
+        <div class="meter"><span>HEALTH</span><div class="bar"><i id="health-bar"></i></div></div>
+        <div class="meter"><span>STAMINA</span><div class="bar"><i id="stamina-bar"></i></div></div>
+        <div class="meter"><span>HYDRATION</span><div class="bar"><i id="hydration-bar"></i></div></div>
+        <div class="meter"><span>SANITY</span><div class="bar"><i id="sanity-bar"></i></div></div>
+      </div>
+      <div class="readouts">
+        <span id="objective">Find a way out.</span>
+        <span id="coords">0 : 0</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="mobile-controls" class="hidden" aria-hidden="true">
+    <div id="stick-zone" class="touch-zone"><div id="stick-knob"></div></div>
+    <button id="mobile-flash" class="touch-button">◐</button>
+    <button id="mobile-run" class="touch-button run">RUN</button>
+    <div id="look-zone" class="look-zone"></div>
+  </section>
+
+  <section id="pause" class="screen hidden">
+    <div class="panel compact">
+      <div class="eyebrow">SYSTEM PAUSED</div>
+      <h2>YOU ARE STILL HERE</h2>
+      <div class="settings">
+        <label>QUALITY
+          <select id="quality">
+            <option value="auto">Auto</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label>VOLUME
+          <input id="volume" type="range" min="0" max="1" step="0.02" value="0.65">
+        </label>
+        <label class="check"><input id="shake" type="checkbox" checked> Camera shake</label>
+        <label class="check"><input id="flashlight" type="checkbox" checked> Flashlight starts on</label>
+      </div>
+      <button id="resume" class="primary">RESUME</button>
+      <button id="restart" class="secondary">RESTART RUN</button>
+      <p class="fine">Settings are saved locally on this device.</p>
+    </div>
+  </section>
+
+  <section id="death" class="screen hidden">
+    <div class="panel compact">
+      <div class="eyebrow">SIGNAL LOST</div>
+      <h2 id="death-title">YOU DID NOT MAKE IT</h2>
+      <p id="death-copy" class="muted">The halls kept going.</p>
+      <button id="retry" class="primary">TRY AGAIN</button>
+    </div>
+  </section>
+
+  <section id="ending" class="screen hidden">
+    <div class="panel">
+      <div class="eyebrow">END OF CURRENT BUILD</div>
+      <h1>YOU FOUND A WAY OUT</h1>
+      <p class="muted">You reached the current edge of this build. The Backrooms are larger than what is implemented here, and the world is designed to keep expanding.</p>
+      <div class="boot-grid">
+        <div><span>LEVELS</span><b>0 · 1 · 2</b></div>
+        <div><span>WORLD</span><b>INFINITE-STYLE</b></div>
+        <div><span>GENERATION</span><b>SEEDED</b></div>
+        <div><span>PERFORMANCE</span><b>ADAPTIVE</b></div>
+      </div>
+      <button id="again-ending" class="primary">START AGAIN</button>
+    </div>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

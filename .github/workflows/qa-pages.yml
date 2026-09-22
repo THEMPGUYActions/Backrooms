@@ -1,0 +1,107 @@
+name: Build, QA and GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Quality checks
+        run: npm run check
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Check build output
+        run: |
+          test -f dist/index.html
+          test -f dist/src/main.js
+          test -f dist/styles.css
+          test -f dist/.nojekyll
+
+  preview:
+    name: Dev build artifact
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Upload dev/CI site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backrooms-site-\${{ github.ref_name }}-\${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+  pages-build:
+    name: Production Pages artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  pages-deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: pages-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
