@@ -1373,7 +1373,7 @@ export class BackroomsGame{
     this.running=false;this.paused=true;this.dead=false;
     this.introSequenceStarted=performance.now();
     const boot=document.getElementById("boot");
-    boot.classList.add("booting");
+    boot.classList.remove("booting");
     const gate=document.getElementById("audio-gate");
     if(gate)gate.classList.add("hidden");
     const introLine=document.getElementById("intro-line");
@@ -1388,7 +1388,7 @@ export class BackroomsGame{
     setTimeout(()=>{
       if(!this.introPlaying)return;
       const boot=document.getElementById("boot");
-      boot?.classList.add("booting");
+      boot?.classList.add("intro-live");
       const gate=document.getElementById("audio-gate");
       gate?.classList.add("hidden");
       this.introTime=0;
