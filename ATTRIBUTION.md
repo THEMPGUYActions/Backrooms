@@ -76,4 +76,4 @@ Original project material not derived from the Backrooms Wiki remains subject to
 Backrooms PBR texture pack by **methodical pixel**:
 https://opengameart.org/content/backrooms-pbr-texture-pack
 
-OpenGameArt lists this texture pack as **CC0**. The project uses its wallpaper, painted wall, carpet and ceiling tile PBR maps as external game assets. The source page also identifies the included maps as color, rough and normal textures. citeturn255659view0
+OpenGameArt lists this texture pack as **CC0**. The project uses its wallpaper, painted wall, carpet and ceiling tile PBR maps as external game assets. The source page also identifies the included maps as color, rough and normal textures.
