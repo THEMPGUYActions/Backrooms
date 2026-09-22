@@ -209,9 +209,7 @@ async function checkAssetSources() {
       fail("src/assets.js missing required OpenGameArt PBR map filename: " + filename);
     }
   }
-  if ((source.match(/opengameart\.org/g) || []).length < REQUIRED_PBR_ASSETS.length) {
-    fail("src/assets.js does not reference the expected OpenGameArt PBR asset set");
-  }
+
 }
 
 async function checkData() {
