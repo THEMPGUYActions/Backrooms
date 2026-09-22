@@ -138,19 +138,17 @@ Production is the main branch.
 
 The GitHub Actions workflow:
 
-1. Runs source-quality checks.
-2. Builds the static site into dist/.
-3. Uploads a GitHub Pages artifact.
-4. Deploys main to GitHub Pages.
+1. Builds the static site into dist/.
+2. Runs source-quality and browser-module resolution checks.
+3. Publishes main to the gh-pages branch root for production.
+4. Publishes dev under /dev/ on the same branch.
 
-The dev branch runs the same QA/build pipeline and publishes a downloadable CI artifact for testing without replacing production.
-
-After GitHub Pages is enabled for the repository with GitHub Actions as the publishing source, the production site will use:
+After GitHub Pages is enabled with gh-pages as the publishing source, the production site will use:
 
 https://thempguyactions.github.io/Backrooms/
 
 GitHub Pages documentation:
-https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 
 ## Branches
 
