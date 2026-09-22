@@ -918,14 +918,14 @@ class EntityManager{
       const dx=p.position.x-e.group.position.x,dz=p.position.z-e.group.position.z,d=Math.hypot(dx,dz);e.cool-=dt;
       if(d>50){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
       if(e.type==="hound"){
-        const forward=new THREE.Vector3(-Math.sin(p.yaw),0,-Math.cos(p.yaw)),to=new THREE.Vector3(dx,0,dz).normalize(),looking=forward.dot(to)<-.48;
+        const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw)),to=new THREE.Vector3(dx,0,dz).normalize(),looking=forward.dot(to)<-.48;
         if(d<13&&!looking&&e.state!=="chase"){e.state="chase";this.game.audio.scare();this.game.triggerFear(.45);e.cool=2.7}
         if(d<10&&looking)e.state="intimidated";
         if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
         e.group.lookAt(p.position.x,1,p.position.z);if(d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
       }else if(e.type==="figure"){
-        const forward=new THREE.Vector3(-Math.sin(p.yaw),0,-Math.cos(p.yaw)),to=new THREE.Vector3(dx,0,dz).normalize();
+        const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw)),to=new THREE.Vector3(dx,0,dz).normalize();
         const looking=forward.dot(to)<-.78;
         if(d<28&&!looking){
           e.group.position.x+=dx/d*.32*dt;
@@ -1146,7 +1146,11 @@ export class BackroomsGame{
     this.scene.fog=new THREE.FogExp2(0x000000,this.level.id==="0"?.027:this.level.id==="1"?.043:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
-    document.getElementById("level-number").textContent=this.level.number;document.getElementById("level-name").textContent=this.level.name;document.getElementById("objective").textContent=this.level.objective;
+    const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
+    const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
+    const objective=document.getElementById("objective");if(objective)objective.textContent=this.level.objective;
+    const recordingLevel=document.getElementById("recording-level");if(recordingLevel)recordingLevel.textContent=this.level.number;
+    const pauseLevel=document.getElementById("pause-level");if(pauseLevel)pauseLevel.textContent=this.level.number;
   }
   changeLevel(id){
     if(!id){this.ending();return}
@@ -1160,6 +1164,8 @@ export class BackroomsGame{
     this.paused=force!==undefined?force:!this.paused;
     const pause=document.getElementById("pause");
     pause?.classList.toggle("hidden",!this.paused);
+    const pauseLevel=document.getElementById("pause-level");
+    if(pauseLevel)pauseLevel.textContent=this.level.number;
     const mobile=document.getElementById("mobile-controls");
     mobile?.classList.toggle("paused",this.paused);
     if(this.paused){
@@ -1295,7 +1301,7 @@ export class BackroomsGame{
       document.getElementById("hud").classList.remove("hidden");
       document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
       document.getElementById("boot").classList.add("fade-out");
-      this.vhsPass.uniforms.intensity.value=.72;
+        this.vhsPass.uniforms.intensity.value=.72;
       this.vhsPass.uniforms.tracking.value=.28;
       this.toast(this.level.objective,3);
     }
