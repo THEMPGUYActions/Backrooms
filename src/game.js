@@ -200,10 +200,10 @@ class Chunk{
           pushMat(vData,px+cell/2,level.wallHeight/2,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
         }
       };
-      if(mask&1&&z>0&&!(this.walls[this.index(x,z-1)]&4))addEdge("north");
-      if(mask&4&&(z===CELLS-1||!(this.walls[this.index(x,z+1)]&1)))addEdge("south");
-      if(mask&8&&x>0&&!(this.walls[this.index(x-1,z)]&2))addEdge("west");
-      if(mask&2&&(x===CELLS-1||!(this.walls[this.index(x+1,z)]&8)))addEdge("east");
+      if(mask&1)addEdge("north");
+      if(mask&8)addEdge("west");
+      if(z===CELLS-1&&(mask&4))addEdge("south");
+      if(x===CELLS-1&&(mask&2))addEdge("east");
 
       const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
       const fixtureChance=level.id==="0"?.78:level.id==="1"?.2:.13;
@@ -659,13 +659,13 @@ class AdaptiveQuality{
   constructor(game){this.game=game;this.mode=localStorage.getItem("br.quality")||"auto";this.samples=[];this.cool=0}
   maxSafePixelRatio(){
     const width=Math.max(1,innerWidth),height=Math.max(1,innerHeight);
-    return Math.max(.5,Math.min(1.15,this.game.renderer.capabilities.maxTextureSize/Math.max(width,height)));
+    return Math.max(1,Math.min(1.15,this.game.renderer.capabilities.maxTextureSize/Math.max(width,height)));
   }
   limits(){
-    if(this.mode==="low")return{pixel:.7,radius:2};
-    if(this.mode==="medium")return{pixel:.9,radius:2};
+    if(this.mode==="low")return{pixel:1,radius:2};
+    if(this.mode==="medium")return{pixel:1,radius:2};
     if(this.mode==="high")return{pixel:1.15,radius:2};
-    return{pixel:Math.min(devicePixelRatio,1.05),radius:2};
+    return{pixel:Math.min(devicePixelRatio,1.0),radius:2};
   }
   apply(){
     const l=this.limits();
@@ -680,7 +680,7 @@ class AdaptiveQuality{
     const avg=this.samples.reduce((a,b)=>a+b,0)/this.samples.length;
     const safe=this.maxSafePixelRatio();
     if(avg>28)this.game.renderer.setPixelRatio(Math.max(.5,this.game.renderer.getPixelRatio()*.9));
-    else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.05,safe,this.game.renderer.getPixelRatio()*1.025));
+    else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.0,safe,this.game.renderer.getPixelRatio()*1.025));
     this.game.renderer.setSize(innerWidth,innerHeight,false);
     this.cool=2;
   }
