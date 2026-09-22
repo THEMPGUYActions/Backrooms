@@ -21,8 +21,7 @@ const SPB_ASSET_FILES = [
   "pbr/crate/crate_color.png",
   "fluorescent_light.png",
   "wall_trim_texture.png",
-  "newstairs_texture.png",
-  "
+  "newstairs_texture.png"
 ];
 const PBR_ASSET_FILES = [
   "wallpaper_color.png",
