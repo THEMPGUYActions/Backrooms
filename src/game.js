@@ -1348,19 +1348,20 @@ export class BackroomsGame{
     this.last=performance.now();
     requestAnimationFrame(this.loop.bind(this));
 
-    // Build the playable world behind the intro. The procedural fallback becomes
-    // playable immediately; optional PBR/found-footage assets continue loading.
-    const worldLoad=this.world.configure((progress,label,detail)=>{
-      this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
-    });
-    this.world.ensureAround(0,0);
-    this.worldReady=true;
-    if(this.pendingStart)this.beginIntroReveal();
-
-    worldLoad.catch(error=>{
+    // Build the procedural world before allowing the intro to hand control to gameplay.
+    // configure() returns as soon as the fallback geometry exists; optional visual
+    // enhancements continue in the background and can never block starting the game.
+    try{
+      await this.world.configure((progress,label,detail)=>{
+        this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
+      });
+      this.world.ensureAround(0,0);
+      this.worldReady=true;
+      if(this.pendingStart)this.beginIntroReveal();
+    }catch(error){
       console.error("[Backrooms] World initialization failed:",error);
       this.toast("WORLD INITIALIZATION FAILED",5);
-    });
+    }
   }
   bindUI(){
     const $=id=>document.getElementById(id);
