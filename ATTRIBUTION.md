@@ -69,3 +69,11 @@ https://backrooms-wiki.wikidot.com/image-use-policy
 Because this repository contains game adaptations of specific Backrooms Wiki levels/entities, treat the wiki-derived game content as CC BY-SA 3.0 and preserve this attribution when redistributing those derivative portions.
 
 Original project material not derived from the Backrooms Wiki remains subject to the repository's applicable license notices.
+
+
+## OpenGameArt texture attribution
+
+Backrooms PBR texture pack by **methodical pixel**:
+https://opengameart.org/content/backrooms-pbr-texture-pack
+
+OpenGameArt lists this texture pack as **CC0**. The project uses its wallpaper, painted wall, carpet and ceiling tile PBR maps as external game assets. The source page also identifies the included maps as color, rough and normal textures.

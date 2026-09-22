@@ -1,16 +1,19 @@
-# Generated game assets
+# Game assets
 
-The first production game build intentionally does not bundle random web images, ripped game files, or unverified asset packs.
+The playable build uses the **Backrooms PBR texture pack** by methodical pixel from OpenGameArt.org:
 
-The browser generates the environment materials and simple props at runtime:
+https://opengameart.org/content/backrooms-pbr-texture-pack
 
-- PBR-style base color maps
-- Roughness maps
-- Procedural normal maps
-- Carpet, concrete, metal, rubber and ceiling materials
-- Fluorescent fixtures
-- Pipes, crates, exit markers and entity representations
+The pack is listed as **CC0** on OpenGameArt.org. It provides color, roughness and normal maps at 1024x1024 for multiple Backrooms materials, including wallpaper, painted wall, carpet and ceiling tiles.
 
-This keeps the project static-host friendly, reduces repository weight, and avoids accidentally redistributing artwork with an incompatible license.
+The build downloads the locked maps from their OpenGameArt URLs into dist/assets/pbr/. The browser then loads the local copies from the same site origin. The procedural material maps remain as a fallback for cases where an individual local texture cannot be loaded.
 
-The renderer uses Three.js r186 from jsDelivr. The source is pinned instead of using an unversioned CDN URL.
+The renderer pins Three.js r186 through an import map and uses the texture maps as real PBR inputs:
+
+- Base color
+- Roughness
+- Normal
+
+The streamed world also has a player-following ceiling surface so chunk boundaries cannot expose the empty WebGL background when exploring beyond the currently generated chunks.
+
+No ripped game files or Backrooms Wiki photographs are bundled by this project.
