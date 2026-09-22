@@ -173,17 +173,31 @@ export class AudioDirector{
     }
 
     this.ambientTimer-=dt;this.buzzTimer-=dt;
+    const p=clamp(proximity);
+
     if(this.ambientTimer<=0){
-      this.ambientSting(.035+Math.random()*.045);
-      this.ambientTimer=38+Math.random()*58;
-    }
-    if(this.buzzTimer<=0&&lightState==="ON"){
-      this.playBuffer("electric_buzz",{gain:.026,rate:.92+Math.random()*.12,pan:(Math.random()-.5)*.6,send:.42,delay:.13});
-      this.buzzTimer=24+Math.random()*42;
+      this.ambientSting(.028+Math.random()*.038);
+      this.ambientTimer=42+Math.random()*72;
     }
 
-    const p=clamp(proximity);
-    let target=.006+p*.043+fear*.003;
+    // The ballast buzz becomes audible as you approach an actual fluorescent fixture.
+    if(this.buzzTimer<=0&&lightState==="ON"){
+      if(p>.03){
+        const gain=.022+p*.14;
+        this.playBuffer("electric_buzz",{
+          gain,
+          rate:.9+Math.random()*.16,
+          pan:(Math.random()-.5)*.5,
+          send:.38+p*.2,
+          delay:.08
+        });
+        this.buzzTimer=9+(1-p)*18+Math.random()*9;
+      }else{
+        this.buzzTimer=10+Math.random()*15;
+      }
+    }
+
+    let target=.006+p*.058+fear*.003;
     if(lightState==="FLICKER")target*=.48;
     if(lightState==="BLACKOUT")target=.0008;
     if(this.humGain)this.humGain.gain.setTargetAtTime(target,this.ctx.currentTime,.11);
