@@ -62,10 +62,13 @@ export function makeLibrary(level){
     concrete:createPBRMaterial({base:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
     ceiling:createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.88,scale:4,normalStrength:.24}),
     metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.62,metalness:.78}),
+    cable:new THREE.MeshStandardMaterial({color:0x171817,roughness:.79,metalness:.58}),
+    water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72}),
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
-    light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.28,metalness:0,emissive:level.theme.light,emissiveIntensity:3})
+    light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.28,metalness:0,emissive:level.theme.light,emissiveIntensity:3}),
+    orangeLight:new THREE.MeshStandardMaterial({color:0xffddaa,roughness:.31,metalness:0,emissive:0xff9b52,emissiveIntensity:2.6})
   };
 }
 
