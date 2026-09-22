@@ -89,15 +89,15 @@ class Chunk{
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
     box(g,new THREE.BoxGeometry(size,.09,size),lib.floor,0,-.045,0);
     box(g,new THREE.BoxGeometry(size,.1,size),lib.ceiling,0,level.wallHeight+.05,0);
-    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.11),vGeom=new THREE.BoxGeometry(.11,level.wallHeight,cell);
-    const hData=[],vData=[],rngBase=new RNG(this.seedKey());
+    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.11),vGeom=new THREE.BoxGeometry(.11,level.wallHeight,cell);\n    const baseHGeom=new THREE.BoxGeometry(cell,.16,.14),baseVGeom=new THREE.BoxGeometry(.14,.16,cell);
+    const hData=[],vData=[],baseHData=[],baseVData=[],rngBase=new RNG(this.seedKey());
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
       const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
       if(mask&1)pushMat(hData,px,level.wallHeight/2,pz-cell/2);
       if(mask&4)pushMat(hData,px,level.wallHeight/2,pz+cell/2);
       if(mask&8)pushMat(vData,px-cell/2,level.wallHeight/2,pz);
-      if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);
+      if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);\n      if(mask&1)pushMat(baseHData,px,.10,pz-cell/2);\n      if(mask&4)pushMat(baseHData,px,.10,pz+cell/2);\n      if(mask&8)pushMat(baseVData,px-cell/2,.10,pz);\n      if(mask&2)pushMat(baseVData,px+cell/2,.10,pz);
       const fixtureChance=level.id==="0"?.43:.24;
       if(rngBase.next()<fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
@@ -105,7 +105,7 @@ class Chunk{
         fixture.userData.light=true;this.fixtures.push(fixture);
         if(((x*13+z*7)%61===0)||level.id==="2"&&((x+z)%29===0)){
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const l=new THREE.PointLight(lightColor,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
+          const l=new THREE.PointLight(lightColor,level.id==="0"?.30:.24,level.id==="2"?14:24,1.15);
           l.position.set(px,level.wallHeight-.2,pz);g.add(l);this.fixtures.push(l);
         }
       }
@@ -121,7 +121,7 @@ class Chunk{
         cable.rotation.z=Math.PI/2;cable.position.set(px,level.wallHeight-.42,pz);g.add(cable);
       }
     }
-    const hm=new THREE.InstancedMesh(hGeom,lib.wall,Math.max(1,hData.length));hm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    const bhm=new THREE.InstancedMesh(baseHGeom,lib.baseboard,Math.max(1,baseHData.length));\n    baseHData.forEach((m,i)=>bhm.setMatrixAt(i,m));bhm.count=baseHData.length;bhm.frustumCulled=false;g.add(bhm);\n    const bvm=new THREE.InstancedMesh(baseVGeom,lib.baseboard,Math.max(1,baseVData.length));\n    baseVData.forEach((m,i)=>bvm.setMatrixAt(i,m));bvm.count=baseVData.length;bvm.frustumCulled=false;g.add(bvm);\n    const hm=new THREE.InstancedMesh(hGeom,lib.wall,Math.max(1,hData.length));hm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     hData.forEach((m,i)=>hm.setMatrixAt(i,m));hm.count=hData.length;hm.frustumCulled=true;g.add(hm);
     const vm=new THREE.InstancedMesh(vGeom,lib.wall,Math.max(1,vData.length));vm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     vData.forEach((m,i)=>vm.setMatrixAt(i,m));vm.count=vData.length;vm.frustumCulled=true;g.add(vm);
@@ -278,18 +278,18 @@ class Player{
   update(dt){
     const input=this.game.input,look=input.consumeLook();
     this.yaw-=look.x*.0021;this.pitch-=look.y*.0021;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
-    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?4.75:2.85;
+    const mv=input.getMove(),run=input.wantsRun()&&(this.game.dev.godMode||this.stamina>4)&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.35:3.25;
     const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw)),right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
     const oldX=this.position.x,oldZ=this.position.z;
     this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
-    const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;
+    if(!this.game.dev.noclip){const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;}
     if(run)this.stamina=Math.max(0,this.stamina-dt*15);else this.stamina=Math.min(100,this.stamina+dt*9);
     this.hydration=Math.max(0,this.hydration-dt*.48);if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
     const dark=this.game.isDark();this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;this.sanity=Math.max(0,Math.min(100,this.sanity));
-    if(this.game.world.hazardAt(this.position.x,this.position.z)){this.health-=dt*34}
+    if(!this.game.dev.godMode&&this.game.world.hazardAt(this.position.x,this.position.z)){this.health-=dt*34}
     if(this.game.world.exitAt(this.position.x,this.position.z)){this.game.reachExit();return}
-    if(this.health<=0||this.sanity<=0){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
+    if(!this.game.dev.godMode&&(this.health<=0||this.sanity<=0)){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
     const moving=Math.hypot(this.position.x-oldX,this.position.z-oldZ)>.01;
     if(moving){this.bob+=dt*(run?13:8);if(this.game.settings.shake)this.shake=Math.min(.04,this.shake+dt*.12)}else this.shake=Math.max(0,this.shake-dt*.22);
     const bob=Math.sin(this.bob)*(.018*(run?1.5:.7))*(moving?1:0);
@@ -369,7 +369,7 @@ export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
-    this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
+    this.settings={shake:localStorage.getItem("br.shake")!=="0"};\n    this.dev={godMode:false,noclip:false,showEntities:true};this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,220);this.camera.rotation.order="YXZ";
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));this.renderer.setSize(innerWidth,innerHeight);
@@ -383,7 +383,7 @@ export class BackroomsGame{
     this.scene.environmentIntensity=.42;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
     this.ambient=new THREE.HemisphereLight(0xb8b0a0,0x0a0806,.20);this.scene.add(this.ambient);
-    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffee,18,28,.48,.75,1.3);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
+    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xffffee,5.2,22,.42,.92,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
   }
   mount(){
@@ -455,7 +455,7 @@ export class BackroomsGame{
     document.getElementById("stamina-bar").style.width=Math.max(0,this.player.stamina)+"%";
     document.getElementById("hydration-bar").style.width=Math.max(0,this.player.hydration)+"%";
     document.getElementById("sanity-bar").style.width=Math.max(0,this.player.sanity)+"%";
-    document.getElementById("status").textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";this.flash.intensity=this.player.flashlight?18:0;
+    document.getElementById("status").textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";this.flash.intensity=this.player.flashlight?5.2:0;
     this.flash.position.copy(this.camera.position);
   }
   updateArgLayer(dt){
