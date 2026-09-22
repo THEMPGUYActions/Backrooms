@@ -1,4 +1,5 @@
 import * as THREE from "three";
+THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
 
@@ -91,7 +92,7 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
   }
 }
 
-export async function applyOpenGameArtPBR(library,level){
+export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
   const source=level.id==="0"
     ? {wall:BACKROOMS_PBR_SOURCES.wallpaper,floor:BACKROOMS_PBR_SOURCES.carpet}
     : {wall:BACKROOMS_PBR_SOURCES.paintedWall,floor:BACKROOMS_PBR_SOURCES.carpet};
@@ -99,12 +100,39 @@ export async function applyOpenGameArtPBR(library,level){
   const wallRepeat=level.id==="0"?2.4:3.0;
   const floorRepeat=level.id==="0"?4.8:4.2;
   const ceilingRepeat=1.0;
-  const jobs=[
-    applyRemoteTexture(library.wall,"map",source.wall.color,true,wallRepeat,.28),
-    applyRemoteTexture(library.floor,"map",source.floor.color,true,floorRepeat,.16),
-    applyRemoteTexture(library.ceiling,"map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25)
+
+  const maps=[
+    ["wall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // wallpaper"],
+    ["wall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // wallpaper"],
+    ["floor","roughnessMap",source.floor.rough,false,floorRepeat,.16,"Roughness // carpet"],
+    ["floor","normalMap",source.floor.normal,false,floorRepeat,.16,"Normal // carpet"],
+    ["ceiling","roughnessMap",BACKROOMS_PBR_SOURCES.ceiling.rough,false,ceilingRepeat,.25,"Roughness // ceiling"],
+    ["ceiling","normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,ceilingRepeat,.25,"Normal // ceiling"],
+    ["wall","map",source.wall.color,true,wallRepeat,.28,"Color // wallpaper"],
+    ["floor","map",source.floor.color,true,floorRepeat,.16,"Color // carpet"],
+    ["ceiling","map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25,"Color // ceiling"]
   ];
-  await Promise.allSettled(jobs);
+
+  const total=maps.length;
+  let done=0;
+  const loadOne=async(entry)=>{
+    const [materialName,kind,url,color,repeat,normalStrength,label]=entry;
+    onProgress(done/total,"LOADING SURFACES",label);
+    await applyRemoteTexture(library[materialName],kind,url,color,repeat,normalStrength);
+    done++;
+    onProgress(done/total,"LOADING SURFACES",label);
+  };
+
+  // Stage 1: roughness/normal data first so the finished materials have correct light response.
+  onProgress(0,"CALIBRATING SURFACES","Loading roughness and normal maps first");
+  await Promise.all(maps.slice(0,6).map(loadOne));
+
+  // Stage 2: final color maps.
+  onProgress(6/total,"LOADING COLORS","Applying final wallpaper, carpet and ceiling textures");
+  await Promise.all(maps.slice(6).map(loadOne));
+
+  onProgress(1,"SURFACES READY","Full PBR set loaded and browser-cacheable");
+  return true;
 }
 
 function normalFromHeight(size,seed){
@@ -172,8 +200,8 @@ export function makeLibrary(level){
     water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72}),
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
-    trim:new THREE.MeshStandardMaterial({color:0xf0eee5,roughness:.62,metalness:0}),
-    trimTop:new THREE.MeshStandardMaterial({color:0xe4e0d5,roughness:.7,metalness:0}),
+    trim:new THREE.MeshStandardMaterial({color:0xf4f0e3,roughness:.66,metalness:0}),
+    trimTop:new THREE.MeshStandardMaterial({color:0xe8e5dc,roughness:.72,metalness:0}),
     outlet:new THREE.MeshStandardMaterial({color:0xe7e4dc,roughness:.58,metalness:0}),
     socket:new THREE.MeshStandardMaterial({color:0x2a2824,roughness:.88,metalness:0}),
     intercom:new THREE.MeshStandardMaterial({color:0xcac5b5,roughness:.72,metalness:.12}),
@@ -187,8 +215,8 @@ export function makeLibrary(level){
     wallAnomaly:new THREE.MeshStandardMaterial({color:0xd2bf61,roughness:.72,metalness:0,emissive:0xffdc69,emissiveIntensity:.7}),
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
-    light:new THREE.MeshStandardMaterial({color:0xfff2c6,roughness:.4,metalness:0,emissive:0xffd66b,emissiveIntensity:2.25}),
-    orangeLight:new THREE.MeshStandardMaterial({color:0xffddaa,roughness:.36,metalness:0,emissive:0xff9b52,emissiveIntensity:2.0})
+    light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
+    orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2})
   };
 }
 
