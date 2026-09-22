@@ -132,7 +132,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -594,7 +594,7 @@ class Chunk{
     const addLight=(x,z,rotation=0,scale=1,baseIntensity=this.zone==="halls"?150:105)=>{
       const fixture=box(g,new THREE.BoxGeometry(3.15*scale,.055,.44*scale),lib.level1Light,x,level.wallHeight-.14,z,0,rotation,0);
       fixture.userData.light=true;fixture.userData.baseEmissive=2.4;this.fixtures.push(fixture);
-      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:0,decay:2});
+      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:this.zone==="halls"?34:24,decay:2});
       return fixture;
     };
 
@@ -615,7 +615,7 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.95,level.wallHeight,.95),lib.concrete,p.x,level.wallHeight/2,p.z);
         box(g,new THREE.BoxGeometry(1.16,.10,1.16),lib.metal,p.x,.54,p.z);
         for(const side of [[.50,.0,.08,1.0],[0,.50,1.0,.08],[-.50,0,.08,1.0],[0,-.50,1.0,.08]]){
-          if(rng.next()<.55)box(g,new THREE.BoxGeometry(side[2],.045,side[3]),lib.parkingLine,p.x+side[0],.70,p.z+side[1]);
+          if(rng.next()<.55)box(g,new THREE.BoxGeometry(side[2],.045,side[3]),lib.warningLine,p.x+side[0],.70,p.z+side[1]);
         }
       }
 
@@ -653,9 +653,21 @@ class Chunk{
       const crates=rng.next()<level.crateChance?1+rng.int(0,2):0;
       for(let i=0;i<crates;i++){
         const p=randomCell();
-        box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
+        const crate=box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
         box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
         box(g,new THREE.BoxGeometry(.055,.84,.055),lib.metal,p.x-.32,.4,p.z);
+        this.crates.push({group:crate,unseen:0});
+      }
+
+      if(rng.next()<(level.shelfChance||.34)){
+        const p=randomCell();
+        const rack=new THREE.Group();
+        rack.position.set(p.x,.02,p.z);
+        for(const y of [.55,1.35,2.15]){
+          box(rack,new THREE.BoxGeometry(2.6,.08,.58),lib.level1Shelf,0,y,0);
+        }
+        for(const x of [-1.2,1.2])box(rack,new THREE.BoxGeometry(.08,2.25,.08),lib.metal,x,1.12,0);
+        g.add(rack);
       }
 
       if(rng.next()<.32){
@@ -682,6 +694,9 @@ class Chunk{
           box(desk,new THREE.BoxGeometry(1.5,.12,.72),lib.officeWood,0,.78,0);
           for(const sx of [-.6,.6])for(const sz of [-.24,.24])box(desk,new THREE.BoxGeometry(.07,.77,.07),lib.officeWood,sx,.385,sz);
           box(desk,new THREE.BoxGeometry(.78,.48,.06),lib.officePlastic,0,1.07,-.02);
+          box(desk,new THREE.BoxGeometry(.55,.08,.50),lib.officeWood,0,.47,.72);
+          box(desk,new THREE.BoxGeometry(.08,.52,.08),lib.officeWood,-.23,.26,.72);
+          box(desk,new THREE.BoxGeometry(.08,.52,.08),lib.officeWood,.23,.26,.72);
           g.add(desk);
         }else if(room.type==="storage"){
           for(let i=0;i<1+rng.int(0,2);i++){const ox=(rng.next()-.5)*room.w*cell*.38,oz=(rng.next()-.5)*room.h*cell*.38;box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz)}
@@ -720,6 +735,36 @@ class Chunk{
     this.group.clear();
   }
   update(dt){
+    if(this.game.level.id==="1"&&this.zone==="halls"){
+      const state=this.game.lightState;
+      if(state!=="ON"&&this.lastLightState==="ON"&&Math.random()<.34){
+        const cell=this.game.level.cellSize;
+        const bx=this.originX+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
+        const bz=this.originZ+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
+        const crate=box(this.group,new THREE.BoxGeometry(.9,.8,.9),this.world.library.crate,bx,.4,bz);
+        crate.userData.appearedAt=this.game.gameTime;
+        this.crates.push({group:crate,unseen:0});
+      }
+      for(let i=this.crates.length-1;i>=0;i--){
+        const item=this.crates[i];
+        if(!item.group.parent){this.crates.splice(i,1);continue}
+        const dx=this.game.player.position.x-item.group.position.x,dz=this.game.player.position.z-item.group.position.z,d=Math.hypot(dx,dz);
+        if(d<24){
+          const forward=new THREE.Vector3(-Math.sin(this.game.player.viewYaw),0,-Math.cos(this.game.player.viewYaw));
+          const to=new THREE.Vector3(-dx,0,-dz).normalize();
+          if(forward.dot(to)>.35)item.unseen=0;else item.unseen+=dt;
+          if(item.unseen>18){
+            item.group.removeFromParent();
+            item.group.geometry?.dispose();
+            this.crates.splice(i,1);
+          }
+        }
+      }
+      this.lastLightState=state;
+    }else{
+      this.lastLightState=this.game.lightState;
+    }
+
     if(this.game.lightState==="ON"){
       for(const fixture of this.fixtures){
         if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)
