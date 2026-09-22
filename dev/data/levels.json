@@ -24,6 +24,25 @@
     "source": "https://backrooms-wiki.wikidot.com/level-2",
     "license": "CC BY-SA 3.0",
     "authors": "Current source page credits Greggita Mahayfaio and earlier contributors",
-    "adaptation": "Procedural utility corridors, machinery styling, blackout conditions and entity encounters are original game adaptations by THEMPGUY."
+    "adaptation": "Procedural utility corridors, machinery styling, blackout conditions and entity encounters are original game adaptations by THEMPGUY.",
+    "next": "3"
+  },
+  {
+    "id": "3",
+    "number": "LEVEL 3",
+    "name": "ELECTRICAL STATION",
+    "source": "https://backrooms-wiki.wikidot.com/level-3",
+    "license": "CC BY-SA 3.0",
+    "authors": "Natedagreat563 and earlier credited contributors; original concept by u/M654z",
+    "adaptation": "Procedural electrical halls, machinery, lighting, supplies and encounters are original game adaptations by THEMPGUY."
+  },
+  {
+    "id": "4",
+    "number": "LEVEL 4",
+    "name": "ABANDONED OFFICE",
+    "source": "https://backrooms-wiki.wikidot.com/level-4",
+    "license": "CC BY-SA 3.0",
+    "authors": "Current Backrooms Wiki article and credited contributors",
+    "adaptation": "Procedural empty offices, supplies, lighting and traversal are original game adaptations by THEMPGUY."
   }
 ]

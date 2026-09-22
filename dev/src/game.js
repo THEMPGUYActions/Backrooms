@@ -13,8 +13,8 @@ const VHSShader={
   uniforms:{
     tDiffuse:{value:null},
     time:{value:0},
-    intensity:{value:.78},
-    tracking:{value:.25},
+    intensity:{value:.72},
+    tracking:{value:.24},
     fear:{value:0},
     resolution:{value:new THREE.Vector2(1,1)}
   },
@@ -31,50 +31,60 @@ const VHSShader={
     float hash(vec2 p){
       return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
     }
-    float noise(vec2 p){
+    float valueNoise(vec2 p){
       vec2 i=floor(p),f=fract(p);
       f=f*f*(3.0-2.0*f);
       return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x),
                  mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x),f.y);
     }
-    vec2 barrel(vec2 uv){
-      vec2 p=uv-.5;
-      float r=dot(p,p);
-      p*=1.0+r*(.11+.045*fear);
-      return p+.5;
+    vec2 tapeWarp(vec2 uv,float t){
+      float lineBlock=floor(uv.y*resolution.y*.07);
+      float low=valueNoise(vec2(lineBlock*.43,t*1.25));
+      float hi=valueNoise(vec2(floor(uv.y*resolution.y*.34),t*6.0));
+      uv.x+=(low-.5)*.0017*tracking+(hi-.5)*.00055*tracking;
+      float tearSeed=floor(t*2.0);
+      float tearY=hash(vec2(tearSeed,41.0));
+      float tear=smoothstep(.014,0.0,abs(uv.y-tearY))*step(.84,hash(vec2(tearSeed,52.0)));
+      uv.x+=tear*.012;
+      uv.y+=tear*(hash(vec2(tearSeed,63.0))-.5)*.002;
+      return uv;
     }
     void main(){
-      vec2 uv=barrel(vUv);
+      vec2 p=vUv-.5;
+      float r=dot(p,p);
+      p*=1.0+r*(.045+.02*fear);
+      vec2 uv=tapeWarp(p+.5,time);
+
       float line=floor(uv.y*resolution.y);
-      float wobble=(noise(vec2(line*.035,time*.35))-.5)*.0018*tracking;
-      uv.x+=wobble;
+      float frame=floor(time*24.0);
+      float chroma=(.0017+.0018*fear)*intensity;
 
-      float scan=sin(uv.y*resolution.y*3.14159)*.5+.5;
-      float n=noise(uv*resolution.xy*.31+time*11.0);
-      float fine=noise(uv*resolution.xy*1.7-time*19.0);
+      vec3 center=texture2D(tDiffuse,uv).rgb;
+      vec3 left=texture2D(tDiffuse,uv-vec2(chroma,0.0)).rgb;
+      vec3 right=texture2D(tDiffuse,uv+vec2(chroma,0.0)).rgb;
+      vec3 c=vec3(left.r*.5+center.r*.5,
+                  center.g*.8+left.g*.1+right.g*.1,
+                  right.b*.5+center.b*.5);
 
-      vec2 ca=vec2(.0016+.002*fear,0.0);
-      vec3 c;
-      c.r=texture2D(tDiffuse,uv+ca).r;
-      c.g=texture2D(tDiffuse,uv).g;
-      c.b=texture2D(tDiffuse,uv-ca).b;
+      float lum=dot(c,vec3(.299,.587,.114));
+      c=mix(c,vec3(lum),.035+.04*intensity);
 
-      float luminance=dot(c,vec3(.299,.587,.114));
-      c=mix(c,vec3(luminance),.07+.06*intensity);
-      c*=vec3(1.045,.99,.89);
-      c+=vec3((n-.5)*.055*intensity);
-      c+=vec3((fine-.5)*.018*intensity);
-      c*=1.0-(scan-.5)*.045*intensity;
+      float fine=hash(floor(uv*resolution*1.08)+vec2(frame*1.31,frame*.71))-.5;
+      float coarse=valueNoise(vec2(floor(uv.x*resolution.x/9.0),floor(uv.y*resolution.y/7.0))+frame*.07)-.5;
+      c+=vec3(fine*.042*intensity+coarse*.02*intensity);
 
-      vec2 q=abs(vUv-.5)*2.0;
-      float vignette=1.0-smoothstep(.52,1.0,max(q.x,q.y));
-      c*=mix(.62,1.0,vignette);
+      float scan=.978+.022*sin((line+frame*.18)*3.14159);
+      c*=scan;
 
-      float edge=smoothstep(.92,1.0,max(q.x,q.y));
-      c*=1.0-edge*(.28+.18*fear);
+      float flutter=(hash(vec2(frame,91.0))-.5)*.014*intensity;
+      c+=flutter;
 
-      float drop=step(.997,noise(vec2(line*.12,floor(time*.7))));
-      c*=1.0-drop*(.18*intensity);
+      float dropout=step(.994,hash(vec2(floor(line/3.0),floor(time*4.0))));
+      c*=1.0-dropout*.3*intensity;
+
+      vec2 edge=abs(vUv-.5)*2.0;
+      float vignette=1.0-smoothstep(.55,1.0,max(edge.x,edge.y));
+      c*=mix(.7,1.0,vignette);
 
       gl_FragColor=vec4(max(c,0.0),1.0);
     }`
@@ -109,7 +119,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -313,7 +323,7 @@ class Chunk{
         fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
         {
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const intensity=level.id==="0"?72:42;
+          const intensity=level.id==="0"?320:level.id==="3"?220:level.id==="4"?110:170;
           this.lightSources.push({
             position:new THREE.Vector3(px+jx,level.wallHeight-.24,pz+jz),
             color:lightColor,
@@ -363,6 +373,26 @@ class Chunk{
     for(const hz of this.hazards){
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
       p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
+    }
+
+    const batteryChance=level.batteryChance??.08;
+    const batteryRng=new RNG(this.seedKey()^0x0bba71);
+    for(let i=0;i<2;i++){
+      if(batteryRng.next()>batteryChance*(i===0?1:.48))continue;
+      let bx=batteryRng.int(1,Math.max(1,cells-2)),bz=batteryRng.int(1,Math.max(1,cells-2));
+      if(this.hazards.some(h=>h.x===bx&&h.z===bz)){bx=Math.max(1,Math.min(cells-2,bx+1));bz=Math.max(1,Math.min(cells-2,bz+1))}
+      const battery=new THREE.Group();
+      battery.position.set(
+        this.originX+bx*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32),
+        .22,
+        this.originZ+bz*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32)
+      );
+      const body=box(battery,new THREE.CylinderGeometry(.105,.105,.42,10),lib.battery,0,0,0,0,0,Math.PI/2);
+      box(battery,new THREE.BoxGeometry(.052,.23,.17),lib.batteryLabel,0,0,0);
+      body.rotation.order="ZYX";
+      battery.rotation.y=batteryRng.next()*Math.PI*2;
+      g.add(battery);
+      this.batteries.push({group:battery,amount:28+batteryRng.int(0,18)});
     }
 
     const wallPoint=(e,offset=.095,y=.6)=>{
@@ -628,16 +658,14 @@ class WorldStreamer{
     for(const [key,c] of this.chunks){
       const d=Math.hypot(c.bounds.center.x-p.x,c.bounds.center.z-p.z);
       const visible=frustum.intersectsSphere(c.bounds);
-      if(visible||d<42){
-        c.group.visible=true;
-        c.hiddenSince=0;
-      }else{
-        c.group.visible=false;
-        c.hiddenSince+=dt;
-      }
-      if(c!==this.chunkAt(p.x,p.z)&&d>115&&!visible&&c.hiddenSince>5){
-        remove.push([key,c]);
-      }
+
+      // The group stays attached so visible fixtures can render at distance.
+      // Individual meshes still use Three.js frustum culling.
+      c.group.visible=true;
+      if(visible||d<55)c.hiddenSince=0;
+      else c.hiddenSince+=dt;
+
+      if(c!==this.chunkAt(p.x,p.z)&&d>155&&!visible&&c.hiddenSince>4)remove.push([key,c]);
     }
     for(const [key,c] of remove){
       this.game.scene.remove(c.group);
@@ -646,13 +674,39 @@ class WorldStreamer{
     }
   }
   collision(position,radius){
-    const chunk=this.chunkAt(position.x,position.z);if(!chunk)return position;
-    const c=chunk.cellAt(position.x,position.z),cell=this.game.level.cellSize,ox=chunk.originX+c.ix*cell,oz=chunk.originZ+c.iz*cell;
+    const chunk=this.chunkAt(position.x,position.z);
+    if(!chunk)return position;
+    const cell=this.game.level.cellSize,wallRadius=radius+.11;
     let x=position.x,z=position.z;
-    if(c.mask&8&&x-ox<radius)x=ox+radius;
-    if(c.mask&2&&ox+cell-x<radius)x=ox+cell-radius;
-    if(c.mask&1&&z-oz<radius)z=oz+radius;
-    if(c.mask&4&&oz+cell-z<radius)z=oz+cell-radius;
+
+    for(let pass=0;pass<2;pass++){
+      const baseX=Math.floor((x-chunk.originX)/cell);
+      const baseZ=Math.floor((z-chunk.originZ)/cell);
+      for(let iz=baseZ-1;iz<=baseZ+1;iz++)for(let ix=baseX-1;ix<=baseX+1;ix++){
+        if(ix<0||iz<0||ix>=chunk.gridSize()||iz>=chunk.gridSize())continue;
+        const mask=chunk.walls[chunk.index(ix,iz)];
+        const minX=chunk.originX+ix*cell,maxX=minX+cell;
+        const minZ=chunk.originZ+iz*cell,maxZ=minZ+cell;
+
+        const testWall=(x1,z1,x2,z2,nx,nz,closed)=>{
+          if(!closed)return;
+          const sx=x2-x1,sz=z2-z1,lenSq=sx*sx+sz*sz||1;
+          const t=Math.max(0,Math.min(1,((x-x1)*sx+(z-z1)*sz)/lenSq));
+          const qx=x1+sx*t,qz=z1+sz*t;
+          let dx=x-qx,dz=z-qz,dist=Math.hypot(dx,dz);
+          if(dist<wallRadius){
+            if(dist<.0001){dx=nx;dz=nz;dist=1}
+            const push=wallRadius-dist;
+            x+=dx/dist*push;z+=dz/dist*push;
+          }
+        };
+
+        testWall(minX,minZ,maxX,minZ,0,-1,(mask&1)!==0);
+        testWall(maxX,minZ,maxX,maxZ,1,0,(mask&2)!==0);
+        testWall(minX,maxZ,maxX,maxZ,0,1,(mask&4)!==0);
+        testWall(minX,minZ,minX,maxZ,-1,0,(mask&8)!==0);
+      }
+    }
     return {x,z};
   }
   hazardAt(x,z){
@@ -680,14 +734,13 @@ class WorldStreamer{
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
-      if(!c.group.visible&&Math.hypot(c.bounds.center.x-x,c.bounds.center.z-z)>60)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d<110)out.push({light,d});
+        if(d<200)out.push({light,d});
       }
     }
     out.sort((a,b)=>a.d-b.d);
-    return out;
+    return out.slice(0,this.game.localLights?.length||8);
   }
   entitySpawns(){const out=[];for(const c of this.chunks.values())if(c.entitySpawn)out.push(c);return out}
 }
@@ -695,42 +748,81 @@ class WorldStreamer{
 class Player{
   constructor(game){
     this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.yaw=0;this.pitch=0;
-    this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;this.flashlight=true;this.eyeY=1.72;this.bob=0;this.shake=0;this.cameraFov=62;
+    this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;
+    this.flashlight=true;this.flashBattery=100;
+    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;
+    this.viewYaw=0;this.viewPitch=0;
   }
-  reset(){this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.bob=0;this.shake=0;this.cameraFov=62;this.health=this.stamina=this.hydration=this.sanity=100;this.flashlight=this.game.startFlash;this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();this.game.camera.rotation.set(0,0,0,"YXZ")}
+  reset(){
+    this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.viewYaw=0;this.viewPitch=0;
+    this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;
+    this.health=this.stamina=this.hydration=this.sanity=100;this.flashBattery=100;
+    this.flashlight=this.game.startFlash;
+    this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();
+    this.game.camera.position.set(0,this.eyeY,0);this.game.camera.rotation.set(0,0,0,"YXZ");
+  }
   update(dt){
     const input=this.game.input,look=input.consumeLook();
     const sensitivity=this.game.settings.sensitivity||1;
     this.yaw-=look.x*.0021*sensitivity;this.pitch-=look.y*.0021*sensitivity;this.pitch=Math.max(-1.48,Math.min(1.48,this.pitch));
+    const yawDiff=Math.atan2(Math.sin(this.yaw-this.viewYaw),Math.cos(this.yaw-this.viewYaw));
+    const viewAlpha=1-Math.exp(-dt*20);
+    this.viewYaw+=yawDiff*viewAlpha;
+    this.viewPitch+=(this.pitch-this.viewPitch)*viewAlpha;
     const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?4.75:2.85;
-    const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw)),right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
+    const forward=new THREE.Vector3(-Math.sin(this.viewYaw),0,-Math.cos(this.viewYaw)),right=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
     const oldX=this.position.x,oldZ=this.position.z;
     this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
     const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;
     if(run)this.stamina=Math.max(0,this.stamina-dt*15);else this.stamina=Math.min(100,this.stamina+dt*9);
+    if(this.flashlight&&this.flashBattery>0){
+      this.flashBattery=Math.max(0,this.flashBattery-dt*(run?.46:.31));
+      if(this.flashBattery<=0)this.flashlight=false;
+    }
     this.hydration=Math.max(0,this.hydration-dt*.48);if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
     const dark=this.game.isDark();this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;this.sanity=Math.max(0,Math.min(100,this.sanity));
     if(this.game.world.hazardAt(this.position.x,this.position.z)){this.health-=dt*34}
     if(this.game.world.exitAt(this.position.x,this.position.z)){this.game.reachExit();return}
     if(this.health<=0||this.sanity<=0){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
-    const moving=Math.hypot(this.position.x-oldX,this.position.z-oldZ)>.01;
+    const distance=Math.hypot(this.position.x-oldX,this.position.z-oldZ);
+    const moving=distance>.001;
     const stride=Math.min(1,Math.abs(mv.y));
-    if(moving&&stride>.05){this.bob+=dt*(run?13:8)*stride;if(this.game.settings.shake)this.shake=Math.min(.03,this.shake+dt*.09*stride)}else this.shake=Math.max(0,this.shake-dt*.24);
+    const targetBobStrength=moving?stride:0;
+    this.bobStrength+=(targetBobStrength-this.bobStrength)*(1-Math.exp(-dt*13));
+    if(this.bobStrength>.01){
+      this.bob+=dt*(run?12.5:8.1)*(.32+.68*this.bobStrength);
+      if(this.game.settings.shake)this.shake=Math.min(.028,this.shake+dt*.075*this.bobStrength);
+    }else{
+      this.shake=Math.max(0,this.shake-dt*.28);
+    }
+
     const fear=1-this.sanity/100;
-    const bobY=(run?.038:.022)*Math.sin(this.bob*2)*stride;
-    const breathing=Math.sin(this.game.gameTime*1.35)*.004;
-    const roll=Math.sin(this.bob)*(.0017+(run?.0018:.0008))*stride;
-    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.12;
-    this.game.camera.position.copy(this.position);
-    this.game.camera.position.y=this.eyeY+bobY+breathing+shakeY;
+    const bobY=(run?.064:.042)*Math.sin(this.bob*2)*this.bobStrength;
+    const bobX=(run?.028:.017)*Math.sin(this.bob)*this.bobStrength;
+    const breathing=Math.sin(this.game.gameTime*1.31)*.0035;
+    const sway=Math.sin(this.game.gameTime*.72)*.0022;
+    const roll=Math.sin(this.bob)*(.0024+(run?.0032:.00125))*this.bobStrength+sway*.35;
+    const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.11;
+    const side=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
+    const cameraTarget=this.position.clone().addScaledVector(side,bobX);
+    cameraTarget.y=this.eyeY+bobY+breathing+shakeY;
+    this.game.camera.position.lerp(cameraTarget,1-Math.exp(-dt*24));
+
     const targetFov=run?67:62;
-    this.cameraFov+=(targetFov-this.cameraFov)*Math.min(1,dt*8);
+    this.cameraFov+=(targetFov-this.cameraFov)*(1-Math.exp(-dt*8));
     if(Math.abs(this.game.camera.fov-this.cameraFov)>.01){this.game.camera.fov=this.cameraFov;this.game.camera.updateProjectionMatrix()}
-    this.game.camera.rotation.set(this.pitch,this.yaw,roll,"YXZ");
+    this.game.camera.rotation.set(this.viewPitch,this.viewYaw,roll,"YXZ");
+
+    const batteryPower=Math.max(0,this.flashBattery/100);
+    const beamPower=Math.pow(batteryPower,.82);
     this.game.flash.position.copy(this.game.camera.position);
+    this.game.flash.intensity=this.flashlight?(20+beamPower*700):0;
+    this.game.flash.distance=this.flashlight?(10+beamPower*105):10;
+    this.game.flash.angle=.36;
+    this.game.flash.penumbra=.54;
     this.game.flashTarget.position.copy(this.game.camera.position).add(new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion));
-    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,Math.hypot(this.position.x-oldX,this.position.z-oldZ));
+    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance);
   }
 }
 
@@ -881,15 +973,15 @@ export class BackroomsGame{
 
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
     this.localLights=[];
-    for(let i=0;i<4;i++){
+    for(let i=0;i<8;i++){
       const light=new THREE.PointLight(0xffd34d,0,0,2);
       light.name="dynamic_fluorescent_"+i;
       light.visible=true;
       this.localLights.push(light);
       this.scene.add(light);
     }this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0x5c523f,0x000000,.035);this.scene.add(this.ambient);
-    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,24,25,.48,.9,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
+    this.ambient=new THREE.HemisphereLight(0x665f52,0x080807,.052);this.scene.add(this.ambient);
+    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,0,10,.36,.54,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
     this.bindUI();
     addEventListener("resize",()=>this.resize());
@@ -1034,7 +1126,12 @@ export class BackroomsGame{
       console.warn("[Backrooms] Fullscreen unavailable:",error);
     }
   }
-  toggleFlashlight(){this.player.flashlight=!this.player.flashlight;this.audio.click();this.toast(this.player.flashlight?"Flashlight on":"Flashlight off",.9)}
+  toggleFlashlight(){
+    if(!this.player.flashlight&&this.player.flashBattery<=0){this.audio.click();this.toast("BATTERY EMPTY",1.1);return}
+    this.player.flashlight=!this.player.flashlight;
+    this.audio.click();
+    this.toast(this.player.flashlight?"Flashlight on":"Flashlight off",.9);
+  }
   isDark(){if(this.level.id==="2")return true;if(this.lightState==="BLACKOUT")return true;return !this.player.flashlight}
   triggerFear(amount=.25){this.horror=Math.max(this.horror,Math.max(0,Math.min(1,amount)));this.player.shake=Math.min(.055,this.player.shake+amount*.07)}
   updateLightEvent(dt){
@@ -1070,6 +1167,28 @@ export class BackroomsGame{
   toast(text,duration=2){
     const el=document.getElementById("toast");el.textContent=text;el.classList.remove("hidden");clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.add("hidden"),duration*1000)
   }
+  collectBatteryPickups(){
+    const p=this.player.position;
+    for(const chunk of this.world.chunks.values()){
+      for(let i=chunk.batteries.length-1;i>=0;i--){
+        const pickup=chunk.batteries[i];
+        const d=Math.hypot(p.x-pickup.group.position.x,p.z-pickup.group.position.z);
+        pickup.group.rotation.y+=dtToRad(1.5);
+        pickup.group.position.y=.22+Math.sin(this.gameTime*2.5+i)*.025;
+        if(d<1.05&&this.player.flashBattery<100){
+          const before=this.player.flashBattery;
+          this.player.flashBattery=Math.min(100,this.player.flashBattery+pickup.amount);
+          const added=Math.round(this.player.flashBattery-before);
+          this.audio.pickup();
+          this.toast("BATTERY +"+added+"%",1.2);
+          this.scene.remove(pickup.group);
+          pickup.group.clear();
+          chunk.batteries.splice(i,1);
+        }
+      }
+    }
+  }
+
   updateLocalLights(){
     const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z);
     for(let i=0;i<this.localLights.length;i++){
@@ -1134,7 +1253,7 @@ export class BackroomsGame{
     this.gameTime+=dt;this.argTimer-=dt;this.scareTimer-=dt;
     this.vhsPass.uniforms.time.value=this.gameTime;
     this.vhsPass.uniforms.fear.value=this.horror;
-    this.player.update(dt);this.world.update(dt);this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
+    this.player.update(dt);this.world.update(dt);this.collectBatteryPickups();this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
     this.updateArgLayer(dt);
     this.updateLightEvent(dt);
     this.updateHorror(dt);
@@ -1151,7 +1270,8 @@ export class BackroomsGame{
     }
     const status=document.getElementById("status");
     if(status)status.textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";
-    this.flash.intensity=this.player.flashlight?18:0;
+    const battery=document.getElementById("flash-battery");
+    if(battery)battery.textContent="BAT "+Math.round(this.player.flashBattery)+"%";
     this.flash.position.copy(this.camera.position);
   }
   updateArgLayer(dt){
