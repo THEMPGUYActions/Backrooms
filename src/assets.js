@@ -101,14 +101,8 @@ export async function applyOpenGameArtPBR(library,level){
   const ceilingRepeat=1.0;
   const jobs=[
     applyRemoteTexture(library.wall,"map",source.wall.color,true,wallRepeat,.28),
-    applyRemoteTexture(library.wall,"roughnessMap",source.wall.rough,false,wallRepeat,.28),
-    applyRemoteTexture(library.wall,"normalMap",source.wall.normal,false,wallRepeat,.28),
     applyRemoteTexture(library.floor,"map",source.floor.color,true,floorRepeat,.16),
-    applyRemoteTexture(library.floor,"roughnessMap",source.floor.rough,false,floorRepeat,.16),
-    applyRemoteTexture(library.floor,"normalMap",source.floor.normal,false,floorRepeat,.16),
-    applyRemoteTexture(library.ceiling,"map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25),
-    applyRemoteTexture(library.ceiling,"roughnessMap",BACKROOMS_PBR_SOURCES.ceiling.rough,false,ceilingRepeat,.25),
-    applyRemoteTexture(library.ceiling,"normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,ceilingRepeat,.25)
+    applyRemoteTexture(library.ceiling,"map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25)
   ];
   await Promise.allSettled(jobs);
 }
