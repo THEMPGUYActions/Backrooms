@@ -52,6 +52,7 @@ export const LEVELS = {
     pipeChance: 0.06,
     entity: "hound",
     exitStyle: "green",
+    batteryChance: 0.09,
     exitAfterChunks: 4,
     objective: "Stay alert. Find the green-marked exit.",
     safe: false
@@ -80,6 +81,7 @@ export const LEVELS = {
     pipeChance: 0.28,
     entity: "smiler",
     exitStyle: "violet",
+    batteryChance: 0.10,
     exitAfterChunks: 5,
     objective: "The power is unstable. Reach the emergency threshold.",
     safe: false
