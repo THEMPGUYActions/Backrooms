@@ -228,18 +228,23 @@ class WorldStreamer{
     this.game.scene.add(this.floorSurface,this.ceilingSurface);
 
     const library=this.library;
-    applyOpenGameArtPBR(library,this.game.level).catch(error=>{
-      console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
-    });
+    applyOpenGameArtPBR(library,this.game.level)
+      .then(()=>this.updateSurfaceTiling(this.game.player.position.x,this.game.player.position.z))
+      .catch(error=>{
+        console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
+      });
     this.updateSurfaceTiling(0,0);
   }
 
   updateSurfaceTiling(px,pz){
-    const tileWorld=4;
-    const repeat=this.surfaceSize/tileWorld;
+    const surfaces=[
+      {material:this.library?.floor,tileWorld:3.2},
+      {material:this.library?.ceiling,tileWorld:1.6}
+    ];
 
-    for(const material of [this.library?.floor,this.library?.ceiling]){
+    for(const {material,tileWorld} of surfaces){
       if(!material)continue;
+      const repeat=this.surfaceSize/tileWorld;
       for(const key of ["map","roughnessMap","normalMap"]){
         const texture=material[key];
         if(!texture)continue;
@@ -410,7 +415,7 @@ export class BackroomsGame{
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
-    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,220);this.camera.rotation.order="YXZ";
+    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,150);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,touchDevice?0.85:1.05));this.renderer.setSize(innerWidth,innerHeight);
