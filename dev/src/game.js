@@ -505,7 +505,7 @@ class WorldStreamer{
     this.surfaceSize=0;this.floorSurface=null;this.ceilingSurface=null;
   }
   key(cx,cz){return cx+","+cz}
-  configure(){
+  async configure(onProgress=()=>{}){
     for(const c of this.chunks.values()){
       this.game.scene.remove(c.group);
       c.dispose();
@@ -551,14 +551,14 @@ class WorldStreamer{
 
     this.game.scene.add(this.floorSurface,this.ceilingSurface);
 
-    const library=this.library;
     this.updateSurfaceTiling();
-    this.visualReady=applyOpenGameArtPBR(library,this.game.level)
-      .then(()=>this.updateSurfaceTiling())
-      .catch(error=>{
-        console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
-      });
-    return this.visualReady;
+    try{
+      await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+    }catch(error){
+      console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
+    }
+    this.updateSurfaceTiling();
+    return true;
   }
 
   updateSurfaceTiling(){
@@ -915,7 +915,7 @@ export class BackroomsGame{
   }
   changeLevel(id){
     if(!id){this.ending();return}
-    this.audio.exit();this.player.position.set(0,1.72,0);this.setLevel(id);this.toast("You slipped into "+this.level.number+".",3);
+    this.audio.exit();this.player.position.set(0,this.player.eyeY,0);this.setLevel(id);this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
