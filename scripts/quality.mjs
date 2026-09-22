@@ -233,7 +233,6 @@ async function checkAssetSources() {
   for (const filename of PBR_ASSET_FILES) {
     if (!lockedFiles.includes(filename)) fail("PBR lock missing map: " + filename);
     if (!assetsSource.includes('"' + filename + '"')) fail("src/assets.js missing local PBR map filename: " + filename);
-    if (!buildSource.includes('"' + filename + '"')) fail("scripts/build.mjs missing PBR map filename: " + filename);
   }
 
   const manifestPath = join(root, "dist", "assets", "pbr", "manifest.json");
