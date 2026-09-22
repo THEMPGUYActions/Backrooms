@@ -1355,14 +1355,13 @@ export class BackroomsGame{
       else this.pendingStart=true;
     };
 
-    const boot=$("boot");
-    boot?.addEventListener("pointerdown",event=>{
-      if(event.target.closest("button,input,select,textarea,a"))return;
+    const audioPage=$(".intro-audio-page");
+    audioPage?.addEventListener("pointerdown",event=>{
       event.preventDefault();
       begin(event);
     });
-    boot?.addEventListener("click",event=>{
-      if(event.detail===0&&!event.target.closest("button,input,select,textarea,a"))begin(event);
+    audioPage?.addEventListener("click",event=>{
+      if(event.detail===0)begin(event);
     });
     const gate=$("audio-gate");
     gate?.addEventListener("keydown",event=>{
