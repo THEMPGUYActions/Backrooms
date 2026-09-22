@@ -9,6 +9,13 @@ const failures = [];
 const fail = message => failures.push(message);
 const THREE_CORE = "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js";
 const THREE_ADDONS = "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/";
+const OPEN_GAME_ART_PACK = "https://opengameart.org/sites/default/files/oga-textures/175228/";
+const REQUIRED_PBR_ASSETS = [
+  "wallpaper_color.png", "wallpaper_rough.png", "wallpaper_normal.png",
+  "painted_wall_color.png", "painted_wall_rough.png", "painted_wall_normal.png",
+  "carpet_color.png", "carpet_rough.png", "carpet_normal.png",
+  "ceiling_tiles_color.png", "ceiling_tiles_rough.png", "ceiling_tiles_normal.png"
+].map(name => OPEN_GAME_ART_PACK + name);
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -189,6 +196,21 @@ async function checkModuleGraph(jsFiles, imports) {
   }
 }
 
+
+async function checkAssetSources() {
+  const assetsPath = join(root, "src/assets.js");
+  const source = await readFile(assetsPath, "utf8");
+  for (const url of REQUIRED_PBR_ASSETS) {
+    if (!source.includes(url)) fail("src/assets.js missing required OpenGameArt PBR source: " + url);
+  }
+  const assetUrlPattern = /https:\/\/opengameart\.org\/sites\/default\/files\/oga-textures\/175228\/[^"']+/g;
+  for (const match of source.matchAll(assetUrlPattern)) {
+    if (!String(match[0]).startsWith(OPEN_GAME_ART_PACK)) {
+      fail("src/assets.js contains an unexpected OpenGameArt asset origin: " + match[0]);
+    }
+  }
+}
+
 async function checkData() {
   try {
     const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -277,6 +299,7 @@ await checkJavaScript(files);
 const { imports } = await checkHtml();
 await checkCss();
 await checkModuleGraph(jsFiles, imports);
+await checkAssetSources();
 await checkData();
 await checkBuildIfPresent();
 await checkWorkflow();
