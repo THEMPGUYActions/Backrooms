@@ -25,22 +25,30 @@ function normalFromHeight(size,seed){
   for(let y=0;y<size;y++){h[y]=[];for(let x=0;x<size;x++)h[y][x]=noise2d(x,y,seed)*255}
   return makeCanvas(size,(x,y,d,i)=>{
     const l=h[y][(x+size-1)%size],r=h[y][(x+1)%size],u=h[(y+size-1)%size][x],dn=h[(y+1)%size][x];
-    d[i]=128+((l-r)*.48);d[i+1]=128+((u-dn)*.48);d[i+2]=255;d[i+3]=255;
+    d[i]=Math.max(0,Math.min(255,128+(l-r)*.48));
+    d[i+1]=Math.max(0,Math.min(255,128+(u-dn)*.48));
+    d[i+2]=255;d[i+3]=255;
   });
 }
 
 export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalStrength=.45}){
-  const size=64;
+  const r0=(base>>16)&255,g0=(base>>8)&255,b0=base&255,size=64;
   const baseCanvas=makeCanvas(size,(x,y,d,i)=>{
-    const n=(noise2d(x>>2,y>>2,seed)*.7+noise2d(x,y,seed+11)*.3);
-    const v=Math.max(0,Math.min(255,base+n*28-14));
-    d[i]=Math.min(255,v);d[i+1]=Math.min(255,v*.97);d[i+2]=Math.min(255,v*.91);d[i+3]=255;
+    const n=noise2d(x>>2,y>>2,seed)*.72+noise2d(x,y,seed+11)*.28;
+    const factor=.84+n*.26;
+    d[i]=Math.max(0,Math.min(255,r0*factor));
+    d[i+1]=Math.max(0,Math.min(255,g0*factor));
+    d[i+2]=Math.max(0,Math.min(255,b0*factor));
+    d[i+3]=255;
   });
-  const roughCanvas=makeCanvas(size,(x,y,d,i)=>{const n=noise2d(x,y,seed+73);d[i]=d[i+1]=d[i+2]=Math.max(30,Math.min(255,rough*255+n*35));d[i+3]=255});
-  const normalCanvas=normalFromHeight(size,seed+41);
+  const roughCanvas=makeCanvas(size,(x,y,d,i)=>{
+    const n=noise2d(x,y,seed+73);
+    const v=Math.max(25,Math.min(255,rough*255+n*34));
+    d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;
+  });
   const m=new THREE.MeshStandardMaterial({
     color:0xffffff,roughness:rough,metalness:metal,
-    map:tex(baseCanvas,true),roughnessMap:tex(roughCanvas,false),normalMap:tex(normalCanvas,false),
+    map:tex(baseCanvas,true),roughnessMap:tex(roughCanvas,false),normalMap:tex(normalFromHeight(size,seed+41),false),
     normalScale:new THREE.Vector2(normalStrength,normalStrength)
   });
   m.map.repeat.set(scale,scale);m.roughnessMap.repeat.set(scale,scale);m.normalMap.repeat.set(scale,scale);
@@ -56,8 +64,7 @@ export function makeLibrary(level){
     metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.62,metalness:.78}),
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
-    rubber:new THREE.MeshStandardMaterial({color:0x111211,roughness:.88,metalness:.05}),
-    exit:new THREE.MeshStandardMaterial({color:level.theme.accent,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
+    exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
     light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.28,metalness:0,emissive:level.theme.light,emissiveIntensity:3})
   };
 }
@@ -67,13 +74,12 @@ export function box(parent,geometry,material,x,y,z,rx=0,ry=0,rz=0){
 }
 
 export function makePropSet(parent,level,library,rng,x,z){
-  if(rng()<.16 && level.id!=="0") {
+  if(rng()<.16 && level.id!=="0"){
     box(parent,new THREE.BoxGeometry(.8,.7,.8),library.crate,x,.35,z);
     box(parent,new THREE.BoxGeometry(.86,.06,.86),library.metal,x,.72,z);
   }
   if(rng()<level.pipeChance){
     const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,4.4,8),library.metal);
-    pipe.rotation.z=Math.PI/2;
-    pipe.position.set(x,2.7,z);parent.add(pipe);
+    pipe.rotation.z=Math.PI/2;pipe.position.set(x,2.7,z);parent.add(pipe);
   }
 }
