@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js";
 import { AudioDirector } from "./audio.js";
 import { LEVELS, levelById, cycleHash } from "./levels.js";
-import { makeLibrary, applyOpenGameArtPBR, disposeLibrary, box, makePropSet } from "./assets.js";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -101,8 +101,21 @@ class RNG{
   pick(a){return a[Math.floor(this.next()*a.length)]}
 }
 
-function canonicalOpen(seed,gx,gz,axis){
-  return cycleHash(seed^gx,gz,axis==="h"?17:31)<.19;
+function canonicalOpen(seed,gx,gz,axis,chance=.19){
+  return cycleHash(seed^gx,gz,axis==="h"?17:31)<chance;
+}
+
+function smoothNoise2D(x,z,seed){
+  const x0=Math.floor(x),z0=Math.floor(z);
+  const fx=x-x0,fz=z-z0;
+  const sx=fx*fx*(3-2*fx),sz=fz*fz*(3-2*fz);
+  const n00=cycleHash(seed,x0,z0,71);
+  const n10=cycleHash(seed,x0+1,z0,71);
+  const n01=cycleHash(seed,x0,z0+1,71);
+  const n11=cycleHash(seed,x0+1,z0+1,71);
+  const a=n00+(n10-n00)*sx;
+  const b=n01+(n11-n01)*sx;
+  return a+(b-a)*sz;
 }
 
 class Chunk{
@@ -119,7 +132,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -156,29 +169,82 @@ class Chunk{
   buildMaze(){
     const cells=this.gridSize(),level=this.game.level;
     const rng=new RNG((Math.imul(this.cx,73856093)^Math.imul(this.cz,19349663)^this.game.seed)|0);
-    this.walls.fill(15);
+    this.walls.fill(15);this.rooms=[];
 
-    if(level.id==="0"){
+    if(level.id==="1"){
+      const macro=smoothNoise2D(this.cx*(level.zoneScale||.24),this.cz*(level.zoneScale||.24),this.game.seed^0x51a3);
+      const zoneRoll=cycleHash(this.game.seed,this.cx*37,this.cz*61,101);
+      this.zone=(this.cx===0&&this.cz===0)||macro>(level.hallChance||.58)||zoneRoll<.10?"halls":"corridors";
+
+      if(this.zone==="halls"){
+        this.walls.fill(0);
+        for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
+        for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
+        const partitions=rng.int(0,2);
+        for(let i=0;i<partitions;i++){
+          if(rng.next()<.5){
+            const x=rng.int(2,cells-3),gap=rng.int(2,cells-3);
+            for(let z=1;z<cells-1;z++)if(Math.abs(z-gap)>1)this.setEdge(x,z,"east",false);
+          }else{
+            const z=rng.int(2,cells-3),gap=rng.int(2,cells-3);
+            for(let x=1;x<cells-1;x++)if(Math.abs(x-gap)>1)this.setEdge(x,z,"south",false);
+          }
+        }
+      }else{
+        const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
+        visited[this.index(stack[0][0],stack[0][1])]=1;
+        const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob] of dirs){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob]);
+          }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
+        }
+        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+          if(x<cells-1&&rng.next()<.11)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.09)this.setEdge(x,z,"south",true);
+        }
+        const roomCount=rng.int(level.roomMin||2,level.roomMax||5);
+        for(let i=0;i<roomCount;i++){
+          let room=null;
+          for(let attempt=0;attempt<12&&!room;attempt++){
+            const w=rng.int(2,3),h=rng.int(2,3),x=rng.int(1,cells-w-1),z=rng.int(1,cells-h-1);
+            const candidate={x,z,w,h,type:rng.next()<.28?"office":rng.next()<.5?"storage":"utility"};
+            const overlap=this.rooms.some(other=>candidate.x<other.x+other.w+1&&candidate.x+candidate.w+1>other.x&&candidate.z<other.z+other.h+1&&candidate.z+candidate.h+1>other.z);
+            if(!overlap)room=candidate;
+          }
+          if(!room)continue;
+          for(let rz=room.z;rz<room.z+room.h;rz++)for(let rx=room.x;rx<room.x+room.w;rx++){
+            if(rx<room.x+room.w-1)this.setEdge(rx,rz,"east",true);
+            if(rz<room.z+room.h-1)this.setEdge(rx,rz,"south",true);
+          }
+          const side=rng.int(0,3);
+          if(side===0){room.entry={side:"north",x:room.x+rng.int(0,room.w-1),z:room.z};this.setEdge(room.entry.x,room.entry.z,"north",true)}
+          else if(side===1){room.entry={side:"east",x:room.x+room.w-1,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"east",true)}
+          else if(side===2){room.entry={side:"south",x:room.x+rng.int(0,room.w-1),z:room.z+room.h-1};this.setEdge(room.entry.x,room.entry.z,"south",true)}
+          else{room.entry={side:"west",x:room.x,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"west",true)}
+          this.rooms.push(room);
+        }
+      }
+    }else if(level.id==="0"){
       const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
       if(mega){
         this.walls.fill(0);
         for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
         for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
-
         const partitions=rng.int(0,3);
         for(let i=0;i<partitions;i++){
           const vertical=rng.next()<.5;
-          if(vertical){
-            const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);
-            for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false);
-          }else{
-            const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);
-            for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false);
-          }
+          if(vertical){const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false)}
+          else{const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false)}
         }
       }else{
-        const visited=new Uint8Array(cells*cells),stack=[[0,0]];
-        visited[this.index(0,0)]=1;
+        const visited=new Uint8Array(cells*cells),stack=[[0,0]];visited[this.index(0,0)]=1;
         while(stack.length){
           const [x,z]=stack[stack.length-1],options=[];
           for(const [dx,dz,b,ob,side] of [[0,-1,1,4,"north"],[1,0,2,8,"east"],[0,1,4,1,"south"],[-1,0,8,2,"west"]]){
@@ -187,27 +253,22 @@ class Chunk{
           }
           if(!options.length){stack.pop();continue}
           const [nx,nz,b,ob]=rng.pick(options);
-          this.walls[this.index(x,z)]&=~b;
-          this.walls[this.index(nx,nz)]&=~ob;
-          visited[this.index(nx,nz)]=1;
-          stack.push([nx,nz]);
+          this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
         }
-        const loopChance=.18;
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.18)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.18)this.setEdge(x,z,"south",true);
         }
       }
-
       if(cells>=5){
         if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
         if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
-        if((this.cz%2)===0)this.setEdge(0,2,"west",true);
-        if((this.cx%2)===0)this.setEdge(cells-1,2,"east",true);
+        if(this.cz%2===0)this.setEdge(0,2,"west",true);
+        if(this.cx%2===0)this.setEdge(cells-1,2,"east",true);
       }
       if(this.cx===0&&this.cz===0){
-        this.setEdge(2,2,"north",true);this.setEdge(2,2,"east",true);
-        this.setEdge(2,2,"south",true);this.setEdge(2,2,"west",true);
+        this.setEdge(2,2,"north",true);this.setEdge(2,2,"east",true);this.setEdge(2,2,"south",true);this.setEdge(2,2,"west",true);
       }
     }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
@@ -225,21 +286,19 @@ class Chunk{
         visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
       }
       const loopChance=level.id==="1"?.12:.07;
-      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
-        if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true);
-      }
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true)}
     }
 
+    const boundaryChance=level.id==="1"?(this.zone==="halls"?.12:.07):.19;
     for(let x=0;x<cells;x++){
       const gx=this.cx*cells+x;
-      if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h"))this.setEdge(x,0,"north",true);
-      if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h"))this.setEdge(x,cells-1,"south",true);
+      if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h",boundaryChance))this.setEdge(x,0,"north",true);
+      if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",boundaryChance))this.setEdge(x,cells-1,"south",true);
     }
     for(let z=0;z<cells;z++){
       const gz=this.cz*cells+z;
-      if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v"))this.setEdge(0,z,"west",true);
-      if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v"))this.setEdge(cells-1,z,"east",true);
+      if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v",boundaryChance))this.setEdge(0,z,"west",true);
+      if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",boundaryChance))this.setEdge(cells-1,z,"east",true);
     }
 
     const rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
@@ -247,16 +306,12 @@ class Chunk{
       if(rng2.next()<level.holeChance&&Math.hypot(x-(cells-1)/2,z-(cells-1)/2)>1.7)this.hazards.push({x,z});
     }
 
-    const chunkDistance=Math.hypot(this.cx,this.cz);
-    const minCell=1,maxCell=Math.max(1,cells-2);
+    const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
     if(chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.035){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
-        if(mask&1)candidates.push({x,z,side:"north"});
-        if(mask&2)candidates.push({x,z,side:"east"});
-        if(mask&4)candidates.push({x,z,side:"south"});
-        if(mask&8)candidates.push({x,z,side:"west"});
+        if(mask&1)candidates.push({x,z,side:"north"});if(mask&2)candidates.push({x,z,side:"east"});if(mask&4)candidates.push({x,z,side:"south"});if(mask&8)candidates.push({x,z,side:"west"});
       }
       if(candidates.length){
         const chosen=rng2.pick(candidates),kind=level.id==="0"?(rng2.next()<.62?"door":"flicker-wall"):"door";
@@ -264,20 +319,15 @@ class Chunk{
         this.exit={...chosen,kind};
       }
     }
-
     if(level.id==="0"&&rng2.next()<.55){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
-        if(mask&1)candidates.push({x,z,side:"north"});
-        if(mask&2)candidates.push({x,z,side:"east"});
-        if(mask&4)candidates.push({x,z,side:"south"});
-        if(mask&8)candidates.push({x,z,side:"west"});
+        if(mask&1)candidates.push({x,z,side:"north"});if(mask&2)candidates.push({x,z,side:"east"});if(mask&4)candidates.push({x,z,side:"south"});if(mask&8)candidates.push({x,z,side:"west"});
       }
       if(candidates.length)this.falseDoors.push(rng2.pick(candidates));
     }
   }
-
   seedKey(){return (this.cx*73856093)^(this.cz*19349663)^this.game.seed}
   buildGeometry(){
     const cells=this.gridSize();
@@ -287,6 +337,7 @@ class Chunk{
     const trimHGeom=new THREE.BoxGeometry(cell,.11,.12),trimVGeom=new THREE.BoxGeometry(.12,.11,cell);
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
     const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
+    const wallMaterial=level.id==="1"?(this.zone==="corridors"?lib.maintenanceWall:lib.concrete):lib.wall;
     const seenH=new Set(),seenV=new Set();
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
@@ -314,7 +365,7 @@ class Chunk{
       if(x===cells-1&&(mask&2))addEdge("east");
 
       const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
-      const fixtureChance=level.id==="0"?.78:level.id==="1"?.2:.13;
+      const fixtureChance=level.id==="0"?.78:level.id==="1"?0:.13;
       if(fixtureSlot&&rngBase.next()<fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,fixtureMaterial=fixtureMat.clone();
         const rotation=rngBase.next()<.5?0:Math.PI/2,jx=(rngBase.next()-.5)*1.8,jz=(rngBase.next()-.5)*1.8;
@@ -348,9 +399,11 @@ class Chunk{
       mesh.computeBoundingSphere();
       g.add(mesh);
     };
-    addInstanced(hGeom,lib.wall,hData);addInstanced(vGeom,lib.wall,vData);
+    addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);
     addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);
     addInstanced(topHGeom,lib.trimTop,topH);addInstanced(topVGeom,lib.trimTop,topV);
+
+    if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
 
     if(level.id==="0"){
       const columnGeom=new THREE.BoxGeometry(.72,level.wallHeight,.72),columnData=[],columnCount=3+rngBase.int(0,4);
@@ -533,6 +586,99 @@ class Chunk{
       }
     }
   }
+  buildLevel1Set(level,lib,rng){
+    const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
+    const cellPos=(x,z)=>({x:this.originX+x*cell+cell/2,z:this.originZ+z*cell+cell/2});
+    const randomCell=()=>cellPos(rng.int(1,Math.max(1,cells-2)),rng.int(1,Math.max(1,cells-2)));
+
+    const addLight=(x,z,rotation=0,scale=1,baseIntensity=this.zone==="halls"?150:105)=>{
+      const fixture=box(g,new THREE.BoxGeometry(3.15*scale,.055,.44*scale),lib.level1Light,x,level.wallHeight-.14,z,0,rotation,0);
+      fixture.userData.light=true;fixture.userData.baseEmissive=2.4;this.fixtures.push(fixture);
+      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:0,decay:2});
+      return fixture;
+    };
+
+    if(this.zone==="halls"){
+      for(let i=0;i<3+rng.int(2,7);i++){
+        const p=randomCell();
+        box(g,new THREE.BoxGeometry(.95,level.wallHeight,.95),lib.concrete,p.x,level.wallHeight/2,p.z);
+        box(g,new THREE.BoxGeometry(1.16,.10,1.16),lib.metal,p.x,.54,p.z);
+        for(const side of [[.50,.0,.08,1.0],[0,.50,1.0,.08],[-.50,0,.08,1.0],[0,-.50,1.0,.08]]){
+          if(rng.next()<.55)box(g,new THREE.BoxGeometry(side[2],.045,side[3]),lib.parkingLine,p.x+side[0],.70,p.z+side[1]);
+        }
+      }
+
+      for(let i=0;i<4+rng.int(0,4);i++){
+        const p=randomCell();
+        addLight(p.x,p.z,rng.next()<.5?0:Math.PI/2,.90+rng.next()*.30);
+      }
+
+      for(let i=0;i<Math.max(2,Math.round(level.puddleChance*6));i++){
+        const p=randomCell();
+        const puddle=box(g,new THREE.CircleGeometry(.75+rng.next()*1.6,18),lib.water,p.x,.016,p.z,-Math.PI/2);
+        puddle.scale.y=.45+rng.next()*.60;
+      }
+
+      if(rng.next()<.70){
+        const y=level.wallHeight-.35;
+        for(let i=0;i<2;i++){
+          const horizontal=rng.next()<.5;
+          const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.07+i*.025,.07+i*.025,size*.76,10),lib.metal);
+          pipe.rotation.z=horizontal?Math.PI/2:0;
+          pipe.position.set(this.originX+size*.50,y+i*.16,this.originZ+size*(horizontal?.50:.58));
+          g.add(pipe);
+        }
+      }
+
+      const crates=rng.next()<level.crateChance?1+rng.int(0,2):0;
+      for(let i=0;i<crates;i++){
+        const p=randomCell();
+        box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
+        box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
+        box(g,new THREE.BoxGeometry(.055,.84,.055),lib.metal,p.x-.32,.4,p.z);
+      }
+
+      if(rng.next()<.32){
+        for(let i=0;i<3;i++){
+          const x=this.originX+size*(.18+i*.27);
+          box(g,new THREE.BoxGeometry(.035,.01,size*.62),lib.parkingLine,x,.008,this.originZ+size*.50);
+        }
+      }
+
+      if(rng.next()<.30){
+        const stepW=2.8,stepD=.46,stepH=.16;
+        const baseX=this.originX+size*.72,baseZ=this.originZ+size*.18;
+        for(let i=0;i<6;i++)box(g,new THREE.BoxGeometry(stepW,stepH*(i+1),stepD),lib.stairs,baseX,stepH*(i+.5),baseZ+i*stepD);
+        box(g,new THREE.BoxGeometry(.07,1.2,3.0),lib.metal,baseX-stepW*.54,.6,baseZ+1.15,0,0,.08);
+        box(g,new THREE.BoxGeometry(.07,1.2,3.0),lib.metal,baseX+stepW*.54,.6,baseZ+1.15,0,0,.08);
+      }
+    }else{
+      for(const [index,room] of this.rooms.entries()){
+        const cx=this.originX+(room.x+room.w*.5)*cell,cz=this.originZ+(room.z+room.h*.5)*cell;
+        addLight(cx,cz,room.w>=room.h?0:Math.PI/2,.62,95);
+
+        if(room.type==="office"){
+          const desk=new THREE.Group();desk.position.set(cx,.02,cz);
+          box(desk,new THREE.BoxGeometry(1.5,.12,.72),lib.officeWood,0,.78,0);
+          for(const sx of [-.6,.6])for(const sz of [-.24,.24])box(desk,new THREE.BoxGeometry(.07,.77,.07),lib.officeWood,sx,.385,sz);
+          box(desk,new THREE.BoxGeometry(.78,.48,.06),lib.officePlastic,0,1.07,-.02);
+          g.add(desk);
+        }else if(room.type==="storage"){
+          for(let i=0;i<1+rng.int(0,2);i++){const ox=(rng.next()-.5)*room.w*cell*.38,oz=(rng.next()-.5)*room.h*cell*.38;box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz)}
+        }else{
+          box(g,new THREE.BoxGeometry(.62,1.0,.48),lib.concrete,cx+.55,.5,cz-.35);
+          if(rng.next()<.45){const puddle=box(g,new THREE.CircleGeometry(.42,14),lib.water,cx-.45,.018,cz+.35,-Math.PI/2);puddle.scale.y=.55}
+        }
+
+        if(room.entry){
+          const e=room.entry,ex=this.originX+e.x*cell+cell/2,ez=this.originZ+e.z*cell+cell/2,rot=e.side==="west"||e.side==="east"?Math.PI/2:0;
+          box(g,new THREE.BoxGeometry(2.35,.10,.16),lib.trim,ex,2.72,ez,0,rot,0);
+          if(index%3===0)box(g,new THREE.BoxGeometry(.56,.10,.04),lib.parkingLine,ex,level.wallHeight-.95,ez,0,rot,0);
+        }
+      }
+    }
+  }
+
   contains(x,z){return x>=this.originX&&x<this.originX+this.world.size&&z>=this.originZ&&z<this.originZ+this.world.size}
   cellAt(x,z){
     const cells=this.gridSize(),cell=this.game.level.cellSize;
@@ -646,6 +792,11 @@ class WorldStreamer{
       await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
     }catch(error){
       console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
+    }
+    try{
+      await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
+    }catch(error){
+      console.warn("[Backrooms] Level 1 Found Footage asset enhancement failed; fallback remains active.",error);
     }
     this.updateSurfaceTiling();
     return true;
@@ -794,7 +945,15 @@ class WorldStreamer{
     out.sort((a,b)=>a.d-b.d);
     return out.slice(0,this.game.localLights?.length||8);
   }
-  entitySpawns(){const out=[];for(const c of this.chunks.values())if(c.entitySpawn)out.push(c);return out}
+  entitySpawns(){
+    const out=[];
+    for(const c of this.chunks.values()){
+      if(!c.entitySpawn)continue;
+      if(this.game.level.id==="1"&&(c.zone!=="halls"||this.game.lightState==="ON"))continue;
+      out.push(c);
+    }
+    return out;
+  }
 }
 
 class Player{
@@ -1209,10 +1368,16 @@ export class BackroomsGame{
       return;
     }
     if(this.lightEventTimer>0)return;
-    if(this.level.id==="0"&&Math.random()<.42){
-      this.lightState="BLACKOUT";this.lightEventTimer=1.3+Math.random()*2.5;this.audio.lightsOut();this.triggerFear(.48);
+    if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
+      this.lightState="BLACKOUT";
+      this.lightEventTimer=this.level.id==="1"?2.8+Math.random()*8.5:1.3+Math.random()*2.5;
+      this.audio.lightsOut();
+      this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
-      this.lightState="FLICKER";this.lightEventTimer=.7+Math.random()*1.7;this.audio.flicker();this.triggerFear(.16);
+      this.lightState="FLICKER";
+      this.lightEventTimer=this.level.id==="1"?1.0+Math.random()*2.8:.7+Math.random()*1.7;
+      this.audio.flicker();
+      this.triggerFear(this.level.id==="1"?.20:.16);
     }
   }
   updateHorror(dt){
