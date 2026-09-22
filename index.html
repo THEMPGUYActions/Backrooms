@@ -47,7 +47,7 @@
 
     <div class="intro-page intro-audio-page">
       <div id="audio-gate" class="audio-gate" role="button" tabindex="0" aria-label="Click anywhere to enable audio">
-        <span>Click anywhere to enable audio.</span>
+        <span class="audio-prompt-pc">Click anywhere to enable audio.</span><span class="audio-prompt-mobile">Tap anywhere to enable audio.</span>
       </div>
     </div>
   </section>
@@ -146,12 +146,12 @@
           <div class="pause-section-title">CONTROLS</div>
 
           <div class="control-list">
-            <div class="control-row"><span>MOVE</span><kbd>W A S D</kbd></div>
-            <div class="control-row"><span>LOOK</span><kbd>MOUSE / TOUCH</kbd></div>
-            <div class="control-row"><span>RUN</span><kbd>SHIFT</kbd><small>HOLD</small></div>
-            <div class="control-row"><span>LIGHT</span><kbd>F</kbd><small>FLASHLIGHT</small></div>
-            <div class="control-row"><span>PAUSE</span><kbd>ESC</kbd><small>MENU</small></div>
-            <div class="control-row"><span>TOUCH</span><kbd>LEFT STICK</kbd><small>LOOK RIGHT SIDE</small></div>
+            <div class="control-row"><span>MOVE</span><span class="control-pc"><kbd>W A S D</kbd></span><span class="control-mobile"><kbd>LEFT STICK</kbd></span></div>
+            <div class="control-row"><span>LOOK</span><span class="control-pc"><kbd>MOUSE</kbd></span><span class="control-mobile"><kbd>DRAG RIGHT SIDE</kbd></span></div>
+            <div class="control-row"><span>RUN</span><span class="control-pc"><kbd>SHIFT</kbd><small>HOLD</small></span><span class="control-mobile"><kbd>RUN BUTTON</kbd><small>HOLD</small></span></div>
+            <div class="control-row"><span>LIGHT</span><span class="control-pc"><kbd>F</kbd><small>FLASHLIGHT</small></span><span class="control-mobile"><kbd>LIGHT BUTTON</kbd></span></div>
+            <div class="control-row"><span>PAUSE</span><span class="control-pc"><kbd>ESC</kbd><small>MENU</small></span><span class="control-mobile"><kbd>PAUSE BUTTON</kbd></span></div>
+            <div class="control-row control-touch-only"><span>TOUCH</span><span class="control-mobile"><kbd>LEFT STICK</kbd><small>DRAG RIGHT SIDE TO LOOK</small></span></div>
           </div>
         </div>
       </div>
