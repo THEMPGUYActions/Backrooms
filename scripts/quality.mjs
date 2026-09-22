@@ -27,7 +27,7 @@ function stripQueryHash(value) {
 }
 
 function isScheme(value) {
-  return /^[a-zA-Z][a-zA-Z\\d+.-]*:/.test(value);
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
 }
 
 function localPathFromSpecifier(file, specifier) {
@@ -63,9 +63,9 @@ function validateRemote(url, context) {
 
 function extractModuleSpecifiers(source) {
   const specs = [];
-  const staticRe = /\\b(?:import\\s+(?:(?:[\\s\\S]*?)\\s+from\\s+)?|export\\s+(?:\\{[\\s\\S]*?\\}|\\*)\\s+from\\s+)["']([^"']+)["']/g;
+  const staticRe = /\b(?:import\s+(?:(?:[\s\S]*?)\s+from\s+)?|export\s+(?:\{[\s\S]*?\}|\*)\s+from\s+)["']([^"']+)["']/g;
   for (const match of source.matchAll(staticRe)) specs.push({ specifier: match[1], kind: "static" });
-  const dynamicRe = /\\bimport\\(\\s*["']([^"']+)["']\\s*\\)/g;
+  const dynamicRe = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
   for (const match of source.matchAll(dynamicRe)) specs.push({ specifier: match[1], kind: "dynamic" });
   return specs;
 }
@@ -83,7 +83,7 @@ async function checkJavaScript(files) {
     try {
       await exec(process.execPath, ["--check", file]);
     } catch (e) {
-      fail("JS syntax: " + file + "\\n" + (e.stderr || e.message));
+      fail("JS syntax: " + file + "\n" + (e.stderr || e.message));
     }
   }
 }
@@ -97,15 +97,15 @@ async function checkHtml() {
   }
 
   const idCounts = new Map();
-  for (const match of html.matchAll(/\\bid=["']([^"']+)["']/g)) {
+  for (const match of html.matchAll(/\bid=["']([^"']+)["']/g)) {
     idCounts.set(match[1], (idCounts.get(match[1]) || 0) + 1);
   }
   for (const [id, count] of idCounts) {
     if (count > 1) fail("index.html has duplicate id: " + id);
   }
 
-  const mapMatches = [...html.matchAll(/<script\\b[^>]*type=["']importmap["'][^>]*>([\\s\\S]*?)<\\/script>/gi)];
-  const firstModuleScript = html.search(/<script\\b[^>]*type=["']module["']/i);
+  const mapMatches = [...html.matchAll(/<script\b[^>]*type=["']importmap["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  const firstModuleScript = html.search(/<script\b[^>]*type=["']module["']/i);
   if (mapMatches.length !== 1) {
     fail("index.html must contain exactly one import map, found " + mapMatches.length);
     return { html, imports: {} };
@@ -141,10 +141,10 @@ async function checkHtml() {
 
 async function checkCss() {
   const css = await readFile(join(root, "styles.css"), "utf8");
-  for (const match of css.matchAll(/url\\(\\s*["']?([^)"']+)["']?\\s*\\)/gi)) {
+  for (const match of css.matchAll(/url\(\s*["']?([^)"']+)["']?\s*\)/gi)) {
     const value = stripQueryHash(match[1].trim());
-    if (!value || value.startsWith("data:") || value.startsWith("#") || /^https?:\\/\\//i.test(value)) continue;
-    await assertFile(resolve(root, value.replace(/^\\.\\//, "")), "CSS local URL");
+    if (!value || value.startsWith("data:") || value.startsWith("#") || /^https?:\/\//i.test(value)) continue;
+    await assertFile(resolve(root, value.replace(/^\.\//, "")), "CSS local URL");
   }
 }
 
@@ -216,7 +216,7 @@ async function checkData() {
 
   try {
     const levelJs = await readFile(join(root, "src/levels.js"), "utf8");
-    const sourceUrls = [...levelJs.matchAll(/sourceUrl:\\s*["']([^"']+)["']/g)].map(match => match[1]);
+    const sourceUrls = [...levelJs.matchAll(/sourceUrl:\s*["']([^"']+)["']/g)].map(match => match[1]);
     const dataUrls = levels.map(level => level.source).filter(Boolean);
     if (sourceUrls.length !== dataUrls.length || sourceUrls.some((url, i) => url !== dataUrls[i])) {
       fail("src/levels.js and data/levels.json source URLs do not match");
@@ -251,7 +251,7 @@ async function checkWorkflow() {
   try {
     const workflow = await readFile(path, "utf8");
     const required = [
-      "branches:\\n      - main\\n      - dev",
+      "branches:\n      - main\n      - dev",
       "npm run check",
       "npm run build",
       "publish_branch: gh-pages",
@@ -261,7 +261,7 @@ async function checkWorkflow() {
       "destination_dir: dev"
     ];
     for (const rule of required) {
-      if (!workflow.includes(rule)) fail("workflow missing required QA/deployment rule: " + rule.replace(/\\n/g, " / "));
+      if (!workflow.includes(rule)) fail("workflow missing required QA/deployment rule: " + rule.replace(/\n/g, " / "));
     }
   } catch (e) {
     fail("workflow could not be read: " + e.message);
@@ -285,7 +285,7 @@ for (const file of files) {
 }
 
 if (failures.length) {
-  console.error(failures.join("\\n\\n"));
+  console.error(failures.join("\n\n"));
   process.exit(1);
 }
 
