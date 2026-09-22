@@ -182,6 +182,8 @@ export function makeLibrary(level){
     trimTop:new THREE.MeshStandardMaterial({color:0xe4e0d5,roughness:.7,metalness:0}),
     outlet:new THREE.MeshStandardMaterial({color:0xe7e4dc,roughness:.58,metalness:0}),
     socket:new THREE.MeshStandardMaterial({color:0x2a2824,roughness:.88,metalness:0}),
+    intercom:new THREE.MeshStandardMaterial({color:0xcac5b5,roughness:.72,metalness:.12}),
+    intercomSlot:new THREE.MeshStandardMaterial({color:0x302f2b,roughness:.9,metalness:0}),
     cameraDome:new THREE.MeshStandardMaterial({color:0x252522,roughness:.55,metalness:.42}),
     handle:new THREE.MeshStandardMaterial({color:0x8b8067,roughness:.34,metalness:.72}),
     door:new THREE.MeshStandardMaterial({color:0xd8d2be,roughness:.73,metalness:.02}),
