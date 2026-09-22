@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-\${{ github.ref }}
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -63,7 +63,7 @@ jobs:
       - name: Upload dev/CI site artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backrooms-site-\${{ github.ref_name }}-\${{ github.sha }}
+          name: backrooms-site-${{ github.ref_name }}-${{ github.sha }}
           path: dist
           if-no-files-found: error
           retention-days: 14
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
