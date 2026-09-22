@@ -65,19 +65,25 @@ class Chunk{
     for(let x=0;x<CELLS;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,CELLS-1)]|=4}
 
     if(this.game.level.id==="0"){
-      const longSegments=rng.int(6,9);
-      for(let i=0;i<longSegments;i++){
-        const vertical=rng.next()<.5,line=rng.int(2,13),start=rng.int(1,7),length=rng.int(5,12);
-        const gaps=new Set(),gapCount=rng.next()<.55?1:2;
-        for(let g=0;g<gapCount;g++)gaps.add(rng.int(1,Math.max(1,length-2)));
-        for(let k=0;k<length;k++){
-          if(gaps.has(k))continue;
-          const x=vertical?line:start+k,z=vertical?start+k:line;
-          if(x<1||x>14||z<1||z>14)continue;
-          this.setEdge(x,z,vertical?"east":"south",false);
+      const split=(x0,z0,x1,z1,depth)=>{
+        const w=x1-x0+1,h=z1-z0+1;
+        if(depth>=3||w<7||h<7||(depth>0&&rng.next()<.28))return;
+        const vertical=(w>h+2)?true:(h>w+2?false:rng.next()<.5);
+        if(vertical){
+          const cut=rng.int(x0+3,x1-3),gapStart=rng.int(z0+1,z1-1),gapLength=rng.next()<.72?1:2;
+          for(let z=z0;z<=z1;z++)if(z<gapStart||z>=gapStart+gapLength)this.setEdge(cut,z,"east",false);
+          split(x0,z0,cut,x1?z1:z1,depth+1);
+          split(cut+1,z0,x1,z1,depth+1);
+        }else{
+          const cut=rng.int(z0+3,z1-3),gapStart=rng.int(x0+1,x1-1),gapLength=rng.next()<.72?1:2;
+          for(let x=x0;x<=x1;x++)if(x<gapStart||x>=gapStart+gapLength)this.setEdge(x,cut,"south",false);
+          split(x0,z0,x1,cut,depth+1);
+          split(x0,cut+1,x1,z1,depth+1);
         }
-      }
-      const stubs=rng.int(8,14);
+      };
+      split(1,1,14,14,0);
+
+      const stubs=rng.int(7,12);
       for(let i=0;i<stubs;i++){
         const vertical=rng.next()<.5,x=rng.int(1,14),z=rng.int(1,14),length=rng.int(1,4);
         for(let k=0;k<length;k++){
@@ -86,7 +92,8 @@ class Chunk{
           this.setEdge(xx,zz,vertical?"east":"south",false);
         }
       }
-      if(rng.next()<.42){
+
+      if(rng.next()<.35){
         const vertical=rng.next()<.5,line=rng.int(3,12),span=rng.int(4,8),start=rng.int(2,13-span);
         for(let k=0;k<span;k++){
           const x=vertical?line:start+k,z=vertical?start+k:line;
