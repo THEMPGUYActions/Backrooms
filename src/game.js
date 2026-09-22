@@ -172,17 +172,28 @@ class Chunk{
     this.walls.fill(15);this.rooms=[];
 
     if(level.id==="1"){
-      const macro=smoothNoise2D(this.cx*(level.zoneScale||.24),this.cz*(level.zoneScale||.24),this.game.seed^0x51a3);
-      const zoneRoll=cycleHash(this.game.seed,this.cx*37,this.cz*61,101);
-      this.zone=(this.cx===0&&this.cz===0)||macro>(level.hallChance||.58)||zoneRoll<.10?"halls":"corridors";
+      // Mirrors the reference mod's Level 1 layout model:
+      // 10x10 cells at 8 blocks each, a world-space Perlin-like split between
+      // giant Halls and tighter maze Corridors, plus occasional 3x3 rooms.
+      const worldX=this.cx*cells*level.cellSize;
+      const worldZ=this.cz*cells*level.cellSize;
+      const macro=smoothNoise2D(worldX*.002,worldZ*.002,this.game.seed^0x51a3);
+      const noise=macro-.5;
+      const forceStart=this.cx===0&&this.cz===0;
+      const hall=forceStart||noise>.0;
+      this.zone=hall?"halls":"corridors";
 
-      if(this.zone==="halls"){
+      if(hall){
         this.walls.fill(0);
         for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
         for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
+
+        // Large open warehouse / parking-lot sectors. Partitions are sparse,
+        // with long sightlines and only a couple of openings, like the reference.
         const partitions=rng.int(0,2);
         for(let i=0;i<partitions;i++){
-          if(rng.next()<.5){
+          const vertical=rng.next()<.5;
+          if(vertical){
             const x=rng.int(2,cells-3),gap=rng.int(2,cells-3);
             for(let z=1;z<cells-1;z++)if(Math.abs(z-gap)>1)this.setEdge(x,z,"east",false);
           }else{
@@ -190,9 +201,22 @@ class Chunk{
             for(let x=1;x<cells-1;x++)if(Math.abs(x-gap)>1)this.setEdge(x,z,"south",false);
           }
         }
+
+        // Keep neighboring Hall sectors connected through several wide openings.
+        for(let x=0;x<cells;x+=2){
+          if(canonicalOpen(this.game.seed,this.cx*cells+x,this.cz*cells,"h",.16))this.setEdge(x,0,"north",true);
+          if(canonicalOpen(this.game.seed,this.cx*cells+x,this.cz*cells+cells,"h",.16))this.setEdge(x,cells-1,"south",true);
+        }
+        for(let z=1;z<cells;z+=2){
+          if(canonicalOpen(this.game.seed,this.cx*cells,this.cz*cells+z,"v",.16))this.setEdge(0,z,"west",true);
+          if(canonicalOpen(this.game.seed,this.cx*cells+cells,this.cz*cells+z,"v",.16))this.setEdge(cells-1,z,"east",true);
+        }
       }else{
-        const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
-        visited[this.index(stack[0][0],stack[0][1])]=1;
+        // SpacePotato's Level1MazeGenerator is a randomized depth-first maze
+        // over a 10x10 grid with 8-block cells. Keep that topology here.
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
         const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
         while(stack.length){
           const [x,z]=stack[stack.length-1],options=[];
@@ -202,19 +226,25 @@ class Chunk{
           }
           if(!options.length){stack.pop();continue}
           const [nx,nz,b,ob]=rng.pick(options);
-          this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
-          visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
         }
+
+        // A few loops prevent the corridors from feeling like a perfect tree.
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.11)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.09)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.045)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.045)this.setEdge(x,z,"south",true);
         }
-        const roomCount=rng.int(level.roomMin||2,level.roomMax||5);
+
+        // Reference mod occasionally places a 3x3 structure in the maze.
+        const roomCount=rng.next()<.88?1:0;
         for(let i=0;i<roomCount;i++){
           let room=null;
-          for(let attempt=0;attempt<12&&!room;attempt++){
-            const w=rng.int(2,3),h=rng.int(2,3),x=rng.int(1,cells-w-1),z=rng.int(1,cells-h-1);
-            const candidate={x,z,w,h,type:rng.next()<.28?"office":rng.next()<.5?"storage":"utility"};
+          for(let attempt=0;attempt<18&&!room;attempt++){
+            const w=3,h=3,x=rng.int(1,cells-w-1),z=rng.int(1,cells-h-1);
+            const candidate={x,z,w,h,type:rng.next()<.125?"storage":rng.pick(["office","utility","infirmary","rubber"])};
             const overlap=this.rooms.some(other=>candidate.x<other.x+other.w+1&&candidate.x+candidate.w+1>other.x&&candidate.z<other.z+other.h+1&&candidate.z+candidate.h+1>other.z);
             if(!overlap)room=candidate;
           }
@@ -231,7 +261,22 @@ class Chunk{
           this.rooms.push(room);
         }
       }
-    }else if(level.id==="0"){
+
+      // Match the reference mod's roughly 400-block generation sectors and
+      // put the stairwell/exit family well away from spawn.
+      if(cells>=5){
+        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
+        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
+        if(this.cz%2===0)this.setEdge(0,2,"west",true);
+        if(this.cx%2===0)this.setEdge(cells-1,2,"east",true);
+      }
+      if(forceStart){
+        this.setEdge(2,2,"north",true);
+        this.setEdge(2,2,"east",true);
+        this.setEdge(2,2,"south",true);
+        this.setEdge(2,2,"west",true);
+      }
+    }    }else if(level.id==="0"){
       const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
       if(mega){
         this.walls.fill(0);
@@ -657,17 +702,6 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
         box(g,new THREE.BoxGeometry(.055,.84,.055),lib.metal,p.x-.32,.4,p.z);
         this.crates.push({group:crate,unseen:0});
-      }
-
-      if(rng.next()<(level.shelfChance||.34)){
-        const p=randomCell();
-        const rack=new THREE.Group();
-        rack.position.set(p.x,.02,p.z);
-        for(const y of [.55,1.35,2.15]){
-          box(rack,new THREE.BoxGeometry(2.6,.08,.58),lib.level1Shelf,0,y,0);
-        }
-        for(const x of [-1.2,1.2])box(rack,new THREE.BoxGeometry(.08,2.25,.08),lib.metal,x,1.12,0);
-        g.add(rack);
       }
 
       if(rng.next()<.32){
