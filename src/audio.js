@@ -45,7 +45,11 @@ export class AudioDirector{
     }
     if(this.loading){await this.loading;return}
     this.loading=(async()=>{
-      this.ctx=new(window.AudioContext||window.webkitAudioContext)();
+      if(!this.ctx){
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        if(!Ctx)throw new Error("Web Audio API unavailable");
+        this.ctx=new Ctx();
+      }
       this.master=this.ctx.createGain();this.master.gain.value=this.volume;this.master.connect(this.ctx.destination);
       this.fxBus=this.ctx.createGain();this.fxBus.gain.value=.64;this.fxBus.connect(this.master);
       this.reverb=this.ctx.createConvolver();this.reverb.buffer=this.createImpulse();
