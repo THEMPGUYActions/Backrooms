@@ -24,11 +24,12 @@ class Chunk{
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
     this.originX=cx*world.size-world.size/2;this.originZ=cz*world.size-world.size/2;
     this.group=new THREE.Group();this.group.name="chunk_"+cx+"_"+cz;
-    this.walls=new Uint8Array(CELLS*CELLS);this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
-  index(x,z){return z*CELLS+x}
+  index(x,z){return z*this.gridSize()+x}
+  gridSize(){return this.game.level.gridSize||5}
   setEdge(x,z,side,open=false){
     const here=this.index(x,z);
     if(side==="north"){
@@ -39,7 +40,7 @@ class Chunk{
       }
     }else if(side==="south"){
       this.walls[here]=open?this.walls[here]&~4:this.walls[here]|4;
-      if(z<CELLS-1){
+      if(z<cells-1){
         const other=this.index(x,z+1);
         this.walls[other]=open?this.walls[other]&~1:this.walls[other]|1;
       }
@@ -51,17 +52,18 @@ class Chunk{
       }
     }else{
       this.walls[here]=open?this.walls[here]&~2:this.walls[here]|2;
-      if(x<CELLS-1){
+      if(x<cells-1){
         const other=this.index(x+1,z);
         this.walls[other]=open?this.walls[other]&~8:this.walls[other]|8;
       }
     }
   }
   buildMaze(){
+    const cells=this.gridSize();
     const rng=new RNG((Math.imul(this.cx,73856093)^Math.imul(this.cz,19349663)^this.game.seed)|0);
     this.walls.fill(this.game.level.id==="0"?0:15);
-    for(let z=0;z<CELLS;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(CELLS-1,z)]|=2}
-    for(let x=0;x<CELLS;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,CELLS-1)]|=4}
+    for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
+    for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
 
     if(this.game.level.id==="0"){
       const split=(x0,z0,x1,z1,depth)=>{
@@ -100,14 +102,14 @@ class Chunk{
         }
       }
     }else{
-      const visited=new Uint8Array(CELLS*CELLS),stack=[[8,8]];
+      const visited=new Uint8Array(cells*cells),stack=[[8,8]];
       visited[this.index(8,8)]=1;
       const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
       while(stack.length){
         const [x,z]=stack[stack.length-1],options=[];
         for(const [dx,dz,b,ob] of dirs){
           const nx=x+dx,nz=z+dz;
-          if(nx>=0&&nx<CELLS&&nz>=0&&nz<CELLS&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob]);
+          if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob]);
         }
         if(!options.length){stack.pop();continue}
         const [nx,nz,b,ob]=rng.pick(options);
@@ -115,21 +117,21 @@ class Chunk{
         visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
       }
       const loopChance=this.game.level.id==="1"?.12:.07;
-      for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
-        if(x<CELLS-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
-        if(z<CELLS-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true);
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
+        if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true);
       }
     }
 
-    for(let x=0;x<CELLS;x++){
-      const gx=this.cx*CELLS+x;
-      if(canonicalOpen(this.game.seed,gx,this.cz*CELLS,"h"))this.setEdge(x,0,"north",true);
-      if(canonicalOpen(this.game.seed,gx,this.cz*CELLS+CELLS,"h"))this.setEdge(x,CELLS-1,"south",true);
+    for(let x=0;x<cells;x++){
+      const gx=this.cx*cells+x;
+      if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h"))this.setEdge(x,0,"north",true);
+      if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h"))this.setEdge(x,cells-1,"south",true);
     }
-    for(let z=0;z<CELLS;z++){
-      const gz=this.cz*CELLS+z;
-      if(canonicalOpen(this.game.seed,this.cx*CELLS,gz,"v"))this.setEdge(0,z,"west",true);
-      if(canonicalOpen(this.game.seed,this.cx*CELLS+CELLS,gz,"v"))this.setEdge(CELLS-1,z,"east",true);
+    for(let z=0;z<cells;z++){
+      const gz=this.cz*cells+z;
+      if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v"))this.setEdge(0,z,"west",true);
+      if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v"))this.setEdge(cells-1,z,"east",true);
     }
 
     if(this.game.level.id==="0"){
@@ -138,7 +140,7 @@ class Chunk{
     }
 
     const level=this.game.level,rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
-    for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
+    for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
       if(rng2.next()<level.holeChance&&Math.hypot(x-8,z-8)>2.5)this.hazards.push({x,z});
     }
 
@@ -173,6 +175,7 @@ class Chunk{
   }
   seedKey(){return (this.cx*73856093)^(this.cz*19349663)^this.game.seed}
   buildGeometry(){
+    const cells=this.gridSize();
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
     const wallThickness=.18;
     const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,level.wallHeight,cell);
@@ -183,7 +186,7 @@ class Chunk{
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
 
-    for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
+    for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
       const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
       const addEdge=(side)=>{
         if(side==="north"){
@@ -202,8 +205,8 @@ class Chunk{
       };
       if(mask&1)addEdge("north");
       if(mask&8)addEdge("west");
-      if(z===CELLS-1&&(mask&4))addEdge("south");
-      if(x===CELLS-1&&(mask&2))addEdge("east");
+      if(z===cells-1&&(mask&4))addEdge("south");
+      if(x===cells-1&&(mask&2))addEdge("east");
 
       const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
       const fixtureChance=level.id==="0"?.78:level.id==="1"?.2:.13;
@@ -340,9 +343,9 @@ class Chunk{
   }
   contains(x,z){return x>=this.originX&&x<this.originX+this.world.size&&z>=this.originZ&&z<this.originZ+this.world.size}
   cellAt(x,z){
-    const cell=this.game.level.cellSize;
+    const cells=this.gridSize(),cell=this.game.level.cellSize;
     let ix=Math.floor((x-this.originX)/cell),iz=Math.floor((z-this.originZ)/cell);
-    ix=Math.max(0,Math.min(CELLS-1,ix));iz=Math.max(0,Math.min(CELLS-1,iz));
+    ix=Math.max(0,Math.min(cells-1,ix));iz=Math.max(0,Math.min(cells-1,iz));
     return {ix,iz,mask:this.walls[this.index(ix,iz)]};
   }
   dispose(){
@@ -418,7 +421,7 @@ class WorldStreamer{
 
     if(this.library)disposeLibrary(this.library);
 
-    this.size=this.game.level.cellSize*CELLS;
+    this.size=this.game.level.cellSize*(this.game.level.gridSize||CELLS);
     this.surfaceSize=4096;
     this.library=makeLibrary(this.game.level);
 
@@ -695,7 +698,7 @@ export class BackroomsGame{
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x000000);this.camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"mediump"});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.0));this.renderer.setSize(innerWidth,innerHeight,false);
+    this.renderer.setPixelRatio(1);this.renderer.setSize(Math.max(1,innerWidth),Math.max(1,innerHeight),false);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.62;
     this.scene.environment=null;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
@@ -707,7 +710,7 @@ export class BackroomsGame{
       this.localLights.push(light);
       this.scene.add(light);
     }this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0x4c4539,0x000000,.012);this.scene.add(this.ambient);
+    this.ambient=new THREE.HemisphereLight(0x554c3c,0x000000,.055);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,24,25,.48,.9,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
