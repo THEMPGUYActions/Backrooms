@@ -30,11 +30,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Quality checks
-        run: npm run check
-
       - name: Build
         run: npm run build
+
+      - name: Quality checks
+        run: npm run check
 
       - name: Verify build
         run: |

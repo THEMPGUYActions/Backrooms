@@ -6,6 +6,6 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/quality.mjs",
-    "build:check": "npm run check && npm run build"
+    "build:check": "npm run build && npm run check"
   }
 }
