@@ -344,7 +344,7 @@ async function checkBuildIfPresent() {
     return;
   }
 
-  for (const required of ["index.html", "styles.css", "src/main.js", "src/game.js", "src/assets.js", "data/levels.json", ".nojekyll"]) {
+  for (const required of ["index.html", "styles.css", "favicon.svg", "sw.js", "src/main.js", "src/game.js", "src/assets.js", "data/levels.json", ".nojekyll"]) {
     await assertFile(join(dist, required), "dist build");
   }
 
