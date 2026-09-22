@@ -339,11 +339,11 @@ class EntityManager{
         if(d<10&&looking)e.state="intimidated";
         if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
-        e.group.lookAt(p.position.x,1,p.position.z);if(d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
+        e.group.lookAt(p.position.x,1,p.position.z);if(!this.game.dev.godMode&&d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
       }else{
         const lightOn=p.flashlight;if(lightOn&&d<18){e.group.position.x-=dx/d*dt*2.2;e.group.position.z-=dz/d*dt*2.2}
         if(!lightOn&&d<15){e.group.position.x+=dx/d*dt*1.4;e.group.position.z+=dz/d*dt*1.4}
-        if(d<1.1){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
+        if(!this.game.dev.godMode&&d<1.1){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
       }
     }
     this.spawnForChunks();
