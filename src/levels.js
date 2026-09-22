@@ -54,18 +54,15 @@ export const LEVELS = {
     entity: "hound",
     exitStyle: "green",
     batteryChance: 0.14,
-    exitAfterChunks: 3,
-    objective: "The halls are open. Find the corridors when the lights begin to fail.",
+    exitAfterChunks: 4,
+    objective: "Find the corridors. The halls are open, but the lights do not stay on.",
     safe: false,
-    zoneScale: 0.24,
-    hallChance: 0.58,
     pillarChance: 0.72,
     puddleChance: 0.56,
     crateChance: 0.20,
-    roomChance: 0.82,
-    roomMin: 2,
-    roomMax: 5,
-    shelfChance: 0.34
+    roomChance: 0.88,
+    roomMin: 1,
+    roomMax: 1
   },
   "2": {
     id: "2",
