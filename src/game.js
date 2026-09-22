@@ -476,12 +476,13 @@ class WorldStreamer{
     this.game.scene.add(this.floorSurface,this.ceilingSurface);
 
     const library=this.library;
-    applyOpenGameArtPBR(library,this.game.level)
+    this.updateSurfaceTiling();
+    this.visualReady=applyOpenGameArtPBR(library,this.game.level)
       .then(()=>this.updateSurfaceTiling())
       .catch(error=>{
         console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
       });
-    this.updateSurfaceTiling();
+    return this.visualReady;
   }
 
   updateSurfaceTiling(){
@@ -741,9 +742,15 @@ export class BackroomsGame{
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
     this.bindUI();addEventListener("resize",()=>this.resize());this.last=performance.now();
   }
-  mount(){
-    document.getElementById("game").appendChild(this.renderer.domElement);this.quality.apply();this.world.configure();this.world.ensureAround(0,0);this.player.reset();
-    this.render();this.last=performance.now();requestAnimationFrame(this.loop.bind(this));
+  async mount(){
+    document.getElementById("game").appendChild(this.renderer.domElement);
+    this.quality.apply();
+    await this.world.configure();
+    this.world.ensureAround(0,0);
+    this.player.reset();
+    this.render();
+    this.last=performance.now();
+    requestAnimationFrame(this.loop.bind(this));
   }
   bindUI(){
     const $=id=>document.getElementById(id);
