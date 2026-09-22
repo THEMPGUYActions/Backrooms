@@ -179,7 +179,7 @@ export function makeLibrary(level){
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
-    light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.28,metalness:0,emissive:level.theme.light,emissiveIntensity:3}),
+    light:new THREE.MeshStandardMaterial({color:0xffedaa,roughness:.34,metalness:0,emissive:0xffcf4a,emissiveIntensity:3.2}),
     orangeLight:new THREE.MeshStandardMaterial({color:0xffddaa,roughness:.31,metalness:0,emissive:0xff9b52,emissiveIntensity:2.6})
   };
 }
