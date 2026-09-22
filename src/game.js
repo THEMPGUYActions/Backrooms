@@ -47,6 +47,23 @@ class Chunk{
       this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
       visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
     }
+    const loopChance=this.game.level.id==="0"?.24:this.game.level.id==="1"?.12:.07;
+    for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
+      const i=this.index(x,z);
+      if(x<CELLS-1&&rng.next()<loopChance){this.walls[i]&=~2;this.walls[this.index(x+1,z)]&=~8}
+      if(z<CELLS-1&&rng.next()<loopChance*.82){this.walls[i]&=~4;this.walls[this.index(x,z+1)]&=~1}
+    }
+    if(this.game.level.id==="0"){
+      for(let z=3;z<13;z+=5)for(let x=3;x<13;x+=5){
+        if(rng.next()<.58){
+          this.walls[this.index(x,z)]&=~(2|4);
+          if(x>0)this.walls[this.index(x-1,z)]&=~2;
+          if(z>0)this.walls[this.index(x,z-1)]&=~4;
+          if(x<CELLS-1)this.walls[this.index(x+1,z)]&=~8;
+          if(z<CELLS-1)this.walls[this.index(x,z+1)]&=~1;
+        }
+      }
+    }
     for(let x=0;x<CELLS;x++){
       const gx=this.cx*CELLS+x;
       if(canonicalOpen(this.game.seed,gx,this.cz*CELLS,"h"))this.walls[this.index(x,0)]&=~1;
@@ -285,7 +302,7 @@ class AdaptiveQuality{
 export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,140);this.camera.rotation.order="YXZ";
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance",stencil:false,depth:true});
@@ -303,21 +320,34 @@ export class BackroomsGame{
   }
   bindUI(){
     const $=id=>document.getElementById(id);
-    $("start").onclick=async()=>{await this.audio.resume();this.start()};
+    const begin=async()=>{if(!this.introActive)return;this.audio.resume().then(()=>{this.audio.clickToEnter();this.beginIntroReveal()})};
+    $("audio-gate").onclick=begin;
+    $("audio-gate").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();begin()}};
     $("resume").onclick=()=>this.togglePause(false);$("restart").onclick=()=>this.restart();$("retry").onclick=()=>this.restart();$("again-ending").onclick=()=>this.restart();
     $("quality").value=this.quality.mode;$("quality").onchange=e=>this.quality.set(e.target.value);
     $("volume").value=String(this.audio.volume);$("volume").oninput=e=>this.audio.setVolume(e.target.value);
     $("shake").checked=this.settings.shake;$("shake").onchange=e=>{this.settings.shake=e.target.checked;localStorage.setItem("br.shake",e.target.checked?"1":"0")};
     $("flashlight").checked=this.startFlash;$("flashlight").onchange=e=>{this.startFlash=e.target.checked;localStorage.setItem("br.flash",e.target.checked?"1":"0")};
   }
-  start(){
-    this.running=true;this.paused=false;this.dead=false;document.getElementById("boot").classList.add("hidden");document.getElementById("hud").classList.remove("hidden");
+  beginIntroReveal(){
+    if(!this.introActive)return;
+    this.introActive=false;
+    const boot=document.getElementById("boot");
+    boot.classList.add("booting");
+    this.player.reset();
+    this.running=true;this.paused=false;this.dead=false;this.introReveal=0;
+    document.getElementById("hud").classList.remove("hidden");
     document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
-    this.toast(this.level.objective,3);this.renderer.domElement.requestPointerLock?.();
+    setTimeout(()=>boot.classList.add("fade-out"),80);
+    setTimeout(()=>{this.toast(this.level.objective,3);this.renderer.domElement.requestPointerLock?.()},1100);
   }
+
+  start(){this.beginIntroReveal()}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
-    this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();this.start();
+    this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();
+    this.running=true;this.paused=false;this.dead=false;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
+    document.getElementById("mobile-controls").classList.toggle("hidden",matchMedia("(pointer:fine)").matches);this.toast(this.level.objective,2.4);
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);
@@ -343,7 +373,10 @@ export class BackroomsGame{
     const el=document.getElementById("toast");el.textContent=text;el.classList.remove("hidden");clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.add("hidden"),duration*1000)
   }
   update(dt){
+    this.gameTime+=dt;this.argTimer-=dt;
+    if(this.introReveal<1)this.introReveal=Math.min(1,this.introReveal+dt/2.7);
     this.player.update(dt);this.world.update(dt);this.entityManager.update(dt);this.quality.update(dt);
+    this.updateArgLayer(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
     document.getElementById("coords").textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
     document.getElementById("health-bar").style.width=Math.max(0,this.player.health)+"%";
@@ -353,6 +386,27 @@ export class BackroomsGame{
     document.getElementById("status").textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";this.flash.intensity=this.player.flashlight?18:0;
     this.flash.position.copy(this.camera.position);
   }
+  updateArgLayer(dt){
+    const t=Math.floor(this.gameTime),h=String(Math.floor(t/3600)%24).padStart(2,"0"),m=String(Math.floor(t/60)%60).padStart(2,"0"),s=String(t%60).padStart(2,"0");
+    const rec=document.getElementById("rec-time");if(rec)rec.textContent=h+":"+m+":"+s;
+    if(this.argTimer<=0&&this.running&&!this.paused){
+      this.argTimer=14+Math.random()*28;
+      const messages=this.level.id==="0"
+        ? ["AUDIO SOURCE: UNKNOWN","ROOM INDEX DESYNC","DOOR COUNT DOES NOT MATCH","FRAME DROP / 00:00:07","DO NOT TRUST THE HUM"]
+        : this.level.id==="1"
+        ? ["SIGNAL: SECONDARY CARRIER","CAMERA CLOCK DRIFT","MOTION DETECTED","NO EXIT MARKER IN RANGE"]
+        : ["POWER BUS: UNSTABLE","FEED: 03:19:XX","THERMAL SIGNATURE LOST","SOMETHING MOVED BETWEEN FRAMES"];
+      this.showArgMessage(messages[Math.floor(Math.random()*messages.length)]);
+      if(Math.random()<.46)this.audio.distantKnock();
+    }
+  }
+
+  showArgMessage(message){
+    const el=document.getElementById("arg-message");if(!el)return;
+    el.textContent=message;el.classList.remove("hidden","glitch");void el.offsetWidth;el.classList.add("glitch");
+    clearTimeout(this.argMessageTimer);this.argMessageTimer=setTimeout(()=>el.classList.add("hidden"),2300+Math.random()*2400);
+  }
+
   render(){this.renderer.render(this.scene,this.camera)}
   loop(now){const raw=(now-this.last)/1000;this.last=now;const dt=Math.min(MAX_DT,raw);if(this.running&&!this.paused)this.update(dt);this.render();requestAnimationFrame(this.loop.bind(this))}
   resize(){this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.renderer.setSize(innerWidth,innerHeight)}
