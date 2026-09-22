@@ -1366,7 +1366,7 @@ export class BackroomsGame{
       return style.visibility!=="hidden"&&Number.parseFloat(style.opacity||"0")>.5;
     };
     const handleAudioGesture=event=>{
-      if(!isAudioPageVisible()||this.audioGateBusy)return;
+      if(!isAudioPageVisible())return;
       event.preventDefault();
       event.stopPropagation();
       begin(event);
