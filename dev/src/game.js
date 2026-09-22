@@ -1280,7 +1280,7 @@ export class BackroomsGame{
   constructor(){
     this.seed=(Number(localStorage.getItem("br.seed"))||Math.floor(Math.random()*2147483647))|0;localStorage.setItem("br.seed",String(this.seed));
     this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={
       shake:localStorage.getItem("br.shake")!=="0",
       sensitivity:Math.max(.5,Math.min(2,Number(localStorage.getItem("br.sensitivity")||1)))
@@ -1328,12 +1328,11 @@ export class BackroomsGame{
     document.getElementById("game").appendChild(this.renderer.domElement);
     this.resize();
     this.quality.apply();
-    this.setLoadingProgress(0,"MOUNTING CAMERA","Initializing the recording rig");
-    await this.world.configure((progress,label,detail)=>this.setLoadingProgress(progress,label,detail));
+    await this.world.configure();
     this.world.ensureAround(0,0);
     this.player.reset();
-    this.setLoadingProgress(1,"TAPE READY","Level 0 / The Lobby");
-    document.getElementById("loading")?.classList.add("hidden");
+    this.mounted=true;
+    if(this.pendingStart)this.beginIntroReveal();
     this.render();
     this.last=performance.now();
     requestAnimationFrame(this.loop.bind(this));
@@ -1345,10 +1344,6 @@ export class BackroomsGame{
     const begin=async event=>{
       if(event?.isTrusted===false||!this.introActive||this.audioGateBusy)return;
       this.audioGateBusy=true;
-      const boot=$("boot");
-      boot?.classList.add("audio-ready");
-      const overlay=$("audio-overlay");
-      if(overlay)overlay.classList.add("hidden");
       try{
         await this.audio.init();
         await this.audio.testUnlock();
@@ -1356,7 +1351,8 @@ export class BackroomsGame{
         console.warn("[Backrooms] Audio unlock failed:",error);
       }
       this.audio.clickToEnter();
-      this.beginIntroReveal();
+      if(this.mounted)this.beginIntroReveal();
+      else this.pendingStart=true;
     };
 
     const boot=$("boot");
@@ -1375,11 +1371,6 @@ export class BackroomsGame{
         begin(event);
       }
     });
-
-    if(this.audio.isEnabled()){
-      boot?.classList.add("audio-ready");
-      $("audio-overlay")?.classList.add("hidden");
-    }
 
     $("resume")?.addEventListener("click",()=>this.togglePause(false));
     $("restart")?.addEventListener("click",()=>this.restart());
@@ -1405,33 +1396,21 @@ export class BackroomsGame{
     }
   }
   beginIntroReveal(){
-    if(!this.introActive||this.introPlaying)return;
+    if(!this.introActive||!this.mounted)return;
     this.introActive=false;
-    this.introPlaying=true;
-    this.introTime=0;
-    this.running=false;this.paused=true;this.dead=false;
-    this.introSequenceStarted=performance.now();
-    const boot=document.getElementById("boot");
-    boot.classList.remove("booting");
-    const gate=document.getElementById("audio-gate");
-    if(gate)gate.classList.add("hidden");
-    const introLine=document.getElementById("intro-line");
-    if(introLine)introLine.textContent="REC 01 // UNKNOWN LOCATION";
+    this.introPlaying=false;
+    this.pendingStart=false;
+    this.running=true;
+    this.paused=false;
+    this.dead=false;
     this.player.reset();
-    this.introCameraStart=new THREE.Vector3(this.player.position.x,this.player.eyeY+1.15,this.player.position.z+4.5);
-    this.camera.position.copy(this.introCameraStart);
-    this.camera.rotation.set(-.025,.06,0,"YXZ");
-    this.vhsPass.uniforms.intensity.value=1.15;
-    this.vhsPass.uniforms.tracking.value=.85;
-    this.vhsPass.uniforms.fear.value=.08;
-    setTimeout(()=>{
-      if(!this.introPlaying)return;
-      const boot=document.getElementById("boot");
-      boot?.classList.add("intro-live");
-      const gate=document.getElementById("audio-gate");
-      gate?.classList.add("hidden");
-      this.introTime=0;
-    },16500);
+    this.vhsPass.uniforms.intensity.value=.72;
+    this.vhsPass.uniforms.tracking.value=.28;
+    this.vhsPass.uniforms.fear.value=0;
+    document.getElementById("hud")?.classList.remove("hidden");
+    document.getElementById("mobile-controls")?.classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
+    document.getElementById("boot")?.classList.add("fade-out");
+    this.toast(this.level.objective,3);
   }
 
   setLoadingProgress(progress,label,detail=""){
@@ -1445,7 +1424,7 @@ export class BackroomsGame{
     if(info)info.textContent=detail;
   }
 
-  start(){this.beginIntroReveal()}
+  start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
     this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();
@@ -1674,8 +1653,7 @@ export class BackroomsGame{
   loop(now){
     const raw=(now-this.last)/1000;this.last=now;
     const dt=Math.min(MAX_DT,raw);
-    if(this.introPlaying)this.updateIntro(dt);
-    else if(this.running&&!this.paused)this.update(dt);
+    if(this.running&&!this.paused)this.update(dt);
     this.render();
     requestAnimationFrame(this.loop.bind(this));
   }
