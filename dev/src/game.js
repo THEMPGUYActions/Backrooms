@@ -695,7 +695,7 @@ export class BackroomsGame{
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x000000);this.camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"mediump"});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,touchDevice?0.85:1.05));this.renderer.setSize(innerWidth,innerHeight);
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.0));this.renderer.setSize(innerWidth,innerHeight);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.62;
     this.scene.environment=null;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
