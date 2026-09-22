@@ -1899,3 +1899,16 @@ button,.audio-gate{
 .intro-ready .intro-audio-page{
   animation:intro-audio-sequence 1s ease 15.25s forwards;
 }
+
+/* Mobile controls stay completely hidden through loading and the intro.
+   They only fade in once gameplay is actually active. */
+#mobile-controls{
+  opacity:0;
+  transition:opacity .65s ease;
+}
+#mobile-controls.mobile-controls-ready{
+  opacity:1;
+}
+@media (prefers-reduced-motion:reduce){
+  #mobile-controls{transition:none}
+}
