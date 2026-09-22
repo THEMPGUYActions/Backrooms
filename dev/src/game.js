@@ -403,7 +403,7 @@ class Chunk{
     }
 
     const buildDoor=(entry,exitDoor)=>{
-      const p=wallPoint(entry,.105,1.29),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
+      const p=wallPoint(entry,.105,1.95),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
       const frameMat=exitDoor?lib.exitFrame:lib.doorFrame;
       box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,-1.02,0,0);
       box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,1.02,0,0);
@@ -427,7 +427,7 @@ class Chunk{
           e.side==="west"?new THREE.Vector3(px-cell/2-.78,1.28,pz):
           new THREE.Vector3(px+cell/2+.78,1.28,pz);
       }else{
-        const p=wallPoint(e,.105,1.29),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
+        const p=wallPoint(e,.105,1.95),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
         anomaly.userData.exit=true;
         this.lightSources.push({position:p.position.clone(),color:0xffeaa0,baseIntensity:.65,intensity:.65,distance:5,decay:2});
         this.exit.position=p.position.clone();
@@ -822,8 +822,13 @@ class AdaptiveQuality{
   apply(){
     const l=this.limits();
     const ratio=Math.min(devicePixelRatio,l.pixel,this.maxSafePixelRatio());
+    const canvas=this.game.renderer.domElement;
+    const width=Math.max(1,canvas.clientWidth||innerWidth);
+    const height=Math.max(1,canvas.clientHeight||innerHeight);
     this.game.renderer.setPixelRatio(ratio);
-    this.game.renderer.setSize(innerWidth,innerHeight,false);
+    this.game.renderer.setSize(width,height,false);
+    this.game.composer?.setPixelRatio(ratio);
+    this.game.composer?.setSize(width,height);
     this.game.world.radius=l.radius;
   }
   update(dt){
@@ -831,9 +836,15 @@ class AdaptiveQuality{
     this.samples.push(dt*1000);if(this.samples.length>45)this.samples.shift();this.cool-=dt;if(this.cool>0)return;
     const avg=this.samples.reduce((a,b)=>a+b,0)/this.samples.length;
     const safe=this.maxSafePixelRatio();
-    if(avg>28)this.game.renderer.setPixelRatio(Math.max(.5,this.game.renderer.getPixelRatio()*.9));
+    if(avg>28)this.game.renderer.setPixelRatio(Math.max(1,this.game.renderer.getPixelRatio()*.9));
     else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.0,safe,this.game.renderer.getPixelRatio()*1.025));
-    this.game.renderer.setSize(innerWidth,innerHeight,false);
+    const ratio=this.game.renderer.getPixelRatio();
+    const canvas=this.game.renderer.domElement;
+    const width=Math.max(1,canvas.clientWidth||innerWidth);
+    const height=Math.max(1,canvas.clientHeight||innerHeight);
+    this.game.renderer.setSize(width,height,false);
+    this.game.composer?.setPixelRatio(ratio);
+    this.game.composer?.setSize(width,height);
     this.cool=2;
   }
   set(mode){this.mode=mode;localStorage.setItem("br.quality",mode);this.apply()}
