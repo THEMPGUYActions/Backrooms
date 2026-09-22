@@ -1366,17 +1366,18 @@ export class BackroomsGame{
       return style.visibility!=="hidden"&&Number.parseFloat(style.opacity||"0")>.5;
     };
     const handleAudioGesture=event=>{
-      if(!isAudioPageVisible())return;
+      if(!isAudioPageVisible()||this.audioGateBusy)return;
       event.preventDefault();
       event.stopPropagation();
       begin(event);
     };
-    boot?.addEventListener("pointerdown",handleAudioGesture,{passive:false});
-    boot?.addEventListener("touchstart",handleAudioGesture,{passive:false});
-    boot?.addEventListener("click",event=>{
-      if(isAudioPageVisible()&&event.detail===0)handleAudioGesture(event);
-    });
+    boot?.addEventListener("pointerdown",handleAudioGesture,{passive:false,capture:true});
+    boot?.addEventListener("touchend",handleAudioGesture,{passive:false,capture:true});
+    boot?.addEventListener("click",handleAudioGesture,{capture:true});
     const gate=$("audio-gate");
+    gate?.addEventListener("pointerdown",handleAudioGesture,{passive:false});
+    gate?.addEventListener("touchend",handleAudioGesture,{passive:false});
+    gate?.addEventListener("click",handleAudioGesture);
     gate?.addEventListener("keydown",event=>{
       if(event.key==="Enter"||event.key===" "){
         event.preventDefault();
