@@ -1,0 +1,11 @@
+{
+  "name": "thempguy-backrooms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/quality.mjs",
+    "build:check": "npm run check && npm run build"
+  }
+}
