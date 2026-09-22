@@ -11,8 +11,7 @@ export const SPACEPOTATO_LEVEL1_SOURCES = Object.freeze({
   crateColor: LOCAL_SPB_ASSET_BASE + "pbr/crate/crate_color.png",
   fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png",
   wallTrim: LOCAL_SPB_ASSET_BASE + "wall_trim_texture.png",
-  stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png",
-  shelf: LOCAL_SPB_ASSET_BASE + "
+  stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png"
 });
 
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
