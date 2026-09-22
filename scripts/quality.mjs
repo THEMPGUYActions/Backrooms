@@ -12,6 +12,17 @@ const THREE_CORE = "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.modul
 const THREE_ADDONS = "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/";
 const OPEN_GAME_ART_PACK = "https://opengameart.org/sites/default/files/oga-textures/175228/";
 const OPEN_GAME_ART_SOURCE = "https://opengameart.org/content/backrooms-pbr-texture-pack";
+const SPB_SOURCE_REPO = "https://github.com/SpacePotatoee/MinecraftFoundFootage";
+const SPB_SOURCE_COMMIT = "0c46c8301fc512c318ac93e23b669355b7d4b180";
+const SPB_ASSET_FILES = [
+  "pbr/concrete/concrete_color.png",
+  "pbr/concrete/concrete_normal.png",
+  "pbr/bricks/bricks_color.png",
+  "pbr/crate/crate_color.png",
+  "fluorescent_light.png",
+  "wall_trim_texture.png",
+  "newstairs_texture.png"
+];
 const PBR_ASSET_FILES = [
   "wallpaper_color.png",
   "wallpaper_rough.png",
@@ -273,6 +284,31 @@ async function checkAssetSources() {
     fail("dist PBR manifest invalid or missing: " + e.message);
   }
 }
+async function checkSpacePotatoAssets(){
+  const manifestPath=join(root,"dist/assets/spb-ff/manifest.json");
+  try{
+    const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
+    if(manifest.source!==SPB_SOURCE_REPO)fail("SpacePotato asset manifest source mismatch");
+    if(manifest.commit!==SPB_SOURCE_COMMIT)fail("SpacePotato asset manifest commit mismatch");
+    for(const filename of SPB_ASSET_FILES){
+      const entry=manifest.files?.[filename];
+      if(!entry){
+        fail("SpacePotato asset manifest missing: "+filename);
+        continue;
+      }
+      if(entry.commit!==SPB_SOURCE_COMMIT||entry.source!==SPB_SOURCE_REPO)fail("SpacePotato asset metadata mismatch: "+filename);
+      if(!Number.isInteger(entry.bytes)||entry.bytes<=0||!/^[a-f0-9]{64}$/.test(entry.sha256||""))fail("SpacePotato asset checksum metadata invalid: "+filename);
+      const assetPath=join(root,"dist/assets/spb-ff",filename);
+      try{
+        const data=await readFile(assetPath);
+        const sha256=createHash("sha256").update(data).digest("hex");
+        if(data.length!==entry.bytes||sha256!==entry.sha256)fail("SpacePotato asset checksum mismatch: "+filename);
+        if(data.length<8||!data.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])))fail("SpacePotato asset is not a PNG: "+filename);
+      }catch{fail("SpacePotato asset missing: "+filename)}
+    }
+  }catch(e){fail("SpacePotato asset manifest invalid or missing: "+e.message)}
+}
+
 async function checkAudioAssets(){
   let lock;
   try{lock=JSON.parse(await readFile(join(root,"data/audio-assets-lock.json"),"utf8"))}catch(e){fail("data/audio-assets-lock.json is missing or invalid: "+e.message);return}
@@ -388,6 +424,7 @@ await checkModuleGraph(jsFiles, imports);
 await checkData();
 await checkBuildIfPresent();
 await checkAssetSources();
+await checkSpacePotatoAssets();
 await checkAudioAssets();
 await checkWorkflow();
 
