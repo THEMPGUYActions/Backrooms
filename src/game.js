@@ -1046,14 +1046,21 @@ class WorldStreamer{
     }
     return best<90?1-best/90:0;
   }
-  nearbyLightSources(x,z){
+  nearbyLightSources(x,z,frustum,camera){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d<200)out.push({light,d});
+        if(d>180)continue;
+        // Point lights are omnidirectional, so Three.js does not treat them as
+        // camera-visible objects for our local-light pool. Explicitly cull them
+        // against the camera frustum so lights behind/outside the FOV are removed
+        // from the active GPU light slots instead of illuminating the scene.
+        const inFov=frustum?frustum.containsPoint(light.position):true;
+        if(!inFov)continue;
+        out.push({light,d});
       }
     }
     out.sort((a,b)=>a.d-b.d);
@@ -1549,7 +1556,12 @@ export class BackroomsGame{
   }
 
   updateLocalLights(){
-    const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z);
+    this.camera.updateMatrixWorld();
+    const lightFrustum=this._lightFrustum||(this._lightFrustum=new THREE.Frustum());
+    const frustumMatrix=this._lightFrustumMatrix||(this._lightFrustumMatrix=new THREE.Matrix4());
+    frustumMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse);
+    lightFrustum.setFromProjectionMatrix(frustumMatrix);
+    const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z,lightFrustum,this.camera);
     for(let i=0;i<this.localLights.length;i++){
       const target=this.localLights[i],entry=sources[i];
       if(!entry){
