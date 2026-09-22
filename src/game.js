@@ -673,7 +673,7 @@ class WorldStreamer{
         const d=Math.hypot(light.position.x-x,light.position.z-z);if(d<best)best=d;
       }
     }
-    return best<45?1-best/45:0;
+    return best<90?1-best/90:0;
   }
   nearbyLightSources(x,z){
     const out=[];
@@ -683,7 +683,7 @@ class WorldStreamer{
       if(!c.group.visible&&Math.hypot(c.bounds.center.x-x,c.bounds.center.z-z)>60)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d<45)out.push({light,d});
+        if(d<110)out.push({light,d});
       }
     }
     out.sort((a,b)=>a.d-b.d);
@@ -848,7 +848,7 @@ export class BackroomsGame{
     this.scene.background=new THREE.Color(0x000000);
     this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
     const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
-    this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"mediump"});
+    this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"highp"});
     this.renderer.setPixelRatio(1);this.renderer.setSize(Math.max(1,innerWidth),Math.max(1,innerHeight),false);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -968,7 +968,7 @@ export class BackroomsGame{
   die(copy){this.lightState="BLACKOUT";this.dead=true;this.paused=true;this.running=false;this.triggerFear(1);document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
   togglePause(force){
     if(!this.running||this.dead)return;this.paused=force!==undefined?force:!this.paused;document.getElementById("pause").classList.toggle("hidden",!this.paused);
-    if(this.paused)document.exitPointerLock?.();else{this.audio.resume();this.renderer.domElement.requestPointerLock?.()}
+    if(this.paused)document.exitPointerLock?.();else{this.audio.resume();const lock=this.renderer.domElement.requestPointerLock?.();lock?.catch(()=>{})}
   }
   toggleFlashlight(){this.player.flashlight=!this.player.flashlight;this.audio.click();this.toast(this.player.flashlight?"Flashlight on":"Flashlight off",.9)}
   isDark(){if(this.level.id==="2")return true;if(this.lightState==="BLACKOUT")return true;return !this.player.flashlight}
