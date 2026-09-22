@@ -598,6 +598,17 @@ class Chunk{
       return fixture;
     };
 
+    if(this.cx===0&&this.cz===0){
+      const sx=2.8,sz=7.2,stepW=3.2,stepD=.48,stepH=.17;
+      for(let i=0;i<7;i++){
+        box(g,new THREE.BoxGeometry(stepW,stepH*(i+1),stepD),lib.stairs,sx,stepH*(i+.5),sz-i*stepD);
+      }
+      for(const side of [-1,1]){
+        const rail=box(g,new THREE.BoxGeometry(.07,1.3,3.6),lib.metal,sx+side*1.82,.67,sz-1.45,0,0,side*.02);
+        rail.rotation.x=side*.035;
+      }
+    }
+
     if(this.zone==="halls"){
       for(let i=0;i<3+rng.int(2,7);i++){
         const p=randomCell();
@@ -617,6 +628,15 @@ class Chunk{
         const p=randomCell();
         const puddle=box(g,new THREE.CircleGeometry(.75+rng.next()*1.6,18),lib.water,p.x,.016,p.z,-Math.PI/2);
         puddle.scale.y=.45+rng.next()*.60;
+      }
+
+      if(rng.next()<.82){
+        const beamY=level.wallHeight-.17;
+        for(let i=0;i<3;i++){
+          const beam=box(g,new THREE.BoxGeometry(size*.88,.12,.16),lib.metal,
+            this.originX+size*.5,beamY+i*.16,this.originZ+size*(.27+i*.23),0,0,0);
+          beam.rotation.y=rng.next()<.5?0:Math.PI/2;
+        }
       }
 
       if(rng.next()<.70){
@@ -1311,7 +1331,7 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
-    this.scene.fog=new THREE.FogExp2(0x000000,this.level.id==="0"?.027:this.level.id==="1"?.043:.058);
+    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x676a64:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.028:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
@@ -1370,7 +1390,7 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      this.lightEventTimer=this.level.id==="1"?2.8+Math.random()*8.5:1.3+Math.random()*2.5;
+      this.lightEventTimer=this.level.id==="1"?16+Math.random()*24:1.3+Math.random()*2.5;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
