@@ -24,6 +24,7 @@ game.mount().then(async()=>{
   try{
     const {BackroomsAdmin}=await import("./admin.js");
     window.backroomsAdmin=new BackroomsAdmin(game);
+    window.backroomsAdmin.activate();
   }catch(error){
     console.warn("[Backrooms] Admin module unavailable:",error);
   }
