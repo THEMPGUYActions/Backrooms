@@ -1,6 +1,6 @@
 # The Backrooms
 
-A production-minded browser Backrooms game by THEMPGUY.
+A browser Backrooms game by THEMPGUY.
 
 The game is static-host friendly: the playable build is HTML, CSS and JavaScript and can be published directly to GitHub Pages or another static host.
 
