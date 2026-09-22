@@ -89,7 +89,8 @@ class Chunk{
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
     box(g,new THREE.BoxGeometry(size,.09,size),lib.floor,0,-.045,0);
     box(g,new THREE.BoxGeometry(size,.1,size),lib.ceiling,0,level.wallHeight+.05,0);
-    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.11),vGeom=new THREE.BoxGeometry(.11,level.wallHeight,cell);\n    const baseHGeom=new THREE.BoxGeometry(cell,.16,.14),baseVGeom=new THREE.BoxGeometry(.14,.16,cell);
+    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.11),vGeom=new THREE.BoxGeometry(.11,level.wallHeight,cell);
+    const baseHGeom=new THREE.BoxGeometry(cell,.16,.14),baseVGeom=new THREE.BoxGeometry(.14,.16,cell);
     const hData=[],vData=[],baseHData=[],baseVData=[],rngBase=new RNG(this.seedKey());
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     for(let z=0;z<CELLS;z++)for(let x=0;x<CELLS;x++){
@@ -97,7 +98,11 @@ class Chunk{
       if(mask&1)pushMat(hData,px,level.wallHeight/2,pz-cell/2);
       if(mask&4)pushMat(hData,px,level.wallHeight/2,pz+cell/2);
       if(mask&8)pushMat(vData,px-cell/2,level.wallHeight/2,pz);
-      if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);\n      if(mask&1)pushMat(baseHData,px,.10,pz-cell/2);\n      if(mask&4)pushMat(baseHData,px,.10,pz+cell/2);\n      if(mask&8)pushMat(baseVData,px-cell/2,.10,pz);\n      if(mask&2)pushMat(baseVData,px+cell/2,.10,pz);
+      if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);
+      if(mask&1)pushMat(baseHData,px,.10,pz-cell/2);
+      if(mask&4)pushMat(baseHData,px,.10,pz+cell/2);
+      if(mask&8)pushMat(baseVData,px-cell/2,.10,pz);
+      if(mask&2)pushMat(baseVData,px+cell/2,.10,pz);
       const fixtureChance=level.id==="0"?.43:.24;
       if(rngBase.next()<fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
@@ -121,7 +126,11 @@ class Chunk{
         cable.rotation.z=Math.PI/2;cable.position.set(px,level.wallHeight-.42,pz);g.add(cable);
       }
     }
-    const bhm=new THREE.InstancedMesh(baseHGeom,lib.baseboard,Math.max(1,baseHData.length));\n    baseHData.forEach((m,i)=>bhm.setMatrixAt(i,m));bhm.count=baseHData.length;bhm.frustumCulled=false;g.add(bhm);\n    const bvm=new THREE.InstancedMesh(baseVGeom,lib.baseboard,Math.max(1,baseVData.length));\n    baseVData.forEach((m,i)=>bvm.setMatrixAt(i,m));bvm.count=baseVData.length;bvm.frustumCulled=false;g.add(bvm);\n    const hm=new THREE.InstancedMesh(hGeom,lib.wall,Math.max(1,hData.length));hm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    const bhm=new THREE.InstancedMesh(baseHGeom,lib.baseboard,Math.max(1,baseHData.length));
+    baseHData.forEach((m,i)=>bhm.setMatrixAt(i,m));bhm.count=baseHData.length;bhm.frustumCulled=false;g.add(bhm);
+    const bvm=new THREE.InstancedMesh(baseVGeom,lib.baseboard,Math.max(1,baseVData.length));
+    baseVData.forEach((m,i)=>bvm.setMatrixAt(i,m));bvm.count=baseVData.length;bvm.frustumCulled=false;g.add(bvm);
+    const hm=new THREE.InstancedMesh(hGeom,lib.wall,Math.max(1,hData.length));hm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     hData.forEach((m,i)=>hm.setMatrixAt(i,m));hm.count=hData.length;hm.frustumCulled=true;g.add(hm);
     const vm=new THREE.InstancedMesh(vGeom,lib.wall,Math.max(1,vData.length));vm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     vData.forEach((m,i)=>vm.setMatrixAt(i,m));vm.count=vData.length;vm.frustumCulled=true;g.add(vm);
