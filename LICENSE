@@ -1,24 +1,79 @@
-This is free and unencumbered software released into the public domain.
+THEMPGUY NON-COMMERCIAL LICENSE
+Version 1.0
 
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
+Copyright (c) 2026 THEMPGUY
 
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, distribute, and sublicense copies of the
+Software, subject to the following conditions:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+1. NON-COMMERCIAL USE
 
-For more information, please refer to <https://unlicense.org>
+The Software may only be used for non-commercial purposes.
+
+You may not use the Software, or any modified or unmodified version of it,
+for the purpose of generating revenue, profit, donations, subscriptions,
+payments, sponsorships, or other financial benefit without explicit written
+permission from THEMPGUY.
+
+2. ADVERTISING PROHIBITED
+
+You may not place, display, embed, serve, distribute, or otherwise include
+advertisements, sponsored content, promotional content, affiliate links,
+paid promotions, or similar monetized material within or alongside a website,
+application, service, or other deployment using the Software.
+
+This restriction applies even if the Software itself is provided free of
+charge.
+
+3. COPYING AND REDISTRIBUTION
+
+You are permitted to clone, fork, copy, modify, and redistribute the Software,
+provided that:
+
+- This license remains included with the Software.
+- The original copyright notice is retained.
+- You do not remove or obscure attribution to THEMPGUY.
+- Your use complies with all restrictions in this license.
+
+4. MODIFICATIONS
+
+You may modify the Software and publish your modifications for non-commercial
+purposes.
+
+Modified versions must retain this license and the original copyright notice.
+
+5. COMMERCIAL PERMISSION
+
+Commercial use, advertising, monetization, or other prohibited use may be
+permitted only with explicit written permission from THEMPGUY.
+
+Permission for one project or deployment does not automatically grant
+permission for any other project or deployment.
+
+6. NO TRADEMARK RIGHTS
+
+This license does not grant permission to use the name, logos, trademarks,
+branding, domain names, or other identifying marks of THEMPGUY except where
+such use is necessary to identify the original Software or is otherwise
+authorized.
+
+7. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+8. ACCEPTANCE
+
+By using, copying, modifying, or redistributing the Software, you agree to
+the terms of this license.
+
+This license is a source-available license and is not an OSI-approved Open
+Source license.
