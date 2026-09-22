@@ -1420,8 +1420,17 @@ export class BackroomsGame{
     this.vhsPass.uniforms.tracking.value=.28;
     this.vhsPass.uniforms.fear.value=0;
     document.getElementById("hud")?.classList.remove("hidden");
-    document.getElementById("mobile-controls")?.classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
-    document.getElementById("boot")?.classList.add("fade-out");
+    const mobileControls=document.getElementById("mobile-controls");
+    const touchDevice=navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches||innerWidth<=900;
+    mobileControls?.classList.toggle("hidden",!touchDevice);
+    mobileControls?.setAttribute("aria-hidden",touchDevice?"false":"true");
+    const boot=document.getElementById("boot");
+    const audioPage=document.querySelector(".intro-audio-page");
+    if(audioPage)audioPage.style.pointerEvents="none";
+    if(boot){
+      boot.style.pointerEvents="none";
+      boot.classList.add("fade-out");
+    }
     this.toast(this.level.objective,3);
   }
 
