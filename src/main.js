@@ -27,9 +27,9 @@ game.mount().then(async()=>{
     window.backroomsAdmin=new BackroomsAdmin(game);
     window.backroomsAdmin.activate();
   }catch(error){
-  /* DEV_ADMIN_END */
     console.warn("[Backrooms] Admin module unavailable:",error);
   }
+  /* DEV_ADMIN_END */
 });
 
 window.backrooms=game;
