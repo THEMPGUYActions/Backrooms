@@ -1,4 +1,4 @@
-name: Build, QA and GitHub Pages
+name: QA and Pages
 
 on:
   push:
@@ -6,21 +6,21 @@ on:
       - main
       - dev
   pull_request:
+    branches:
+      - main
+      - dev
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  group: backrooms-pages
+  cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Validate source
+  qa:
+    name: QA and static build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -33,46 +33,32 @@ jobs:
       - name: Quality checks
         run: npm run check
 
-      - name: Build static site
+      - name: Build
         run: npm run build
 
-      - name: Check build output
+      - name: Verify build
         run: |
-          test -f dist/index.html
-          test -f dist/src/main.js
-          test -f dist/styles.css
+          test -s dist/index.html
+          test -s dist/src/main.js
+          test -s dist/styles.css
           test -f dist/.nojekyll
 
-  preview:
-    name: Dev build artifact
-    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Build static site
-        run: npm run build
-
-      - name: Upload dev/CI site artifact
+      - name: Upload CI build
+        if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: backrooms-site-${{ github.ref_name }}-${{ github.sha }}
+          name: backrooms-preview-${{ github.event.pull_request.number || github.run_number }}
           path: dist
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
 
-  pages-build:
-    name: Production Pages artifact
+  deploy-production:
+    name: Publish production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: validate
+    needs: qa
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -82,26 +68,43 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build static site
+      - name: Build production
         run: npm run build
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+      - name: Publish main to Pages root
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: dist
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          keep_files: true
+          force_orphan: false
+          full_commit_message: "deploy: production ${{ github.sha }}"
 
-  pages-deploy:
-    name: Deploy production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: pages-build
+  deploy-dev:
+    name: Publish development
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: qa
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: write
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build development
+        run: npm run build
+
+      - name: Publish dev to /dev/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          destination_dir: dev
+          full_commit_message: "deploy: dev ${{ github.sha }}"
