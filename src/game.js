@@ -242,8 +242,16 @@ class Chunk{
     }
 
     const addInstanced=(geometry,material,data)=>{
-      const mesh=new THREE.InstancedMesh(geometry,material,Math.max(1,data.length));
-      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.count=data.length;mesh.frustumCulled=true;g.add(mesh);
+      if(!data.length)return;
+      const mesh=new THREE.InstancedMesh(geometry,material,data.length);
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      data.forEach((m,i)=>mesh.setMatrixAt(i,m));
+      mesh.instanceMatrix.needsUpdate=true;
+      mesh.count=data.length;
+      mesh.frustumCulled=true;
+      mesh.computeBoundingBox();
+      mesh.computeBoundingSphere();
+      g.add(mesh);
     };
     addInstanced(hGeom,lib.wall,hData);addInstanced(vGeom,lib.wall,vData);
     addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);
@@ -255,8 +263,16 @@ class Chunk{
         const cx=.75+rngBase.next()*(cells-1.5),cz=.75+rngBase.next()*(cells-1.5);
         columnData.push(new THREE.Matrix4().makeTranslation(this.originX+cx*cell,level.wallHeight/2,this.originZ+cz*cell));
       }
-      const columns=new THREE.InstancedMesh(columnGeom,lib.wall,columnData.length);
-      columns.instanceMatrix.setUsage(THREE.StaticDrawUsage);columnData.forEach((m,i)=>columns.setMatrixAt(i,m));columns.frustumCulled=true;g.add(columns);
+      if(columnData.length){
+        const columns=new THREE.InstancedMesh(columnGeom,lib.wall,columnData.length);
+        columns.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        columnData.forEach((m,i)=>columns.setMatrixAt(i,m));
+        columns.instanceMatrix.needsUpdate=true;
+        columns.computeBoundingBox();
+        columns.computeBoundingSphere();
+        columns.frustumCulled=true;
+        g.add(columns);
+      }
     }
 
     for(const hz of this.hazards){
@@ -871,18 +887,20 @@ export class BackroomsGame{
   render(){this.syncRendererViewport();this.renderer.render(this.scene,this.camera)}
   loop(now){const raw=(now-this.last)/1000;this.last=now;const dt=Math.min(MAX_DT,raw);if(this.running&&!this.paused)this.update(dt);this.render();requestAnimationFrame(this.loop.bind(this))}
   syncRendererViewport(){
-    const size=this.renderer.getDrawingBufferSize(new THREE.Vector2());
-    const ratio=Math.max(.0001,this.renderer.getPixelRatio());
-    this.renderer.setViewport(0,0,size.x/ratio,size.y/ratio);
-    this.renderer.setScissor(0,0,size.x/ratio,size.y/ratio);
+    const canvas=this.renderer.domElement;
+    const cssWidth=Math.max(1,canvas.clientWidth||innerWidth);
+    const cssHeight=Math.max(1,canvas.clientHeight||innerHeight);
+    this.renderer.setViewport(0,0,cssWidth,cssHeight);
+    this.renderer.setScissor(0,0,cssWidth,cssHeight);
     this.renderer.setScissorTest(false);
   }
   resize(){
-    const ratio=Math.min(this.renderer.getPixelRatio(),this.quality.maxSafePixelRatio());
-    this.renderer.setPixelRatio(ratio);
-    this.renderer.setSize(innerWidth,innerHeight,false);
+    const width=Math.max(1,this.renderer.domElement.clientWidth||innerWidth);
+    const height=Math.max(1,this.renderer.domElement.clientHeight||innerHeight);
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(width,height,false);
     this.syncRendererViewport();
-    this.camera.aspect=innerWidth/innerHeight;
+    this.camera.aspect=width/height;
     this.camera.updateProjectionMatrix();
   }
 }
