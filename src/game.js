@@ -658,19 +658,31 @@ class EntityManager{
 
 class AdaptiveQuality{
   constructor(game){this.game=game;this.mode=localStorage.getItem("br.quality")||"auto";this.samples=[];this.cool=0}
+  maxSafePixelRatio(){
+    const width=Math.max(1,innerWidth),height=Math.max(1,innerHeight);
+    return Math.max(.5,Math.min(1.15,this.game.renderer.capabilities.maxTextureSize/Math.max(width,height)));
+  }
   limits(){
     if(this.mode==="low")return{pixel:.7,radius:2};
     if(this.mode==="medium")return{pixel:.9,radius:2};
     if(this.mode==="high")return{pixel:1.15,radius:2};
     return{pixel:Math.min(devicePixelRatio,1.05),radius:2};
   }
-  apply(){const l=this.limits();this.game.renderer.setPixelRatio(Math.min(devicePixelRatio,l.pixel));this.game.world.radius=l.radius}
+  apply(){
+    const l=this.limits();
+    const ratio=Math.min(devicePixelRatio,l.pixel,this.maxSafePixelRatio());
+    this.game.renderer.setPixelRatio(ratio);
+    this.game.renderer.setSize(innerWidth,innerHeight,false);
+    this.game.world.radius=l.radius;
+  }
   update(dt){
     if(this.mode!=="auto")return;
     this.samples.push(dt*1000);if(this.samples.length>45)this.samples.shift();this.cool-=dt;if(this.cool>0)return;
     const avg=this.samples.reduce((a,b)=>a+b,0)/this.samples.length;
-    if(avg>28)this.game.renderer.setPixelRatio(Math.max(.72,this.game.renderer.getPixelRatio()*.9));
-    else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.05,this.game.renderer.getPixelRatio()*1.025));
+    const safe=this.maxSafePixelRatio();
+    if(avg>28)this.game.renderer.setPixelRatio(Math.max(.5,this.game.renderer.getPixelRatio()*.9));
+    else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.05,safe,this.game.renderer.getPixelRatio()*1.025));
+    this.game.renderer.setSize(innerWidth,innerHeight,false);
     this.cool=2;
   }
   set(mode){this.mode=mode;localStorage.setItem("br.quality",mode);this.apply()}
@@ -852,5 +864,11 @@ export class BackroomsGame{
 
   render(){this.renderer.render(this.scene,this.camera)}
   loop(now){const raw=(now-this.last)/1000;this.last=now;const dt=Math.min(MAX_DT,raw);if(this.running&&!this.paused)this.update(dt);this.render();requestAnimationFrame(this.loop.bind(this))}
-  resize(){this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.renderer.setSize(innerWidth,innerHeight)}
+  resize(){
+    const ratio=Math.min(this.renderer.getPixelRatio(),this.quality.maxSafePixelRatio());
+    this.renderer.setPixelRatio(ratio);
+    this.renderer.setSize(innerWidth,innerHeight,false);
+    this.camera.aspect=innerWidth/innerHeight;
+    this.camera.updateProjectionMatrix();
+  }
 }
