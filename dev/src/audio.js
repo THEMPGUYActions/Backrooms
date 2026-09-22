@@ -151,19 +151,14 @@ export class AudioDirector{
     setTimeout(()=>this.tone(72,.08,"square",.018),310+Math.random()*110);
     if(Math.random()<.16)this.playBuffer("ambient_horror",{gain:.018,rate:.68,pan,send:.6,delay:.35});
   }
-  update(dt,moving,running,fear=0,proximity=0,lightState="ON"){
+  update(dt,moving,running,fear=0,proximity=0,lightState="ON",distance=0){
     if(!this.ready)return;
     if(moving){
-      this.stepDistance+=dt;
-      const movedStep=running?1.08:.76;
-      const distancePerSecond=running?4.75:2.85;
-      this.stepDistance+=distancePerSecond*dt-this.stepDistance;
-    }
-    if(moving){
+      this.stepDistance+=Math.max(0,distance);
       const cadence=running?1.03:.71;
-      this.stepDistance+=(distancePerSecondFallback(running,dt));
-      if(this.stepDistance>=cadence){
-        this.stepDistance-=cadence;this.step(running?1:.78);
+      while(this.stepDistance>=cadence){
+        this.stepDistance-=cadence;
+        this.step(running?1:.78);
       }
     }else{
       this.stepDistance=Math.min(this.stepDistance,.45);
@@ -171,7 +166,8 @@ export class AudioDirector{
 
     this.ambientTimer-=dt;this.buzzTimer-=dt;
     if(this.ambientTimer<=0){
-      this.ambientSting(.035+Math.random()*.045);this.ambientTimer=38+Math.random()*58;
+      this.ambientSting(.035+Math.random()*.045);
+      this.ambientTimer=38+Math.random()*58;
     }
     if(this.buzzTimer<=0&&lightState==="ON"){
       this.playBuffer("electric_buzz",{gain:.026,rate:.92+Math.random()*.12,pan:(Math.random()-.5)*.6,send:.42,delay:.13});
@@ -184,8 +180,4 @@ export class AudioDirector{
     if(lightState==="BLACKOUT")target=.0008;
     if(this.humGain)this.humGain.gain.setTargetAtTime(target,this.ctx.currentTime,.11);
   }
-}
-
-function distancePerSecondFallback(running,dt){
-  return (running?4.75:2.85)*dt;
 }
