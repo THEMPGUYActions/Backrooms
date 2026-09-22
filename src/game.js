@@ -1355,7 +1355,7 @@ export class BackroomsGame{
       else this.pendingStart=true;
     };
 
-    const audioPage=$(".intro-audio-page");
+    const audioPage=document.querySelector(".intro-audio-page");
     audioPage?.addEventListener("pointerdown",event=>{
       event.preventDefault();
       begin(event);
