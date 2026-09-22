@@ -1566,6 +1566,7 @@ export class BackroomsGame{
       const target=this.localLights[i],entry=sources[i];
       if(!entry){
         target.intensity=0;
+        target.visible=false;
         continue;
       }
       const source=entry.light;

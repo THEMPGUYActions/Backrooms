@@ -1382,6 +1382,14 @@ body::after{
 }
 
 
+/* Mobile touch hitboxes: the look surface must not cover the buttons. */
+@media (pointer:coarse),(hover:none),(max-width:720px){
+  #mobile-controls .look-zone{z-index:1}
+  #mobile-controls .touch-zone,
+  #mobile-controls .touch-button{z-index:2}
+  #mobile-controls .touch-button{pointer-events:auto}
+}
+
 /* Cross-browser mobile and intro presentation */
 html{
   min-height:100%;
