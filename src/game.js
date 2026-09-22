@@ -100,15 +100,26 @@ class Chunk{
       if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);
       const fixtureChance=level.id==="0"?.43:.24;
       if(rngBase.next()<fixtureChance){
-        const fixture=box(g,new THREE.BoxGeometry(1.35,.07,.18),lib.light,px,level.wallHeight-.05,pz);
+        const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
+        const fixture=box(g,new THREE.BoxGeometry(1.35,.07,.18),fixtureMat,px,level.wallHeight-.05,pz);
         fixture.userData.light=true;this.fixtures.push(fixture);
         if(((x*13+z*7)%61===0)||level.id==="2"&&((x+z)%29===0)){
-          const l=new THREE.PointLight(level.theme.light,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
+          const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
+          const l=new THREE.PointLight(lightColor,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
           l.position.set(px,level.wallHeight-.2,pz);g.add(l);this.fixtures.push(l);
         }
       }
       const propRng=new RNG(this.seedKey()^Math.imul(x,92821)^Math.imul(z,31337));
       makePropSet(g,level,lib,()=>propRng.next(),px,pz);
+      if(level.id==="1"&&propRng.next()<.055){
+        const puddle=new THREE.Mesh(new THREE.CircleGeometry(cell*(.18+propRng.next()*.2),18),lib.water);
+        puddle.rotation.x=-Math.PI/2;puddle.scale.y=.55;
+        puddle.position.set(px+(propRng.next()-.5)*cell*.65,.012,pz+(propRng.next()-.5)*cell*.65);g.add(puddle);
+      }
+      if(level.id==="2"&&propRng.next()<.12){
+        const cable=new THREE.Mesh(new THREE.CylinderGeometry(.026,.026,cell*(.75+propRng.next()*.4),6),lib.cable);
+        cable.rotation.z=Math.PI/2;cable.position.set(px,level.wallHeight-.42,pz);g.add(cable);
+      }
     }
     const hm=new THREE.InstancedMesh(hGeom,lib.wall,Math.max(1,hData.length));hm.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     hData.forEach((m,i)=>hm.setMatrixAt(i,m));hm.count=hData.length;hm.frustumCulled=true;g.add(hm);
