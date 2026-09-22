@@ -37,6 +37,7 @@ export class AudioDirector{
   flicker(){this.playBuffer("electric_buzz",{gain:.22+Math.random()*.12,rate:.86+Math.random()*.24,pan:(Math.random()-.5)*.3,send:.34,delay:.1});this.noise(.09,.024,120);this.tone(38,.18,"sine",.018)}
   pickup(){this.tone(523,.09,"sine",.04);this.tone(659,.12,"sine",.032)}
   scare(){this.playBuffer("ambient_horror",{gain:.24,rate:.9+Math.random()*.18,pan:(Math.random()-.5)*.24,send:.5,delay:.2});this.noise(.45,.09,250);this.tone(43,.5,"sawtooth",.06);this.tone(89,.28,"triangle",.03)}
+  lightsOut(){this.playBuffer("electric_buzz",{gain:.34,rate:.72+Math.random()*.12,pan:(Math.random()-.5)*.2,send:.55,delay:.18});this.noise(.22,.08,150);this.tone(38,.7,"sine",.055)}
   ambientSting(gain=.1){this.playBuffer("ambient_horror",{gain,rate:.92+Math.random()*.12,pan:(Math.random()-.5)*.5,send:.52,delay:.18})}
   hurt(){this.noise(.16,.07,380);this.tone(71,.12,"square",.035)}
   exit(){this.tone(392,.12,"sine",.05);setTimeout(()=>this.tone(523,.16,"sine",.045),90);setTimeout(()=>this.tone(659,.22,"sine",.04),190)}
