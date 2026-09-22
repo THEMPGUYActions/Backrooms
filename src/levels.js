@@ -13,13 +13,13 @@ export const LEVELS = {
       ceiling: 0xe8e5dc,
       fog: 0x000000,
       accent: 0xffe992,
-      light: 0xffd34d,
-      ambient: 0x17130a
+      light: 0xffcf42,
+      ambient: 0x100e08
     },
     gridSize: 5,
     cellSize: 16,
-    wallHeight: 2.95,
-    darkness: 0.11,
+    wallHeight: 5.2,
+    darkness: 0.075,
     holeChance: 0.010,
     pipeChance: 0,
     entity: "skinwalker",
