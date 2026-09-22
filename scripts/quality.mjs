@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, join, posix, resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -208,38 +209,62 @@ async function checkModuleGraph(jsFiles, imports) {
 async function checkAssetSources() {
   const assetsSource = await readFile(join(root, "src/assets.js"), "utf8");
   const buildSource = await readFile(join(root, "scripts/build.mjs"), "utf8");
+  let lock;
+
+  try {
+    lock = JSON.parse(await readFile(join(root, "data/pbr-assets-lock.json"), "utf8"));
+  } catch (e) {
+    fail("data/pbr-assets-lock.json is missing or invalid: " + e.message);
+    return;
+  }
 
   if (!assetsSource.includes('new URL("../assets/pbr/", import.meta.url).href')) {
     fail("src/assets.js must use the locally bundled /assets/pbr runtime path");
   }
-  if (!buildSource.includes('const OPEN_GAME_ART_PACK = "' + OPEN_GAME_ART_PACK + '";')) {
-    fail("scripts/build.mjs must pin the OpenGameArt PBR pack base URL");
+  if (!buildSource.includes('const LOCK_PATH = join(root, "data", "pbr-assets-lock.json");')) {
+    fail("scripts/build.mjs must consume the PBR asset lock");
   }
+  if (lock.source !== "https://opengameart.org/content/backrooms-pbr-texture-pack") fail("PBR lock source is unexpected");
+  if (lock.license !== "CC0") fail("PBR lock license must be CC0");
+  if (lock.author !== "methodical pixel") fail("PBR lock author must be methodical pixel");
 
+  const lockedFiles = Object.keys(lock.files || {});
+  if (lockedFiles.length !== 12) fail("PBR asset lock must contain exactly 12 maps");
   for (const filename of PBR_ASSET_FILES) {
+    if (!lockedFiles.includes(filename)) fail("PBR lock missing map: " + filename);
     if (!assetsSource.includes('"' + filename + '"')) fail("src/assets.js missing local PBR map filename: " + filename);
-    if (!buildSource.includes('"' + filename + '"')) fail("scripts/build.mjs missing OpenGameArt map filename: " + filename);
+    if (!buildSource.includes('"' + filename + '"')) fail("scripts/build.mjs missing PBR map filename: " + filename);
   }
 
   const manifestPath = join(root, "dist", "assets", "pbr", "manifest.json");
   try {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-    if (manifest.source !== OPEN_GAME_ART_SOURCE) fail("dist PBR manifest has an unexpected source");
-    if (manifest.license !== "CC0") fail("dist PBR manifest must record CC0");
-    if (manifest.author !== "methodical pixel") fail("dist PBR manifest must record methodical pixel");
+    if (manifest.source !== lock.source) fail("dist PBR manifest source does not match lock");
+    if (manifest.license !== lock.license) fail("dist PBR manifest license does not match lock");
+    if (manifest.author !== lock.author) fail("dist PBR manifest author does not match lock");
 
     for (const filename of PBR_ASSET_FILES) {
+      const expected = lock.files?.[filename];
       const entry = manifest.files?.[filename];
-      if (!entry?.url?.startsWith(OPEN_GAME_ART_PACK)) fail("dist PBR manifest missing source URL: " + filename);
-      if (!Number.isInteger(entry.bytes) || entry.bytes <= 0) fail("dist PBR manifest missing byte count: " + filename);
-      if (!/^[a-f0-9]{64}$/.test(entry.sha256 || "")) fail("dist PBR manifest missing SHA-256: " + filename);
+      if (!expected) continue;
+      if (!entry) {
+        fail("dist PBR manifest missing map: " + filename);
+        continue;
+      }
+      if (entry.url !== expected.url || entry.bytes !== expected.bytes || entry.sha256 !== expected.sha256) {
+        fail("dist PBR manifest does not match locked metadata: " + filename);
+      }
 
       const assetPath = join(root, "dist", "assets", "pbr", filename);
       try {
         const data = await readFile(assetPath);
-        if (data.length !== entry.bytes) fail("dist PBR asset byte count does not match manifest: " + filename);
-        if (data.length < 8 || !data.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) {
+        const sha256 = createHash("sha256").update(data).digest("hex");
+        if (data.length !== expected.bytes) fail("dist PBR asset byte count mismatch: " + filename);
+        if (sha256 !== expected.sha256) fail("dist PBR asset SHA-256 mismatch: " + filename);
+        if (data.length < 24 || !data.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) {
           fail("dist PBR asset is not a PNG: " + filename);
+        } else if (data.readUInt32BE(16) !== 1024 || data.readUInt32BE(20) !== 1024) {
+          fail("dist PBR asset is not 1024x1024: " + filename);
         }
       } catch {
         fail("dist PBR asset missing: " + filename);
