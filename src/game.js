@@ -112,8 +112,9 @@ class Chunk{
       const fixtureChance=level.id==="0" ? (x%2===0&&z%2===0&&rngBase.next()<.92) : rngBase.next()<(level.id==="1"?.18:.12);
       if(fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
+        const fixtureMaterial=fixtureMat.clone();
+        const fixture=box(g,new THREE.BoxGeometry(1.28,.025,.42),fixtureMaterial,px,level.wallHeight-.085,pz);
         box(g,new THREE.BoxGeometry(1.55,.07,.62),lib.metal,px,level.wallHeight-.035,pz);
-        const fixture=box(g,new THREE.BoxGeometry(1.28,.025,.42),fixtureMat,px,level.wallHeight-.085,pz);
         fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
         if(((x/2+z/2)%4===0)||level.id==="2"&&((x+z)%7===0)){
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
@@ -192,6 +193,12 @@ class Chunk{
     this.group.clear();
   }
   update(dt){
+    if(this.game.lightState==="ON"&&this.fixtures.length){
+      for(const fixture of this.fixtures){
+        if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
+        if(fixture.isLight&&fixture.userData.baseIntensity!==undefined)fixture.intensity=fixture.userData.baseIntensity;
+      }
+    }
     if(this.game.lightState!=="ON"&&this.fixtures.length){
       const blackout=this.game.lightState==="BLACKOUT";
       const flicker=Math.sin(this.game.gameTime*88+this.cx*7+this.cz*11)>-.15;
