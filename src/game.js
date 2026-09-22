@@ -87,8 +87,6 @@ class Chunk{
   seedKey(){return (this.cx*73856093)^(this.cz*19349663)^this.game.seed}
   buildGeometry(){
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
-    box(g,new THREE.BoxGeometry(size,.09,size),lib.floor,0,-.045,0);
-    box(g,new THREE.BoxGeometry(size,.1,size),lib.ceiling,0,level.wallHeight+.05,0);
     const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,.11),vGeom=new THREE.BoxGeometry(.11,level.wallHeight,cell);
     const hData=[],vData=[],rngBase=new RNG(this.seedKey());
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
@@ -98,12 +96,12 @@ class Chunk{
       if(mask&4)pushMat(hData,px,level.wallHeight/2,pz+cell/2);
       if(mask&8)pushMat(vData,px-cell/2,level.wallHeight/2,pz);
       if(mask&2)pushMat(vData,px+cell/2,level.wallHeight/2,pz);
-      const fixtureChance=level.id==="0"?.43:.24;
+      const fixtureChance=level.id==="0"?.24:.13;
       if(rngBase.next()<fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
         const fixture=box(g,new THREE.BoxGeometry(1.35,.07,.18),fixtureMat,px,level.wallHeight-.05,pz);
         fixture.userData.light=true;this.fixtures.push(fixture);
-        if(((x*13+z*7)%61===0)||level.id==="2"&&((x+z)%29===0)){
+        if(((x*13+z*7)%127===0)||level.id==="2"&&((x+z)%53===0)){
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
           const l=new THREE.PointLight(lightColor,level.id==="0"?.58:.42,level.id==="2"?9:13,.95);
           l.position.set(px,level.wallHeight-.2,pz);g.add(l);this.fixtures.push(l);
@@ -184,7 +182,7 @@ class Chunk{
 class WorldStreamer{
   constructor(game){
     this.game=game;this.chunks=new Map();this.library=null;this.radius=BASE_RADIUS;this.size=0;
-    this.infiniteCeiling=null;
+    this.surfaceSize=0;this.floorSurface=null;this.ceilingSurface=null;
   }
   key(cx,cz){return cx+","+cz}
   configure(){
@@ -194,29 +192,64 @@ class WorldStreamer{
     }
     this.chunks.clear();
 
-    if(this.infiniteCeiling){
-      this.game.scene.remove(this.infiniteCeiling);
-      this.infiniteCeiling.geometry.dispose();
-      this.infiniteCeiling=null;
+    for(const surface of [this.floorSurface,this.ceilingSurface]){
+      if(surface){
+        this.game.scene.remove(surface);
+        surface.geometry.dispose();
+      }
     }
+    this.floorSurface=null;
+    this.ceilingSurface=null;
+
     if(this.library)disposeLibrary(this.library);
 
     this.size=this.game.level.cellSize*CELLS;
+    this.surfaceSize=this.size*3;
     this.library=makeLibrary(this.game.level);
 
-    this.infiniteCeiling=new THREE.Mesh(
-      new THREE.PlaneGeometry(this.size*10,this.size*10),
+    this.floorSurface=new THREE.Mesh(
+      new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
+      this.library.floor
+    );
+    this.floorSurface.rotation.x=-Math.PI/2;
+    this.floorSurface.position.y=0;
+    this.floorSurface.frustumCulled=false;
+    this.floorSurface.renderOrder=-2;
+
+    this.ceilingSurface=new THREE.Mesh(
+      new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
       this.library.ceiling
     );
-    this.infiniteCeiling.rotation.x=Math.PI/2;
-    this.infiniteCeiling.position.set(0,this.game.level.wallHeight+.14,0);
-    this.infiniteCeiling.frustumCulled=false;
-    this.game.scene.add(this.infiniteCeiling);
+    this.ceilingSurface.rotation.x=Math.PI/2;
+    this.ceilingSurface.position.y=this.game.level.wallHeight+.08;
+    this.ceilingSurface.frustumCulled=false;
+    this.ceilingSurface.renderOrder=-2;
+
+    this.game.scene.add(this.floorSurface,this.ceilingSurface);
 
     const library=this.library;
     applyOpenGameArtPBR(library,this.game.level).catch(error=>{
-      console.warn("[Backrooms] OpenGameArt enhancement failed; procedural materials remain active.",error);
+      console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
     });
+    this.updateSurfaceTiling(0,0);
+  }
+
+  updateSurfaceTiling(px,pz){
+    const tileWorld=4;
+    const repeat=this.surfaceSize/tileWorld;
+
+    for(const material of [this.library?.floor,this.library?.ceiling]){
+      if(!material)continue;
+      for(const key of ["map","roughnessMap","normalMap"]){
+        const texture=material[key];
+        if(!texture)continue;
+        texture.wrapS=THREE.RepeatWrapping;
+        texture.wrapT=THREE.RepeatWrapping;
+        texture.repeat.set(repeat,repeat);
+        texture.offset.set((px-this.surfaceSize/2)/tileWorld,(pz-this.surfaceSize/2)/tileWorld);
+        texture.needsUpdate=true;
+      }
+    }
   }
   chunkAt(x,z){
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
@@ -240,10 +273,12 @@ class WorldStreamer{
   update(dt){
     const p=this.game.player.position;
     this.ensureAround(p.x,p.z);
-    if(this.infiniteCeiling){
-      const snap=this.size*2;
-      this.infiniteCeiling.position.x=Math.floor(p.x/snap)*snap;
-      this.infiniteCeiling.position.z=Math.floor(p.z/snap)*snap;
+    if(this.floorSurface&&this.ceilingSurface){
+      this.floorSurface.position.x=p.x;
+      this.floorSurface.position.z=p.z;
+      this.ceilingSurface.position.x=p.x;
+      this.ceilingSurface.position.z=p.z;
+      this.updateSurfaceTiling(p.x,p.z);
     }
     for(const c of this.chunks.values())c.update(dt)
   }
@@ -352,14 +387,19 @@ class EntityManager{
 
 class AdaptiveQuality{
   constructor(game){this.game=game;this.mode=localStorage.getItem("br.quality")||"auto";this.samples=[];this.cool=0}
-  limits(){if(this.mode==="low")return{pixel:.8,radius:1};if(this.mode==="medium")return{pixel:1,radius:1};if(this.mode==="high")return{pixel:1.35,radius:2};return{pixel:Math.min(devicePixelRatio,1.35),radius:1}}
+  limits(){
+    if(this.mode==="low")return{pixel:.7,radius:1};
+    if(this.mode==="medium")return{pixel:.9,radius:1};
+    if(this.mode==="high")return{pixel:1.15,radius:1};
+    return{pixel:Math.min(devicePixelRatio,1.05),radius:1};
+  }
   apply(){const l=this.limits();this.game.renderer.setPixelRatio(Math.min(devicePixelRatio,l.pixel));this.game.world.radius=l.radius}
   update(dt){
     if(this.mode!=="auto")return;
     this.samples.push(dt*1000);if(this.samples.length>45)this.samples.shift();this.cool-=dt;if(this.cool>0)return;
     const avg=this.samples.reduce((a,b)=>a+b,0)/this.samples.length;
     if(avg>28)this.game.renderer.setPixelRatio(Math.max(.72,this.game.renderer.getPixelRatio()*.9));
-    else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.35,this.game.renderer.getPixelRatio()*1.045));
+    else if(avg<18)this.game.renderer.setPixelRatio(Math.min(1.05,this.game.renderer.getPixelRatio()*1.025));
     this.cool=2;
   }
   set(mode){this.mode=mode;localStorage.setItem("br.quality",mode);this.apply()}
@@ -371,8 +411,9 @@ export class BackroomsGame{
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.gameTime=0;this.argTimer=9;
     this.settings={shake:localStorage.getItem("br.shake")!=="0"};this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.05,220);this.camera.rotation.order="YXZ";
-    this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance",stencil:false,depth:true});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));this.renderer.setSize(innerWidth,innerHeight);
+    const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
+    this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true});
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,touchDevice?0.85:1.05));this.renderer.setSize(innerWidth,innerHeight);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
     const room=new RoomEnvironment();
     const pmrem=new THREE.PMREMGenerator(this.renderer);
