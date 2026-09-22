@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { InputManager } from "./input.js";
 import { AudioDirector } from "./audio.js";
 import { LEVELS, levelById, cycleHash } from "./levels.js";
@@ -698,13 +697,7 @@ export class BackroomsGame{
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"mediump"});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,touchDevice?0.85:1.05));this.renderer.setSize(innerWidth,innerHeight);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.62;
-    const room=new RoomEnvironment();
-    const pmrem=new THREE.PMREMGenerator(this.renderer);
-    this.environmentTarget=pmrem.fromScene(room,0.04);
-    pmrem.dispose();
-    room.dispose();
-    this.scene.environment=this.environmentTarget.texture;
-    this.scene.environmentIntensity=.012;
+    this.scene.environment=null;
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
     this.localLights=[];
     for(let i=0;i<3;i++){
