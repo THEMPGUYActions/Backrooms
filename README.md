@@ -167,9 +167,13 @@ See:
 - GAME-CONTENT-LICENSE.md
 - LICENSE
 
-The Backrooms Wiki licensing guide is used for the wiki-derived setting material. The OpenGameArt texture pack used by this build is separately identified as CC0:
+The Backrooms Wiki licensing guide is used for the wiki-derived setting material:
 
 https://backrooms-wiki.wikidot.com/licensing-guide
+
+The OpenGameArt texture pack used by this build is separately identified as CC0:
+
+https://opengameart.org/content/backrooms-pbr-texture-pack
 
 The current image-use guide also describes compatible media licenses and attribution requirements:
 
