@@ -108,6 +108,56 @@ h2{font-size:clamp(26px,5vw,44px)}
 @keyframes noise{0%{transform:translate(0,0)}25%{transform:translate(2%,-1%)}50%{transform:translate(-1%,2%)}75%{transform:translate(1%,1%)}100%{transform:translate(0,0)}}
 
 .intro-screen{
+  overflow:hidden;
+}
+.intro-film{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+  background:#000;color:#eee;opacity:0;pointer-events:none;
+  font-family:Georgia,"Times New Roman",serif;
+}
+.intro-film-title{animation:movie-title 8.4s ease both}
+.movie-title{
+  font-size:clamp(42px,9vw,104px);font-weight:400;letter-spacing:.025em;
+  text-transform:none;color:#eee;
+}
+.movie-present{
+  margin-top:20px;font:13px "Courier New",monospace;letter-spacing:.32em;
+  color:rgba(235,235,235,.68);text-transform:uppercase;
+}
+.intro-film-credits{
+  z-index:4;display:flex;flex-direction:column;justify-content:center;
+  gap:16px;animation:movie-credits 7.8s ease 8.7s both;
+}
+.credits-kicker{font:9px "Courier New",monospace;letter-spacing:.28em;color:#777}
+.credits-main{font:clamp(28px,5vw,52px);font-weight:400;margin-bottom:4px}
+.credits-line{font:10px/1.6 "Courier New",monospace;letter-spacing:.18em;color:#aaa}
+.audio-overlay{
+  position:absolute;inset:0;z-index:30;display:grid;place-items:center;
+  pointer-events:none;text-align:center;
+  color:rgba(235,235,235,.76);font:12px "Courier New",monospace;
+  letter-spacing:.14em;text-transform:uppercase;
+  text-shadow:0 0 16px rgba(255,255,255,.12);
+  animation:audio-prompt 2.8s steps(2,end) infinite;
+}
+.audio-overlay.hidden{display:none}
+.intro-screen.audio-ready .audio-overlay{display:none}
+.intro-screen.audio-ready .audio-gate{display:none}
+.intro-screen.booting .intro-film{display:none}
+@keyframes movie-title{
+  0%,12%{opacity:0;transform:scale(1.025)}
+  25%,72%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(.99)}
+}
+@keyframes movie-credits{
+  0%,12%{opacity:0;transform:translateY(12px)}
+  25%,72%{opacity:1;transform:translateY(0)}
+  100%{opacity:0;transform:translateY(-8px)}
+}
+@keyframes audio-prompt{
+  0%,48%,100%{opacity:.72}
+  49%{opacity:.35}
+}
+.intro-screen{
   position:fixed;inset:0;z-index:100;display:grid;place-items:center;
   background:#000;cursor:pointer;user-select:none;transition:opacity 2.6s cubic-bezier(.2,.65,.2,1),visibility 0s linear 2.6s;
 }
