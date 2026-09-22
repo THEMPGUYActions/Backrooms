@@ -21,7 +21,7 @@ export const LEVELS = {
     darkness: 0.11,
     holeChance: 0.010,
     pipeChance: 0,
-    entity: "none",
+    entity: "skinwalker",
     exitStyle: "mixed",
     exitAfterChunks: 3,
     objective: "Find a way out. Not every door is real.",
