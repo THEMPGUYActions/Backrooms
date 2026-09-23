@@ -1424,6 +1424,7 @@ export class BackroomsGame{
       setTimeout(activateAudioGate,16500);
     }
     const handleAudioGesture=event=>{
+      if(!audioGateReady&&audioPage?.classList.contains("intro-audio-active"))audioGateReady=true;
       if(!this.introActive||!audioGateReady||!audioPage?.classList.contains("intro-audio-active"))return;
       if(gate&&!gate.contains(event.target)&&!audioPage?.contains(event.target))return;
       event.stopPropagation();
