@@ -777,13 +777,13 @@ class Chunk{
     // Render only exposed surfaces of the union of wall blocks. This removes
     // internal coplanar faces, which is both cheaper and immune to z-fighting.
     const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
-    const appendFace=(verts,nx,ny,nz,u1,v1)=>{
+    const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
       const base=positions.length/3;
       for(const v of verts){
         positions.push(v[0],v[1],v[2]);
         normals.push(nx,ny,nz);
       }
-      uvs.push(0,0,u1,0,u1,v1,0,v1);
+      uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
       indices.push(base,base+1,base+2,base,base+2,base+3);
     };
 
@@ -795,7 +795,7 @@ class Chunk{
       if(!has(x,z-1)){
         appendFace(
           [[minX,0,minZ],[maxX,0,minZ],[maxX,h,minZ],[minX,h,minZ]],
-          0,0,-1,1,h
+          0,0,-1,minX,0,maxX,h
         );
 
       }
@@ -803,7 +803,7 @@ class Chunk{
       if(!has(x,z+1)){
         appendFace(
           [[maxX,0,maxZ],[minX,0,maxZ],[minX,h,maxZ],[maxX,h,maxZ]],
-          0,0,1,1,h
+          0,0,1,minX,0,maxX,h
         );
 
       }
@@ -811,7 +811,7 @@ class Chunk{
       if(!has(x-1,z)){
         appendFace(
           [[minX,0,maxZ],[minX,0,minZ],[minX,h,minZ],[minX,h,maxZ]],
-          -1,0,0,1,h
+          -1,0,0,minZ,0,maxZ,h
         );
 
       }
@@ -819,7 +819,7 @@ class Chunk{
       if(!has(x+1,z)){
         appendFace(
           [[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
-          1,0,0,1,h
+          1,0,0,minZ,0,maxZ,h
         );
 
       }
@@ -853,40 +853,69 @@ class Chunk{
       this.level0WallMesh=mesh;
     }
 
-    // Keep dynamic Level 0 lighting deliberately small. Emissive fixtures do
-    // most of the work, while only six local point lights are created per chunk.
-    const lightBudget=6;
+    // Keep dynamic Level 0 lighting deliberately small. The source
+    // ceiling grid is on 8-block spacing, so use those same integer positions.
+    const lightBudget=7;
     let lightCount=0;
-    for(let z=0;z<cells&&lightCount<lightBudget;z++){
-      for(let x=0;x<cells&&lightCount<lightBudget;x++){
-        if((x+z)%2!==0||rng.next()>.55)continue;
-        if(this.macroBlockedCells?.some(r=>r.x===x&&r.z===z))continue;
 
-        const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-        if(wallCells.has(Math.floor(px)+","+Math.floor(pz)))continue;
-        const mat=lib.light.clone();
-        mat.emissiveIntensity=1.65+rng.next()*.45;
-        const rotation=rng.next()<.5?0:Math.PI/2;
-        const fixture=box(g,new THREE.BoxGeometry(3.35,.05,.58),mat,px,h-.10,pz,0,rotation,0);
-        fixture.userData.light=true;
-        fixture.userData.baseEmissive=mat.emissiveIntensity;
-        this.fixtures.push(fixture);
+    const clearForFixture=(x,z,rotation)=>{
+      const hx=rotation===0?1.72:.31;
+      const hz=rotation===0?.31:1.72;
+      const minX=Math.floor(x-hx),maxX=Math.floor(x+hx);
+      const minZ=Math.floor(z-hz),maxZ=Math.floor(z+hz);
+      for(let wz=minZ;wz<=maxZ;wz++)for(let wx=minX;wx<=maxX;wx++){
+        if(wallCells.has(wx+","+wz))return false;
+      }
+      return true;
+    };
 
-        const intensity=88+rng.next()*24;
-        this.lightSources.push({
-          position:new THREE.Vector3(px,h-.28,pz),
-          color:0xffd66a,
-          baseIntensity:intensity,
-          intensity,
-          distance:24,
-          decay:2,
-          fixture
-        });
-        lightCount++;
+    const candidates=[];
+    for(let z=4;z<this.world.size;z+=8){
+      for(let x=4;x<this.world.size;x+=8){
+        const px=this.originX+x,pz=this.originZ+z;
+        const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
+        candidates.push({px,pz,d:dx*dx+dz*dz});
       }
     }
-  }
+    candidates.sort((a,b)=>a.d-b.d);
 
+    for(const candidate of candidates){
+      if(lightCount>=lightBudget)break;
+      if(next()>.72)continue;
+
+      const rotations=[0,Math.PI/2];
+      let rotation=rotations[(Math.floor(next()*2))];
+      if(!clearForFixture(candidate.px,candidate.pz,rotation)){
+        rotation=rotation===0?Math.PI/2:0;
+        if(!clearForFixture(candidate.px,candidate.pz,rotation))continue;
+      }
+
+      const mat=lib.light.clone();
+      mat.emissiveIntensity=1.55+next()*.4;
+      const fixture=box(
+        g,
+        new THREE.BoxGeometry(3.35,.05,.58),
+        mat,
+        candidate.px,h-.10,candidate.pz,
+        0,rotation,0
+      );
+      fixture.userData.light=true;
+      fixture.userData.baseEmissive=mat.emissiveIntensity;
+      this.fixtures.push(fixture);
+
+      const intensity=88+next()*22;
+      this.lightSources.push({
+        position:new THREE.Vector3(candidate.px,h-.28,candidate.pz),
+        color:0xffd66a,
+        baseIntensity:intensity,
+        intensity,
+        distance:24,
+        decay:2,
+        fixture
+      });
+      lightCount++;
+    }
+  }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
