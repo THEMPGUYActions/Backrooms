@@ -186,7 +186,7 @@ class Chunk{
       const worldX=this.cx*cells*level.cellSize;
       const worldZ=this.cz*cells*level.cellSize;
       const macro=smoothNoise2D(worldX*.002,worldZ*.002,this.game.seed);
-      this.zone=(!forceStart&&macro>.5)?"mega":"maze";
+      this.zone=(forceStart||macro>.5)?"mega":"maze";
 
       if(this.zone==="mega"){
         // Reference megaroom sectors are open concrete garage space.
@@ -384,7 +384,7 @@ class Chunk{
     const trimHGeom=new THREE.BoxGeometry(cell,.11,.12),trimVGeom=new THREE.BoxGeometry(.12,.11,cell);
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
     const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
-    const wallMaterial=level.id==="1"?(this.zone==="maze"?lib.maintenanceWall:lib.concrete):lib.wall;
+    const wallMaterial=level.id==="1"?lib.concrete:lib.wall;
     const seenH=new Set(),seenV=new Set();
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
@@ -448,8 +448,12 @@ class Chunk{
       g.add(mesh);
     };
     addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);
-    addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);
-    addInstanced(topHGeom,lib.trimTop,topH);addInstanced(topVGeom,lib.trimTop,topV);
+    if(level.id!=="1"){
+      addInstanced(trimHGeom,lib.trim,trimH);
+      addInstanced(trimVGeom,lib.trim,trimV);
+      addInstanced(topHGeom,lib.trimTop,topH);
+      addInstanced(topVGeom,lib.trimTop,topV);
+    }
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
 
@@ -657,135 +661,174 @@ class Chunk{
   }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
-    const cellPos=(x,z)=>({
+    const next=()=>rng.next();
+    const center=(x,z)=>({
       x:this.originX+x*cell+cell/2,
       z:this.originZ+z*cell+cell/2
     });
 
-    const addLight=(x,z,rotation=0,scale=1,intensity=this.zone==="mega"?145:100)=>{
+    const addLight=(x,z,rotation=0,scale=1,intensity=105)=>{
       const fixture=box(
         g,
-        new THREE.BoxGeometry(3.15*scale,.055,.44*scale),
+        new THREE.BoxGeometry(3.65*scale,.07,.32*scale),
         lib.level1Light,
         x,
-        level.wallHeight-.14,
+        level.wallHeight-.38,
         z,
         0,
         rotation,
         0
       );
       fixture.userData.light=true;
-      fixture.userData.baseEmissive=2.4;
+      fixture.userData.baseEmissive=2.9;
       this.fixtures.push(fixture);
+
+      // Dark recessed housing around the tube. The reference lights sit under
+      // broad ceiling beams rather than on a white Level 0 tile grid.
+      box(
+        g,
+        new THREE.BoxGeometry(3.95*scale,.16,.52*scale),
+        lib.garageBeam,
+        x,
+        level.wallHeight-.27,
+        z,
+        0,
+        rotation,
+        0
+      );
+
       this.lightSources.push({
-        position:new THREE.Vector3(x,level.wallHeight-.28,z),
-        color:level.theme.light,
+        position:new THREE.Vector3(x,level.wallHeight-.48,z),
+        color:0xf4f4ee,
         baseIntensity:intensity,
         intensity,
-        distance:this.zone==="mega"?38:25,
+        distance:34,
         decay:2,
         fixture
       });
-      return fixture;
     };
 
-    // The reference start sector contains a stairwell structure. Keep the
-    // readable stair geometry here rather than dropping back to Level 0's roof.
-    if(this.cx===0&&this.cz===0){
-      const sx=2.8,sz=7.2,stepW=3.2,stepD=.48,stepH=.17;
-      for(let i=0;i<8;i++){
-        box(g,new THREE.BoxGeometry(stepW,stepH*(i+1),stepD),lib.stairs,sx,stepH*(i+.5),sz-i*stepD);
-      }
-      for(const side of [-1,1]){
-        const rail=box(g,new THREE.BoxGeometry(.07,1.3,3.9),lib.metal,sx+side*1.82,.67,sz-1.55,0,0,side*.02);
-        rail.rotation.x=side*.035;
-      }
-    }
-
     if(this.zone==="mega"){
-      // Large underground parking-garage sectors: concrete support columns,
-      // long fluorescent runs, sparse storage and road markings.
-      const columnXs=[12,28,44,60];
-      const columnZs=[12,28,44,60];
-      for(const x of columnXs)for(const z of columnZs){
-        if(rng.next()>.72)continue;
-        box(g,new THREE.BoxGeometry(.92,level.wallHeight,.92),lib.concrete,this.originX+x,level.wallHeight/2,this.originZ+z);
-        box(g,new THREE.BoxGeometry(1.14,.10,1.14),lib.metal,this.originX+x,.52,this.originZ+z);
+      // 5x5 parking-column rhythm. This is the dominant Level 1 shape in
+      // SpacePotato's megaroom1: long sightlines with repeating square
+      // concrete pillars and low structural beams.
+      const columnGeom=new THREE.BoxGeometry(1.22,level.wallHeight,.1);
+      const pillarGeom=new THREE.BoxGeometry(1.22,level.wallHeight,1.22);
+      const baseGeom=new THREE.BoxGeometry(1.42,.16,1.42);
+      const columns=[],bases=[];
+
+      for(let ix=1;ix<=8;ix+=2){
+        for(let iz=1;iz<=8;iz+=2){
+          const p=center(ix,iz);
+          columns.push(new THREE.Matrix4().makeTranslation(p.x,level.wallHeight/2,p.z));
+          bases.push(new THREE.Matrix4().makeTranslation(p.x,.08,p.z));
+        }
       }
 
-      for(let x=12;x<size-8;x+=16)for(let z=12;z<size-8;z+=16){
-        if(rng.next()>.88)continue;
-        addLight(this.originX+x,this.originZ+z,rng.next()<.5?0:Math.PI/2,.92+rng.next()*.18,145+rng.next()*25);
-      }
+      const addInst=(geometry,material,data)=>{
+        const mesh=new THREE.InstancedMesh(geometry,material,data.length);
+        mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        data.forEach((m,i)=>mesh.setMatrixAt(i,m));
+        mesh.instanceMatrix.needsUpdate=true;
+        mesh.computeBoundingBox();
+        mesh.computeBoundingSphere();
+        g.add(mesh);
+      };
+      addInst(pillarGeom,lib.concrete,columns);
+      addInst(baseGeom,lib.garageBase,bases);
 
-      // Concrete service beams and pipes overhead are sparse, not the dense
-      // Level 0 ceiling pattern.
-      for(let i=0;i<2;i++){
-        const beam=box(
+      // Dark structural bands directly below the slab.
+      for(let z=8;z<size;z+=16){
+        box(
           g,
-          new THREE.BoxGeometry(size*.78,.13,.16),
-          lib.metal,
-          this.originX+size*.5,
-          level.wallHeight-.18-i*.16,
-          this.originZ+size*(.31+i*.38)
+          new THREE.BoxGeometry(size,.42,.58),
+          lib.garageBeam,
+          this.originX+size/2,
+          level.wallHeight-.55,
+          this.originZ+z
         );
-        beam.rotation.y=rng.next()<.5?0:Math.PI/2;
       }
 
-      if(rng.next()<.46){
-        const pipe=new THREE.Mesh(
-          new THREE.CylinderGeometry(.075,.075,size*.72,10),
-          lib.metal
-        );
-        pipe.rotation.z=Math.PI/2;
-        pipe.position.set(this.originX+size*.5,level.wallHeight-.48,this.originZ+size*.64);
-        g.add(pipe);
+      // Long fluorescent rows between the structural bands.
+      for(let z=8;z<size;z+=16){
+        for(let x=8;x<size;x+=16){
+          const p=this.centerForLevel1Cell(x,z);
+          addLight(p.x,p.z,0,.92,98+next()*24);
+        }
       }
 
-      for(let i=0;i<1+rng.int(0,2);i++){
-        if(rng.next()<.22)continue;
-        const p=cellPos(rng.int(1,cells-2),rng.int(1,cells-2));
-        const crate=box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
-        box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
-        box(g,new THREE.BoxGeometry(.055,.84,.055),lib.metal,p.x-.32,.4,p.z);
-        this.crates.push({group:crate,unseen:0});
+      // A second perpendicular row in selected lanes creates the deep,
+      // repeating light pattern visible in the reference.
+      for(let x=16;x<size-4;x+=32){
+        for(let z=16;z<size-8;z+=16){
+          if(next()<.34)continue;
+          const p={x:this.originX+x,z:this.originZ+z};
+          addLight(p.x,p.z,Math.PI/2,.72,72+next()*20);
+        }
       }
 
-      if(rng.next()<.55){
-        const lane=this.originX+size*(.27+rng.next()*.46);
-        box(g,new THREE.BoxGeometry(.045,.012,size*.66),lib.parkingLine,lane,.008,this.originZ+size*.5);
+      // Faded parking/traffic markings. Keep them extremely dark and thin so
+      // they read as garage infrastructure instead of a bright arcade floor.
+      const lineMat=lib.parkingLine;
+      for(let x=16;x<size-8;x+=16){
+        box(g,new THREE.BoxGeometry(.055,.012,5.6),lineMat,this.originX+x,.012,this.originZ+12);
+        if(next()<.7)box(g,new THREE.BoxGeometry(.055,.012,5.6),lineMat,this.originX+x,.012,this.originZ+44);
+      }
+
+      // Large wet patches are a major part of the reference appearance.
+      for(let i=0;i<7;i++){
+        const px=this.originX+6+next()*(size-12);
+        const pz=this.originZ+6+next()*(size-12);
+        const puddle=new THREE.Mesh(new THREE.CircleGeometry(.8+next()*3.8,32),lib.puddle);
+        puddle.rotation.x=-Math.PI/2;
+        puddle.rotation.z=next()*Math.PI;
+        puddle.scale.set(1.2+next()*1.7,.38+.18*next(),1);
+        puddle.position.set(px,.014,pz);
+        g.add(puddle);
+      }
+
+      // Sparse service hardware at the edge of a few bays.
+      for(let i=0;i<2;i++){
+        if(next()>.42)continue;
+        const px=this.originX+(2+next()*(cells-4))*cell;
+        const pz=this.originZ+(.9+next()*.15)*cell;
+        box(g,new THREE.BoxGeometry(.16,1.8,.28),lib.garageBase,px,.9,pz);
+        box(g,new THREE.BoxGeometry(.5,.08,.32),lib.metal,px,1.72,pz);
       }
     }else{
-      // Tight maze sectors use the white/gray room materials and a single
-      // overhead fluorescent fixture at selected corridor cells.
+      // The non-megaroom path is the maze portion of the reference generator.
+      // It still uses the same gray concrete palette, not the yellow Level 0
+      // materials or a painted-white ceiling.
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         const mask=this.walls[this.index(x,z)];
         const openings=4-((mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0));
         if(openings<=0)continue;
-        if((x+z)%2!==0&&rng.next()>.38)continue;
-        const p=cellPos(x,z);
-        const horizontal=openings>=2&&((mask&1)===0||(mask&4)===0);
-        addLight(p.x,p.z,horizontal?0:Math.PI/2,.72,92+rng.next()*18);
+        if((x+z)%2!==0&&next()>.42)continue;
+        const p=center(x,z);
+        addLight(p.x,p.z,openings>=2?0:Math.PI/2,.72,82+next()*18);
       }
 
+      // Small pillar rooms are the same 3x3 special-room mechanism used by
+      // Level1MazeGenerator.spawnRandomRooms().
       for(const room of this.rooms){
-        const cx=this.originX+(room.x+room.w*.5)*cell;
-        const cz=this.originZ+(room.z+room.h*.5)*cell;
+        const p=center(room.x+1,room.z+1);
         if(room.type==="pillars"){
-          for(const [ox,oz] of [[-1.05,-1.05],[1.05,-1.05],[-1.05,1.05],[1.05,1.05]]){
-            box(g,new THREE.BoxGeometry(.52,level.wallHeight-.15,.52),lib.concrete,cx+ox,level.wallHeight/2,cz+oz);
+          for(const [ox,oz] of [[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]]){
+            box(g,new THREE.BoxGeometry(.58,level.wallHeight,.58),lib.concrete,p.x+ox*1.15,.0+level.wallHeight/2,p.z+oz*1.15);
           }
         }else{
-          for(let i=0;i<3;i++){
-            const ox=(rng.next()-.5)*room.w*cell*.48;
-            const oz=(rng.next()-.5)*room.h*cell*.48;
-            const crate=box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz);
-            crate.rotation.y=rng.next()*Math.PI*2;
+          for(let i=0;i<2;i++){
+            const ox=(next()-.5)*room.w*cell*.34;
+            const oz=(next()-.5)*room.h*cell*.34;
+            box(g,new THREE.BoxGeometry(.92,.78,.92),lib.crate,p.x+ox,.39,p.z+oz);
           }
-          box(g,new THREE.BoxGeometry(1.9,.10,.72),lib.metal,cx,.76,cz+1.0);
         }
       }
     }
+  }
+
+  centerForLevel1Cell(worldX,worldZ){
+    return {x:this.originX+worldX,z:this.originZ+worldZ};
   }
 
   contains(x,z){return x>=this.originX&&x<this.originX+this.world.size&&z>=this.originZ&&z<this.originZ+this.world.size}
@@ -926,6 +969,16 @@ class WorldStreamer{
     this.ceilingSurface.renderOrder=-2;
 
     this.game.scene.add(this.floorSurface,this.ceilingSurface);
+    if(this.game.level.id==="1"){
+      this.library.floor.color.setHex(0x666a68);
+      this.library.floor.roughness=.42;
+      this.library.floor.metalness=.03;
+      this.library.ceiling.color.setHex(0x4e514f);
+      this.library.ceiling.roughness=.78;
+      this.library.ceiling.metalness=0;
+      this.library.concrete.color.setHex(0xaeb0ac);
+      this.library.concrete.roughness=.84;
+    }
 
     this.updateSurfaceTiling();
 
@@ -1589,8 +1642,8 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
-    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x686b67:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.018:.058);
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
+    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.024:.058);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:.052;
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
