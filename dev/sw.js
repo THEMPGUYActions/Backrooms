@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v7";
+const CACHE_NAME="backrooms-assets-v8";
 const CORE=[
   "index.html",
   "styles.css",
@@ -85,6 +85,15 @@ self.addEventListener("message",event=>{
     "carpet_color.png","carpet_rough.png","carpet_normal.png",
     "ceiling_tiles_color.png","ceiling_tiles_rough.png","ceiling_tiles_normal.png"
   ];
+  const level0=[
+    "level0/wall_block_2_texture.png",
+    "level0/wall_block_2.png",
+    "level0/wallpaper_bottom_block_texture.png",
+    "level0/pbr/carpet/carpet_color.png",
+    "level0/pbr/carpet/carpet_normal.png",
+    "level0/pbr/ceiling_tile/ceiling_tile_color.png",
+    "level0/pbr/ceiling_tile/ceiling_tile_normal.png"
+  ];
   const audio=[
     "ambient_horror.ogg","electric_buzz.ogg",
     "footstep_01.ogg","footstep_02.ogg","footstep_03.ogg",
@@ -94,6 +103,7 @@ self.addEventListener("message",event=>{
     caches.open(CACHE_NAME).then(cache=>
       Promise.all([
         ...pbr.map(file=>cache.add(new URL("./assets/pbr/"+file,base)).catch(()=>null)),
+        ...level0.map(file=>cache.add(new URL("./assets/spb-ff/"+file,base)).catch(()=>null)),
         ...audio.map(file=>cache.add(new URL("./assets/audio/"+file,base)).catch(()=>null))
       ])
     )
