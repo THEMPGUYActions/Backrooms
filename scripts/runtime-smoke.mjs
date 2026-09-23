@@ -157,7 +157,11 @@ try{
   if(state.bootDisplay!=="none"||state.bootPointerEvents!=="none")throw new Error("Intro overlay still blocked gameplay after activation: "+JSON.stringify(state));
 
   await command("Runtime.evaluate",{expression:"location.href='http://127.0.0.1:"+port+"/index.html?admin=1'",returnByValue:true});
-  await delay(2800);
+  await delay(2500);
+  await command("Runtime.evaluate",{expression:"(()=>{const page=document.querySelector('.intro-audio-page');if(page){page.classList.add('intro-audio-active');page.style.visibility='visible';page.style.opacity='1';}document.getElementById('audio-gate')?.focus();})()",returnByValue:true});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:point.x,y:point.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:point.x,y:point.y,button:"left",clickCount:1});
+  await delay(1500);
   const runtimeErrors=messages.filter(message=>
     message.method==="Runtime.exceptionThrown"||
     (message.method==="Runtime.consoleAPICalled"&&["error","assert"].includes(message.params?.type))
@@ -168,6 +172,14 @@ try{
       return message.params?.args?.map(arg=>arg.value??arg.description??"").join(" ")||"Console error";
     }).join("\n");
     throw new Error("Runtime browser errors:\n"+detail);
+  }
+  const adminStateResult=await command("Runtime.evaluate",{
+    expression:"JSON.stringify({enabled:window.backrooms.admin.enabled,ready:!!window.backroomsAdmin?.ready,opened:!!window.backroomsAdmin?.opened,panel:!!document.getElementById('admin-panel'),panelVisible:!!document.getElementById('admin-panel')&&!document.getElementById('admin-panel').classList.contains('hidden'),running:window.backrooms.running,introActive:window.backrooms.introActive})",
+    returnByValue:true
+  });
+  const adminState=JSON.parse(adminStateResult.result?.result?.value||"{}");
+  if(!adminState.enabled||!adminState.ready||!adminState.opened||!adminState.panel||!adminState.panelVisible||!adminState.running||adminState.introActive){
+    throw new Error("Admin did not defer safely until gameplay was active: "+JSON.stringify(adminState));
   }
 
   console.log("RUNTIME SMOKE PASS");
