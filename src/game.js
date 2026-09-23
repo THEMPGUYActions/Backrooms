@@ -3,10 +3,11 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20260923-1950";
-import { AudioDirector } from "./audio.js?v=20260923-1950";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1950";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1950";
+import { InputManager } from "./input.js?v=20260923-2050";
+import { AudioDirector } from "./audio.js?v=20260923-2050";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2050";
+import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2050";
+import { level0RoomRows, level0RotationForMask, rotateLevel0Local, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2105";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -124,11 +125,30 @@ function smoothNoise2D(x,z,seed){
   const b=n01+(n11-n01)*sx;
   return a+(b-a)*sz;
 }
+function makeWorldTiledBoxGeometry(width,height,depth,tile=1){
+  const geometry=new THREE.BoxGeometry(width,height,depth);
+  const position=geometry.attributes.position;
+  const normal=geometry.attributes.normal;
+  const uv=geometry.attributes.uv;
+  for(let i=0;i<position.count;i++){
+    const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+    const nx=normal.getX(i),ny=normal.getY(i),nz=normal.getZ(i);
+    let u,v;
+    if(Math.abs(ny)>.5){u=x/tile;v=z/tile}
+    else if(Math.abs(nz)>.5){u=x/tile;v=y/tile}
+    else{u=z/tile;v=y/tile}
+    uv.setXY(i,u,v);
+  }
+  uv.needsUpdate=true;
+  return geometry;
+}
+
 
 class Chunk{
   constructor(world,cx,cz){
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
-    this.originX=cx*world.size-world.size/2;this.originZ=cz*world.size-world.size/2;
+    const level0Offset=this.game.level.id==="0"?32:world.size/2;
+    this.originX=cx*world.size-level0Offset;this.originZ=cz*world.size-level0Offset;
     this.group=new THREE.Group();this.group.name="chunk_"+cx+"_"+cz;
     this.bounds=new THREE.Sphere(
       new THREE.Vector3(
@@ -139,7 +159,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.collisionSegments=[];this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -179,7 +199,7 @@ class Chunk{
     this.walls.fill(15);this.rooms=[];
 
     if(level.id==="1"){
-      // SpacePotato's Level 1 uses two real generation paths:
+      // Level 1 uses two generation paths:
       // a 10x10 DFS maze and a Perlin-selected large parking-garage room.
       // There is no separate procedural "hall/corridor" generator.
       const forceStart=this.cx===0&&this.cz===0;
@@ -259,44 +279,75 @@ class Chunk{
         }
       }
     }else if(level.id==="0"){
-      const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
-      if(mega){
-        this.walls.fill(0);
-        for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
-        for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
-        const partitions=rng.int(0,3);
-        for(let i=0;i<partitions;i++){
-          const vertical=rng.next()<.5;
-          if(vertical){const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false)}
-          else{const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false)}
-        }
-      }else{
-        const visited=new Uint8Array(cells*cells),stack=[[0,0]];visited[this.index(0,0)]=1;
+      // Level 0 uses a 5x5 maze made from 16-block cells,
+      // with occasional large megaroom structures. Port that topology into
+      // the browser's 80x80 streamed sector instead of reusing Level 1 rules.
+      const isStart=this.cx===0&&this.cz===0;
+      const megaRoll=isStart?1:rng.int(1,2);
+      const roomType=isStart?1:(megaRoll===1?rng.int(1,6):0);
+      this.megaType=roomType||null;
+
+      const generateMaze=()=>{
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+        const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
+
         while(stack.length){
           const [x,z]=stack[stack.length-1],options=[];
-          for(const [dx,dz,b,ob,side] of [[0,-1,1,4,"north"],[1,0,2,8,"east"],[0,1,4,1,"south"],[-1,0,8,2,"west"]]){
+          for(const [dx,dz,b,ob] of dirs){
             const nx=x+dx,nz=z+dz;
-            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob,side]);
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)]){
+              options.push([nx,nz,b,ob]);
+            }
           }
-          if(!options.length){stack.pop();continue}
+          if(!options.length){
+            stack.pop();
+            continue;
+          }
           const [nx,nz,b,ob]=rng.pick(options);
-          this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
-          visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
         }
-        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.18)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.18)this.setEdge(x,z,"south",true);
+      };
+
+      if(roomType===1||roomType===2){
+        // The large Level 0 macro rooms span a wide footprint. Keep only the
+        // perimeter so the sector can still stitch to neighboring sectors.
+        this.zone="mega";
+        this.walls.fill(0);
+        for(let z=0;z<cells;z++){
+          this.walls[this.index(0,z)]|=8;
+          this.walls[this.index(cells-1,z)]|=2;
+        }
+        for(let x=0;x<cells;x++){
+          this.walls[this.index(x,0)]|=1;
+          this.walls[this.index(x,cells-1)]|=4;
+        }
+      }else{
+        // Level0MazeGenerator: randomized DFS over a 5x5 grid, then connect
+        // the four sector edges in reference's alternating pattern.
+        this.zone="maze";
+        generateMaze();
+
+        if(roomType>=3){
+          // megaroom3-6 are a 32x32 structure embedded in the maze. A 2x2
+          // group of 16x16 cells gives the same footprint in the browser.
+          // The real generator overlays megaroom3-6 onto the maze after
+          // generation. Do not carve a fake 2x2 topology underneath it.
+          this.rooms.push({x:1,z:1,w:3,h:3,type:"mega"});
         }
       }
-      if(cells>=5){
-        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
-        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
-        if(this.cz%2===0)this.setEdge(0,2,"west",true);
-        if(this.cx%2===0)this.setEdge(cells-1,2,"east",true);
-      }
-      if(this.cx===0&&this.cz===0){
-        this.setEdge(2,2,"north",true);this.setEdge(2,2,"east",true);this.setEdge(2,2,"south",true);this.setEdge(2,2,"west",true);
-      }
+
+      // Exact Level0MazeGenerator cross-sector openings:
+      // top row south, right edge west, bottom row north, left edge east.
+      for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
+      for(let i=0;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
+      for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
+      for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
+
     }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
       visited[this.index(Math.floor(cells/2),Math.floor(cells/2))]=1;
@@ -316,7 +367,7 @@ class Chunk{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true)}
     }
 
-    if(level.id!=="1"){
+    if(level.id!=="1"&&level.id!=="0"){
       const boundaryChance=.19;
       for(let x=0;x<cells;x++){
         const gx=this.cx*cells+x;
@@ -338,7 +389,7 @@ class Chunk{
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
     const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
     if(level.id==="1"){
-      // SpacePotato's Level1ChunkGenerator places the level2 stairwell on
+      // The Level 1 generator places the level2 stairwell on
       // maze-grid sectors outside the starting area, using a 50% roll.
       if(level1ExitSector&&rng2.next()<.5){
         const candidates=[];
@@ -386,51 +437,53 @@ class Chunk{
     const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
     const wallMaterial=level.id==="1"?lib.concrete:lib.wall;
     const seenH=new Set(),seenV=new Set();
+
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
 
-    for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-      const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-      const addEdge=(side)=>{
-        if(side==="north"){
-          const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
-          pushMat(hData,px,level.wallHeight/2,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});
-        }else if(side==="south"){
-          const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
-          pushMat(hData,px,level.wallHeight/2,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});
-        }else if(side==="west"){
-          const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
-          pushMat(vData,px-cell/2,level.wallHeight/2,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
-        }else{
-          const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
-          pushMat(vData,px+cell/2,level.wallHeight/2,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
-        }
-      };
-      if(mask&1)addEdge("north");
-      if(mask&8)addEdge("west");
-      if(z===cells-1&&(mask&4))addEdge("south");
-      if(x===cells-1&&(mask&2))addEdge("east");
+    if(level.id==="0"){
+      // Level 0 room templates contain the openings themselves. Keep edge
+      // metadata for wall props, but do not add a second perimeter layer.
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)];
+        if(mask&1)edges.push({x,z,side:"north"});
+        if(mask&8)edges.push({x,z,side:"west"});
+        if(z===cells-1&&(mask&4))edges.push({x,z,side:"south"});
+        if(x===cells-1&&(mask&2))edges.push({x,z,side:"east"});
+      }
+    }else{
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
+        const addEdge=(side)=>{
+          if(side==="north"){
+            const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,level.wallHeight/2,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});
+          }else if(side==="south"){
+            const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,level.wallHeight/2,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});
+          }else if(side==="west"){
+            const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px-cell/2,level.wallHeight/2,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
+          }else{
+            const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px+cell/2,level.wallHeight/2,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
+          }
+        };
+        if(mask&1)addEdge("north");
+        if(mask&8)addEdge("west");
+        if(z===cells-1&&(mask&4))addEdge("south");
+        if(x===cells-1&&(mask&2))addEdge("east");
 
-      const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
-      const fixtureChance=level.id==="0"?.78:level.id==="1"?0:.13;
-      if(fixtureSlot&&rngBase.next()<fixtureChance){
-        const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,fixtureMaterial=fixtureMat.clone();
-        const rotation=rngBase.next()<.5?0:Math.PI/2,jx=(rngBase.next()-.5)*1.8,jz=(rngBase.next()-.5)*1.8;
-        const fixture=box(g,new THREE.BoxGeometry(3.7,.045,.72),fixtureMaterial,px+jx,level.wallHeight-.11,pz+jz,0,rotation,0);
-        box(g,new THREE.BoxGeometry(4.0,.11,.9),lib.metal,px+jx,level.wallHeight-.045,pz+jz,0,rotation,0);
-        fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
-        {
+        const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
+        const fixtureChance=level.id==="0"?0:level.id==="1"?0:.13;
+        if(fixtureSlot&&rngBase.next()<fixtureChance){
+          const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,fixtureMaterial=fixtureMat.clone();
+          const rotation=rngBase.next()<.5?0:Math.PI/2,jx=(rngBase.next()-.5)*1.8,jz=(rngBase.next()-.5)*1.8;
+          const fixture=box(g,new THREE.BoxGeometry(3.7,.045,.72),fixtureMaterial,px+jx,level.wallHeight-.11,pz+jz,0,rotation,0);
+          fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
           const intensity=level.id==="0"?320:level.id==="3"?220:level.id==="4"?110:170;
-          this.lightSources.push({
-            position:new THREE.Vector3(px+jx,level.wallHeight-.24,pz+jz),
-            color:lightColor,
-            baseIntensity:intensity,
-            intensity,
-            distance:0,
-            decay:2,
-            fixture
-          });
+          this.lightSources.push({position:new THREE.Vector3(px+jx,level.wallHeight-.24,pz+jz),color:lightColor,baseIntensity:intensity,intensity,distance:0,decay:2,fixture});
         }
       }
     }
@@ -456,24 +509,7 @@ class Chunk{
     }
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
-
-    if(level.id==="0"){
-      const columnGeom=new THREE.BoxGeometry(.72,level.wallHeight,.72),columnData=[],columnCount=3+rngBase.int(0,4);
-      for(let i=0;i<columnCount;i++){
-        const cx=.75+rngBase.next()*(cells-1.5),cz=.75+rngBase.next()*(cells-1.5);
-        columnData.push(new THREE.Matrix4().makeTranslation(this.originX+cx*cell,level.wallHeight/2,this.originZ+cz*cell));
-      }
-      if(columnData.length){
-        const columns=new THREE.InstancedMesh(columnGeom,lib.wall,columnData.length);
-        columns.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-        columnData.forEach((m,i)=>columns.setMatrixAt(i,m));
-        columns.instanceMatrix.needsUpdate=true;
-        columns.computeBoundingBox();
-        columns.computeBoundingSphere();
-        columns.frustumCulled=true;
-        g.add(columns);
-      }
-    }
+    else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
 
     for(const hz of this.hazards){
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
@@ -659,6 +695,110 @@ class Chunk{
       }
     }
   }
+  buildLevel0Set(level,lib,rng){
+    const g=this.group,cell=level.cellSize,cells=this.gridSize(),next=()=>rng.next();
+
+    const addRectCollision=(cx,cz,w,d,rot=0)=>{
+      const c=Math.cos(rot),s=Math.sin(rot),hw=w/2,hd=d/2,pts=[[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([x,z])=>({x:cx+x*c-z*s,z:cz+x*s+z*c}));
+      for(let i=0;i<4;i++){const a=pts[i],b=pts[(i+1)%4];this.collisionSegments.push({x1:a.x,z1:a.z,x2:b.x,z2:b.z})}
+    };
+
+    const addRun=(baseX,baseZ,z,start,end,rot)=>{
+      const width=end-start+1,local=rotateLevel0Local((start+end+1)/2,z+.5,rot,16);
+      const cx=baseX+(local.x-8),cz=baseZ+(local.z-8);
+      box(g,makeWorldTiledBoxGeometry(width,level.wallHeight,1,1),lib.wall,cx,level.wallHeight/2,cz,0,rot,0);
+      box(g,new THREE.BoxGeometry(width+.06,.07,1.06),lib.trimTop,cx,level.wallHeight-.035,cz,0,rot,0);
+      addRectCollision(cx,cz,width,1,rot);
+    };
+
+    const addRoom=(cx,cz,mask,variant)=>{
+      const t=level0RoomRows(mask,variant),rot=level0RotationForMask(mask),rows=t.rows;
+      for(let z=0;z<16;z++){
+        const bits=rows[z]>>>0;
+        let x=0;
+        while(x<16){
+          while(x<16&&!(bits&(1<<x)))x++;
+          if(x>=16)break;
+          const start=x;
+          while(x+1<16&&(bits&(1<<(x+1))))x++;
+          addRun(cx-8,cz-8,z,start,x,rot);
+          x++;
+        }
+      }
+
+      const fx={A:[8,8,0,3.8,.82],B:[8,7,rot,3.6,.80],C:[9,7,rot,3.2,.76],D:[8,8,rot+Math.PI/2,3.9,.92],E:[8,9,rot,3.1,.70]}[t.family]||[8,8,rot,3.4,.8];
+      if(next()<fx[4]){
+        const p=rotateLevel0Local(fx[0],fx[1],rot,16),lx=cx-8+p.x,lz=cz-8+p.z,mat=lib.light.clone();
+        mat.emissiveIntensity=1.6+next()*.6;
+        const fixture=box(g,new THREE.BoxGeometry(fx[3],.052,.58),mat,lx,level.wallHeight-.12,lz,0,fx[2],0);
+        fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
+        this.lightSources.push({position:new THREE.Vector3(lx,level.wallHeight-.31,lz),color:0xffd66a,baseIntensity:105+next()*55,intensity:105+next()*55,distance:24,decay:2,fixture});
+      }
+    };
+
+    const addMega=(type,cx,cz)=>{
+      const t=LEVEL0_MEGA_TEMPLATES[type]||LEVEL0_MEGA_TEMPLATES[1],size=t.size,ox=cx-size/2,oz=cz-size/2;
+      const wall=(x,z,w,d,rot=0)=>{
+        box(g,makeWorldTiledBoxGeometry(w,level.wallHeight,d,1),lib.wall,x,level.wallHeight/2,z,0,rot,0);
+        addRectCollision(x,z,w,d,rot);
+        box(g,new THREE.BoxGeometry(w+.06,.07,d+.06),lib.trimTop,x,level.wallHeight-.035,z,0,rot,0);
+      };
+      if(t.kind==="grid_posts"){
+        for(const px of t.posts)for(const pz of t.posts)wall(ox+px+1,oz+pz+1,2,2);
+        for(const x of t.posts)for(const z of t.posts)if(next()<.58){
+          const fx=box(g,new THREE.BoxGeometry(3.2,.052,.56),lib.light.clone(),ox+x+1,level.wallHeight-.12,oz+z+1);
+          fx.userData.light=true;fx.userData.baseEmissive=1.8;this.fixtures.push(fx);
+          this.lightSources.push({position:new THREE.Vector3(ox+x+1,level.wallHeight-.31,oz+z+1),color:0xffd66a,baseIntensity:102,intensity:102,distance:28,decay:2,fixture:fx});
+        }
+        return;
+      }
+      if(t.kind==="open"||t.kind==="open_small"){
+        const step=t.kind==="open_small"?8:8;
+        for(let x=step/2;x<size;x+=step)for(let z=step/2;z<size;z+=step)if(next()<.62){
+          const fx=box(g,new THREE.BoxGeometry(3.35,.052,.58),lib.light.clone(),ox+x,level.wallHeight-.12,oz+z);
+          fx.userData.light=true;fx.userData.baseEmissive=1.8;this.fixtures.push(fx);
+          this.lightSources.push({position:new THREE.Vector3(ox+x,level.wallHeight-.31,oz+z),color:0xffd66a,baseIntensity:92,intensity:92,distance:28,decay:2,fixture:fx});
+        }
+        return;
+      }
+      if(t.kind==="maze_garage"){
+        wall(cx,oz+4,size,8);wall(cx,oz+size-4,size,8);wall(ox+4,cz,8,size);wall(ox+size-4,cz,8,size);
+        for(const x of [ox+10,ox+17,ox+24,ox+31,ox+38])wall(x,cz,2,30);
+        for(const z of [oz+10,oz+17,oz+24,oz+31,oz+38])wall(cx,z,30,2);
+        return;
+      }
+      if(t.kind==="dense_rooms"){
+        wall(cx,oz+4,size,8);wall(cx,oz+size-4,size,8);wall(ox+4,cz,8,size);wall(ox+size-4,cz,8,size);
+        for(const x of [ox+15,ox+32])wall(x,cz,2,30);
+        for(const z of [oz+15,oz+32])wall(cx,z,30,2);
+        return;
+      }
+      if(t.kind==="small_rooms"){
+        wall(cx,oz+3,size,6);wall(cx,oz+size-3,size,6);wall(ox+3,cz,6,size);wall(ox+size-3,cz,6,size);
+        wall(cx,cz,2,12);wall(cx,cz,12,2);
+      }
+    };
+
+    if(this.zone==="mega"){
+      const type=this.megaType===2?2:1;
+      if(type===1||type===2){
+        for(const x of [-8,24])for(const z of [-8,24])addMega(type,x,z);
+      }else if(type===6){
+        addMega(type,-8,-8);
+      }else{
+        addMega(type,8,8);
+      }
+    }else{
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)];
+        const variant=Math.floor(cycleHash(this.seedKey(),x,z,0x4c30)*8);
+        const covered=this.rooms.some(r=>r.type==="mega"&&x>=r.x&&x<r.x+r.w&&z>=r.z&&z<r.z+r.h);
+        if(!covered)addRoom(this.originX+x*cell+cell/2,this.originZ+z*cell+cell/2,mask,variant);
+      }
+      if(this.megaType>=3)addMega(this.megaType,0,0);
+    }
+  }
+
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
@@ -710,7 +850,7 @@ class Chunk{
 
     if(this.zone==="mega"){
       // 5x5 parking-column rhythm. This is the dominant Level 1 shape in
-      // SpacePotato's megaroom1: long sightlines with repeating square
+      // The Level 0 macro room 1: long sightlines with repeating square
       // concrete pillars and low structural beams.
       const columnGeom=new THREE.BoxGeometry(1.22,level.wallHeight,.1);
       const pillarGeom=new THREE.BoxGeometry(1.22,level.wallHeight,1.22);
@@ -981,13 +1121,14 @@ class WorldStreamer{
     }
 
     this.updateSurfaceTiling();
+    this.updateWallTextureTiling();
 
     // The procedural fallback is complete at this point. Do not make startup
     // depend on remote texture downloads or external asset hosts.
     void (async()=>{
       try{
         if(this.game.level.id==="1"){
-          await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
+          await applyreferenceLevel1Assets(this.library,this.game.level,onProgress);
         }else{
           await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
         }
@@ -995,9 +1136,22 @@ class WorldStreamer{
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
       this.updateSurfaceTiling();
+      this.updateWallTextureTiling();
     })();
 
     return true;
+  }
+
+  updateWallTextureTiling(){
+    if(this.game.level.id!=="0"||!this.library?.wall)return;
+    for(const key of ["map","roughnessMap","normalMap"]){
+      const texture=this.library.wall[key];
+      if(!texture)continue;
+      texture.wrapS=THREE.RepeatWrapping;
+      texture.wrapT=THREE.RepeatWrapping;
+      texture.repeat.set(1,1);
+      texture.offset.set(0,0);
+    }
   }
 
   updateSurfaceTiling(){
@@ -1025,11 +1179,13 @@ class WorldStreamer{
     }
   }
   chunkAt(x,z){
-    const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    const offset=this.game.level.id==="0"?32:this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     return this.chunks.get(this.key(cx,cz))||null;
   }
   ensureAround(x,z){
-    const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    const offset=this.game.level.id==="0"?32:this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
       if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
       const k=this.key(cx+dx,cz+dz);
@@ -1082,35 +1238,39 @@ class WorldStreamer{
     if(this.game.admin?.noclip)return {x:position.x,z:position.z};
     const chunk=this.chunkAt(position.x,position.z);
     if(!chunk)return position;
-    const cell=this.game.level.cellSize,wallRadius=radius+.11;
+    const wallRadius=radius+.11;
     let x=position.x,z=position.z;
 
+    const testSegment=(x1,z1,x2,z2)=>{
+      const sx=x2-x1,sz=z2-z1,lenSq=sx*sx+sz*sz||1;
+      const t=Math.max(0,Math.min(1,((x-x1)*sx+(z-z1)*sz)/lenSq));
+      const qx=x1+sx*t,qz=z1+sz*t;
+      let dx=x-qx,dz=z-qz,dist=Math.hypot(dx,dz);
+      if(dist<wallRadius){
+        if(dist<.0001){dx=-(sz||1);dz=sx||1;dist=Math.hypot(dx,dz)||1}
+        const push=wallRadius-dist;
+        x+=dx/dist*push;z+=dz/dist*push;
+      }
+    };
+
+    if(this.game.level.id==="0"&&chunk.collisionSegments?.length){
+      for(let pass=0;pass<2;pass++)for(const seg of chunk.collisionSegments)testSegment(seg.x1,seg.z1,seg.x2,seg.z2);
+      return {x,z};
+    }
+
+    const cell=this.game.level.cellSize;
+    const baseX=Math.floor((x-chunk.originX)/cell),baseZ=Math.floor((z-chunk.originZ)/cell);
     for(let pass=0;pass<2;pass++){
-      const baseX=Math.floor((x-chunk.originX)/cell);
-      const baseZ=Math.floor((z-chunk.originZ)/cell);
-      for(let iz=baseZ-1;iz<=baseZ+1;iz++)for(let ix=baseX-1;ix<=baseX+1;ix++){
+      const bx=Math.floor((x-chunk.originX)/cell),bz=Math.floor((z-chunk.originZ)/cell);
+      for(let iz=bz-1;iz<=bz+1;iz++)for(let ix=bx-1;ix<=bx+1;ix++){
         if(ix<0||iz<0||ix>=chunk.gridSize()||iz>=chunk.gridSize())continue;
         const mask=chunk.walls[chunk.index(ix,iz)];
         const minX=chunk.originX+ix*cell,maxX=minX+cell;
         const minZ=chunk.originZ+iz*cell,maxZ=minZ+cell;
-
-        const testWall=(x1,z1,x2,z2,nx,nz,closed)=>{
-          if(!closed)return;
-          const sx=x2-x1,sz=z2-z1,lenSq=sx*sx+sz*sz||1;
-          const t=Math.max(0,Math.min(1,((x-x1)*sx+(z-z1)*sz)/lenSq));
-          const qx=x1+sx*t,qz=z1+sz*t;
-          let dx=x-qx,dz=z-qz,dist=Math.hypot(dx,dz);
-          if(dist<wallRadius){
-            if(dist<.0001){dx=nx;dz=nz;dist=1}
-            const push=wallRadius-dist;
-            x+=dx/dist*push;z+=dz/dist*push;
-          }
-        };
-
-        testWall(minX,minZ,maxX,minZ,0,-1,(mask&1)!==0);
-        testWall(maxX,minZ,maxX,maxZ,1,0,(mask&2)!==0);
-        testWall(minX,maxZ,maxX,maxZ,0,1,(mask&4)!==0);
-        testWall(minX,minZ,minX,maxZ,-1,0,(mask&8)!==0);
+        if(mask&1)testSegment(minX,minZ,maxX,minZ);
+        if(mask&2)testSegment(maxX,minZ,maxX,maxZ);
+        if(mask&4)testSegment(minX,maxZ,maxX,maxZ);
+        if(mask&8)testSegment(minX,minZ,minX,maxZ);
       }
     }
     return {x,z};
@@ -1189,7 +1349,7 @@ class Player{
     const viewAlpha=1-Math.exp(-dt*20);
     this.viewYaw+=yawDiff*viewAlpha;
     this.viewPitch+=(this.pitch-this.viewPitch)*viewAlpha;
-    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?4.75:2.85;
+    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.2:2.85;
     const forward=new THREE.Vector3(-Math.sin(this.viewYaw),0,-Math.cos(this.viewYaw)),right=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
     const oldX=this.position.x,oldZ=this.position.z;
