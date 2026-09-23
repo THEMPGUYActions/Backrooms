@@ -735,11 +735,15 @@ class Chunk{
   }
   buildLevel0Set(level,lib,rng){
     const g=this.group,cells=this.gridSize(),cell=level.cellSize;
+    const roomRng=new RNG(this.seedKey()^0x5d11f);
+    const lightRng=new RNG(this.seedKey()^0x6a11c);
+    const next=()=>lightRng.next();
     const wallCells=new Set();
     const addWall=(x,z)=>wallCells.add(x+","+z);
 
     const addRoom=(cellX,cellZ,mask)=>{
-      const template=level0RoomRows(mask,0),rotation=level0RotationForMask(mask);
+      const variant=roomRng.int(0,7);
+      const template=level0RoomRows(mask,variant),rotation=level0RotationForMask(mask);
       const baseX=this.originX+cellX*cell,baseZ=this.originZ+cellZ*cell;
       for(let z=0;z<16;z++){
         const bits=template.rows[z]>>>0;
@@ -852,15 +856,32 @@ class Chunk{
       g.add(mesh);
       this.level0WallMesh=mesh;
     }
+    // The source fills every 16x16 Minecraft chunk with four 8x8 roof
+    // structures. Each roof structure is roof1 (80%) or roof2 (20%).
+    // roof2 contains four ceiling fluorescents at local block positions
+    // (2,1), (2,5), (6,1), (6,5). Those positions are symmetric under the
+    // source's NONE/CW90 roof rotations, so the same coordinates are exact.
+    const fixtureCandidates=[];
+    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
+      for(let tileX=0;tileX<this.world.size;tileX+=8){
+        const roofIsLit=lightRng.next()<.2;
+        lightRng.next(); // consume the source NONE/CW90 rotation roll
+        if(!roofIsLit)continue;
 
-    // Keep dynamic Level 0 lighting deliberately small. The source
-    // ceiling grid is on 8-block spacing, so use those same integer positions.
-    const lightBudget=7;
-    let lightCount=0;
+        for(const localZ of [1,5])for(const localX of [2,6]){
+          const px=this.originX+tileX+localX;
+          const pz=this.originZ+tileZ+localZ;
+          const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
+          fixtureCandidates.push({px,pz,d:dx*dx+dz*dz});
+        }
+      }
+    }
+
+    fixtureCandidates.sort((a,b)=>a.d-b.d);
 
     const clearForFixture=(x,z,rotation)=>{
-      const hx=rotation===0?1.72:.31;
-      const hz=rotation===0?.31:1.72;
+      const hx=rotation===0?1.65:.30;
+      const hz=rotation===0?.30:1.65;
       const minX=Math.floor(x-hx),maxX=Math.floor(x+hx);
       const minZ=Math.floor(z-hz),maxZ=Math.floor(z+hz);
       for(let wz=minZ;wz<=maxZ;wz++)for(let wx=minX;wx<=maxX;wx++){
@@ -869,26 +890,11 @@ class Chunk{
       return true;
     };
 
-    const candidates=[];
-    for(let z=4;z<this.world.size;z+=8){
-      for(let x=4;x<this.world.size;x+=8){
-        const px=this.originX+x,pz=this.originZ+z;
-        const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
-        candidates.push({px,pz,d:dx*dx+dz*dz});
-      }
-    }
-    candidates.sort((a,b)=>a.d-b.d);
-
-    for(const candidate of candidates){
-      if(lightCount>=lightBudget)break;
-      if(next()>.72)continue;
-
-      const rotations=[0,Math.PI/2];
-      let rotation=rotations[(Math.floor(next()*2))];
-      if(!clearForFixture(candidate.px,candidate.pz,rotation)){
-        rotation=rotation===0?Math.PI/2:0;
-        if(!clearForFixture(candidate.px,candidate.pz,rotation))continue;
-      }
+    const maxFixtures=24;
+    let fixtureCount=0;
+    for(const candidate of fixtureCandidates){
+      if(fixtureCount>=maxFixtures)break;
+      if(!clearForFixture(candidate.px,candidate.pz,0))continue;
 
       const mat=lib.light.clone();
       mat.emissiveIntensity=1.55+next()*.4;
@@ -897,23 +903,23 @@ class Chunk{
         new THREE.BoxGeometry(3.35,.05,.58),
         mat,
         candidate.px,h-.10,candidate.pz,
-        0,rotation,0
+        0,0,0
       );
       fixture.userData.light=true;
       fixture.userData.baseEmissive=mat.emissiveIntensity;
       this.fixtures.push(fixture);
 
-      const intensity=88+next()*22;
+      const intensity=82+next()*18;
       this.lightSources.push({
         position:new THREE.Vector3(candidate.px,h-.28,candidate.pz),
-        color:0xffd66a,
+        color:0xffff78,
         baseIntensity:intensity,
         intensity,
-        distance:24,
+        distance:18,
         decay:2,
         fixture
       });
-      lightCount++;
+      fixtureCount++;
     }
   }
   buildLevel1Set(level,lib,rng){
