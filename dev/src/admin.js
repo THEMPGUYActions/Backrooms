@@ -7,6 +7,7 @@ export class BackroomsAdmin{
     this.game=game;
     this.opened=false;
     this.ready=false;
+    this.busy=false;
     this.opener=null;
   }
   activate(){
@@ -215,41 +216,57 @@ export class BackroomsAdmin{
 
   async teleportLevel(id){
     const level=LEVELS[String(id)];
-    if(!level||!this.game.running||this.game.introActive||this.game.dead)return;
-    this.game.paused=true;
-    this.game.dead=false;
-    document.getElementById("pause")?.classList.add("hidden");
-    document.getElementById("death")?.classList.add("hidden");
-    document.getElementById("ending")?.classList.add("hidden");
+    if(!level||this.busy||!this.game.running||this.game.introActive||this.game.dead)return;
+    this.busy=true;
+    const wasPaused=this.game.paused;
+    if(this.root)this.root.style.pointerEvents="none";
+    try{
+      this.game.paused=true;
+      document.getElementById("pause")?.classList.add("hidden");
+      document.getElementById("death")?.classList.add("hidden");
+      document.getElementById("ending")?.classList.add("hidden");
 
-    this.game.levelId=String(id);
-    this.game.level=level;
-    this.game.lightState="ON";
-    this.game.lightEventTimer=48;
-    this.game.intercomTimer=70;
-    const FogClass=this.game.scene.fog?.constructor;
-    if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.043:level.id==="2"?.058:level.id==="3"?.052:.036);
-    this.game.ambient.color.setHex(level.theme.ambient);
-    this.game.flash.color.setHex(level.id==="2"?0xd9d7ff:0xffffee);
-    await this.game.world.configure();
-    this.game.world.ensureAround(0,0);
-    this.game.entityManager.clear();
-    this.game.player.reset();
-    if(String(id)==="1")this.game.player.position.set(6,this.game.player.eyeY,3);
-    else this.game.player.position.set(0,this.game.player.eyeY,0);
-    this.game.running=true;
-    this.game.paused=false;
-    this.game.introActive=false;
-    this.game.introPlaying=false;
-    document.getElementById("hud")?.classList.remove("hidden");
-    document.getElementById("mobile-controls")?.classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
-    const n=document.getElementById("level-number");if(n)n.textContent=level.number;
-    const name=document.getElementById("level-name");if(name)name.textContent=level.name;
-    const obj=document.getElementById("objective");if(obj)obj.textContent=level.objective;
-    const rec=document.getElementById("recording-level");if(rec)rec.textContent=level.number;
-    const pause=document.getElementById("pause-level");if(pause)pause.textContent=level.number;
-    this.game.toast("LOADED "+level.number,1.4);
-    this.sync();
+      this.game.levelId=String(id);
+      this.game.level=level;
+      this.game.lightState="ON";
+      this.game.lightEventTimer=48;
+      this.game.intercomTimer=70;
+      const FogClass=this.game.scene.fog?.constructor;
+      if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.043:level.id==="2"?.058:level.id==="3"?.052:.036);
+      this.game.ambient.color.setHex(level.theme.ambient);
+      this.game.flash.color.setHex(level.id==="2"?0xd9d7ff:0xffffee);
+
+      await this.game.world.configure();
+      this.game.world.ensureAround(0,0);
+      this.game.entityManager.clear();
+      this.game.player.reset();
+      if(String(id)==="1")this.game.player.position.set(6,this.game.player.eyeY,3);
+      else this.game.player.position.set(0,this.game.player.eyeY,0);
+
+      this.game.running=true;
+      this.game.paused=wasPaused;
+      this.game.introActive=false;
+      this.game.introPlaying=false;
+      document.getElementById("hud")?.classList.remove("hidden");
+      document.getElementById("mobile-controls")?.classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
+      const n=document.getElementById("level-number");if(n)n.textContent=level.number;
+      const name=document.getElementById("level-name");if(name)name.textContent=level.name;
+      const obj=document.getElementById("objective");if(obj)obj.textContent=level.objective;
+      const rec=document.getElementById("recording-level");if(rec)rec.textContent=level.number;
+      const pause=document.getElementById("pause-level");if(pause)pause.textContent=level.number;
+      this.game.toast("LOADED "+level.number,1.4);
+      this.sync();
+    }catch(error){
+      console.error("[Backrooms] Admin teleport failed:",error);
+      this.game.running=true;
+      this.game.paused=wasPaused;
+      this.game.introActive=false;
+      this.game.introPlaying=false;
+      this.game.toast("ADMIN TELEPORT FAILED",2);
+    }finally{
+      this.busy=false;
+      if(this.root)this.root.style.pointerEvents="";
+    }
   }
 
   action(kind){
