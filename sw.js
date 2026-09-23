@@ -90,7 +90,8 @@ self.addEventListener("message",event=>{
     "carpet_color.png","carpet_rough.png","carpet_normal.png",
     "ceiling_tiles_color.png","ceiling_tiles_rough.png","ceiling_tiles_normal.png"
   ];
-  const foundFootage=["level0/wall_block.png","level0/pole.png","level0/plastic.png","level0/power_pole_texture.png","level0/power_pole_top_texture.png","wall_trim_texture.png","fluorescent_light.png"];\n  const audio=[
+  const foundFootage=["level0/wall_block.png","level0/pole.png","level0/plastic.png","level0/power_pole_texture.png","level0/power_pole_top_texture.png","wall_trim_texture.png","fluorescent_light.png"];
+  const audio=[
     "ambient_horror.ogg","electric_buzz.ogg",
     "footstep_01.ogg","footstep_02.ogg","footstep_03.ogg",
     "footstep_04.ogg","footstep_05.ogg","footstep_06.ogg"
