@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2050";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2050";
+import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2050";
 import { level0RoomRows, level0RotationForMask, rotateLevel0Local, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2105";
 
 const VHSShader={
@@ -125,11 +125,30 @@ function smoothNoise2D(x,z,seed){
   const b=n01+(n11-n01)*sx;
   return a+(b-a)*sz;
 }
+function makeWorldTiledBoxGeometry(width,height,depth,tile=1){
+  const geometry=new THREE.BoxGeometry(width,height,depth);
+  const position=geometry.attributes.position;
+  const normal=geometry.attributes.normal;
+  const uv=geometry.attributes.uv;
+  for(let i=0;i<position.count;i++){
+    const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+    const nx=normal.getX(i),ny=normal.getY(i),nz=normal.getZ(i);
+    let u,v;
+    if(Math.abs(ny)>.5){u=x/tile;v=z/tile}
+    else if(Math.abs(nz)>.5){u=x/tile;v=y/tile}
+    else{u=z/tile;v=y/tile}
+    uv.setXY(i,u,v);
+  }
+  uv.needsUpdate=true;
+  return geometry;
+}
+
 
 class Chunk{
   constructor(world,cx,cz){
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
-    this.originX=cx*world.size-world.size/2;this.originZ=cz*world.size-world.size/2;
+    const level0Offset=this.game.level.id==="0"?32:world.size/2;
+    this.originX=cx*world.size-level0Offset;this.originZ=cz*world.size-level0Offset;
     this.group=new THREE.Group();this.group.name="chunk_"+cx+"_"+cz;
     this.bounds=new THREE.Sphere(
       new THREE.Vector3(
@@ -309,7 +328,7 @@ class Chunk{
         }
       }else{
         // Level0MazeGenerator: randomized DFS over a 5x5 grid, then connect
-        // the four sector edges in SpacePotato's alternating pattern.
+        // the four sector edges in reference's alternating pattern.
         this.zone="maze";
         generateMaze();
 
@@ -329,15 +348,6 @@ class Chunk{
       for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
       for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
 
-      // Give the starting sector a clean four-way opening around spawn,
-      // matching the large connected start room while keeping the rest of
-      // the generator deterministic.
-      if(isStart){
-        this.setEdge(2,2,"north",true);
-        this.setEdge(2,2,"east",true);
-        this.setEdge(2,2,"south",true);
-        this.setEdge(2,2,"west",true);
-      }
     }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
       visited[this.index(Math.floor(cells/2),Math.floor(cells/2))]=1;
@@ -696,7 +706,7 @@ class Chunk{
     const addRun=(baseX,baseZ,z,start,end,rot)=>{
       const width=end-start+1,local=rotateLevel0Local((start+end+1)/2,z+.5,rot,16);
       const cx=baseX+(local.x-8),cz=baseZ+(local.z-8);
-      box(g,new THREE.BoxGeometry(width,level.wallHeight,1),lib.wall,cx,level.wallHeight/2,cz,0,rot,0);
+      box(g,makeWorldTiledBoxGeometry(width,level.wallHeight,1,1),lib.wall,cx,level.wallHeight/2,cz,0,rot,0);
       box(g,new THREE.BoxGeometry(width+.06,.07,1.06),lib.trimTop,cx,level.wallHeight-.035,cz,0,rot,0);
       addRectCollision(cx,cz,width,1,rot);
     };
@@ -729,7 +739,7 @@ class Chunk{
     const addMega=(type,cx,cz)=>{
       const t=LEVEL0_MEGA_TEMPLATES[type]||LEVEL0_MEGA_TEMPLATES[1],size=t.size,ox=cx-size/2,oz=cz-size/2;
       const wall=(x,z,w,d,rot=0)=>{
-        box(g,new THREE.BoxGeometry(w,level.wallHeight,d),lib.wall,x,level.wallHeight/2,z,0,rot,0);
+        box(g,makeWorldTiledBoxGeometry(w,level.wallHeight,d,1),lib.wall,x,level.wallHeight/2,z,0,rot,0);
         addRectCollision(x,z,w,d,rot);
         box(g,new THREE.BoxGeometry(w+.06,.07,d+.06),lib.trimTop,x,level.wallHeight-.035,z,0,rot,0);
       };
@@ -773,7 +783,11 @@ class Chunk{
       const type=this.megaType===2?2:1;
       if(type===1||type===2){
         for(const x of [-8,24])for(const z of [-8,24])addMega(type,x,z);
-      }else addMega(type,0,0);
+      }else if(type===6){
+        addMega(type,-8,-8);
+      }else{
+        addMega(type,8,8);
+      }
     }else{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         const mask=this.walls[this.index(x,z)];
@@ -1107,13 +1121,14 @@ class WorldStreamer{
     }
 
     this.updateSurfaceTiling();
+    this.updateWallTextureTiling();
 
     // The procedural fallback is complete at this point. Do not make startup
     // depend on remote texture downloads or external asset hosts.
     void (async()=>{
       try{
         if(this.game.level.id==="1"){
-          await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
+          await applyreferenceLevel1Assets(this.library,this.game.level,onProgress);
         }else{
           await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
         }
@@ -1121,9 +1136,22 @@ class WorldStreamer{
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
       this.updateSurfaceTiling();
+      this.updateWallTextureTiling();
     })();
 
     return true;
+  }
+
+  updateWallTextureTiling(){
+    if(this.game.level.id!=="0"||!this.library?.wall)return;
+    for(const key of ["map","roughnessMap","normalMap"]){
+      const texture=this.library.wall[key];
+      if(!texture)continue;
+      texture.wrapS=THREE.RepeatWrapping;
+      texture.wrapT=THREE.RepeatWrapping;
+      texture.repeat.set(1,1);
+      texture.offset.set(0,0);
+    }
   }
 
   updateSurfaceTiling(){
@@ -1151,11 +1179,13 @@ class WorldStreamer{
     }
   }
   chunkAt(x,z){
-    const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    const offset=this.game.level.id==="0"?32:this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     return this.chunks.get(this.key(cx,cz))||null;
   }
   ensureAround(x,z){
-    const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    const offset=this.game.level.id==="0"?32:this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
       if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
       const k=this.key(cx+dx,cz+dz);

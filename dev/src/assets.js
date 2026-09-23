@@ -4,7 +4,7 @@ THREE.Cache.enabled=true;
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
 const LOCAL_SPB_ASSET_BASE = new URL("../assets/spb-ff/", import.meta.url).href;
 
-export const SPACEPOTATO_LEVEL1_SOURCES = Object.freeze({
+export const LEVEL1_ASSET_SOURCES = Object.freeze({
   concreteColor: LOCAL_SPB_ASSET_BASE + "pbr/concrete/concrete_color.png",
   concreteNormal: LOCAL_SPB_ASSET_BASE + "pbr/concrete/concrete_normal.png",
   brickColor: LOCAL_SPB_ASSET_BASE + "pbr/bricks/bricks_color.png",
@@ -182,24 +182,24 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
   return m;
 }
 
-export async function applySpacePotatoLevel1Assets(library,level,onProgress=()=>{}){
+export async function applyLevel1Assets(library,level,onProgress=()=>{}){
   if(level.id!=="1")return false;
   const maps=[
-    [library.floor,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete floor"],
-    [library.floor,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete floor normal"],
-    [library.ceiling,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete ceiling"],
-    [library.ceiling,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete ceiling normal"],
-    [library.concrete,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete walls"],
-    [library.concrete,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete wall normal"],
-    [library.maintenanceWall,"map",SPACEPOTATO_LEVEL1_SOURCES.brickColor,true,2.4,.20,"White brick corridors"],
-    [library.crate,"map",SPACEPOTATO_LEVEL1_SOURCES.crateColor,true,1,.16,"Wooden crates"],
-    [library.level1Light,"map",SPACEPOTATO_LEVEL1_SOURCES.fluorescent,true,1,.18,"Fluorescent fixtures"],
-    [library.trim,"map",SPACEPOTATO_LEVEL1_SOURCES.wallTrim,true,1,.12,"Wall trim"],
-    [library.trimTop,"map",SPACEPOTATO_LEVEL1_SOURCES.wallTrim,true,1,.12,"Wall trim top"],
-    [library.stairs,"map",SPACEPOTATO_LEVEL1_SOURCES.stairs,true,1,.12,"Concrete stairs"]
+    [library.floor,"map",LEVEL1_ASSET_SOURCES.concreteColor,true,3.2,.18,"Concrete floor"],
+    [library.floor,"normalMap",LEVEL1_ASSET_SOURCES.concreteNormal,false,3.2,.22,"Concrete floor normal"],
+    [library.ceiling,"map",LEVEL1_ASSET_SOURCES.concreteColor,true,3.2,.18,"Concrete ceiling"],
+    [library.ceiling,"normalMap",LEVEL1_ASSET_SOURCES.concreteNormal,false,3.2,.22,"Concrete ceiling normal"],
+    [library.concrete,"map",LEVEL1_ASSET_SOURCES.concreteColor,true,3.2,.18,"Concrete walls"],
+    [library.concrete,"normalMap",LEVEL1_ASSET_SOURCES.concreteNormal,false,3.2,.22,"Concrete wall normal"],
+    [library.maintenanceWall,"map",LEVEL1_ASSET_SOURCES.brickColor,true,2.4,.20,"White brick corridors"],
+    [library.crate,"map",LEVEL1_ASSET_SOURCES.crateColor,true,1,.16,"Wooden crates"],
+    [library.level1Light,"map",LEVEL1_ASSET_SOURCES.fluorescent,true,1,.18,"Fluorescent fixtures"],
+    [library.trim,"map",LEVEL1_ASSET_SOURCES.wallTrim,true,1,.12,"Wall trim"],
+    [library.trimTop,"map",LEVEL1_ASSET_SOURCES.wallTrim,true,1,.12,"Wall trim top"],
+    [library.stairs,"map",LEVEL1_ASSET_SOURCES.stairs,true,1,.12,"Concrete stairs"]
   ];
   let done=0;
-  onProgress(0,"LOADING LEVEL 1 ASSETS","SpacePotato Found Footage materials");
+  onProgress(0,"LOADING LEVEL 1 ASSETS","Level 1 reference materials");
   await Promise.all(maps.map(async([material,kind,url,color,repeat,normalStrength,label])=>{
     await applyRemoteTexture(material,kind,url,color,repeat,normalStrength);
     done++;
@@ -233,7 +233,7 @@ export function makeLibrary(level){
   ceiling.emissiveIntensity=level.id==="0"?.055:level.id==="1"?0:.028;
   return {
     floor:createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
-    wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:3.8,normalStrength:.35}),
+    wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:level.id==="0"?1:3.8,normalStrength:.35}),
     concrete:createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
     maintenanceWall:createPBRMaterial({base:0xe4e3dc,seed:117+Number(level.id),rough:.9,scale:2.4,normalStrength:.28}),
     stairs:new THREE.MeshStandardMaterial({color:0x8b8d89,roughness:.88,metalness:0}),

@@ -1,4 +1,4 @@
-// Browser-native recreation of SpacePotato's Level 0 room structures.
+// Browser-native recreation of reference's Level 0 room structures.
 // The Minecraft NBT files are used only as source/reference material. No NBT
 // or Minecraft runtime data is shipped with the browser game.
 //
@@ -32,21 +32,23 @@ export function level0RoomRows(mask,index=0){
 }
 
 export function level0RotationForMask(mask){
+  // Convert the browser's wall bits (N=1,E=2,S=4,W=8) to the
+  // template orientation used by the original room set.
   switch(mask){
-    case 8:return Math.PI;
-    case 4:return Math.PI/2;
-    case 2:return 0;
-    case 1:return -Math.PI/2;
-    case 12:return Math.PI/2;
-    case 9:return Math.PI;
-    case 6:return 0;
-    case 3:return -Math.PI/2;
-    case 10:return Math.PI/2;
-    case 5:return 0;
-    case 14:return Math.PI/2;
-    case 7:return 0;
-    case 11:return -Math.PI/2;
-    case 13:return Math.PI;
+    case 1:return Math.PI;        // north wall
+    case 2:return -Math.PI/2;     // east wall
+    case 4:return 0;              // south wall
+    case 8:return Math.PI/2;      // west wall
+    case 9:return Math.PI/2;      // north + west
+    case 3:return Math.PI;        // north + east
+    case 6:return -Math.PI/2;     // south + east
+    case 12:return 0;             // south + west
+    case 10:return 0;             // east + west hallway
+    case 5:return Math.PI/2;      // north + south hallway
+    case 14:return 0;             // all but north
+    case 7:return -Math.PI/2;     // all but west
+    case 11:return Math.PI;       // all but south
+    case 13:return Math.PI/2;     // all but east
     default:return 0;
   }
 }
