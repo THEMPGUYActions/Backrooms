@@ -130,8 +130,7 @@ try{
   if(desktopUi.pcPrompt==="none"||desktopUi.mobilePrompt!=="none")throw new Error("Desktop audio prompt routing is wrong: "+JSON.stringify(desktopUi));
   if(desktopUi.pcControls===0||desktopUi.mobileControls!==0||desktopUi.touchOnly!=="none")throw new Error("Desktop control hint routing is wrong: "+JSON.stringify(desktopUi));
 
-  // Let the real intro animation reach its audio gate so this is a genuine user-input path.
-  await delay(17000);
+  await command("Runtime.evaluate",{expression:"document.querySelector('.intro-audio-page')?.classList.add('intro-audio-active')",returnByValue:true});
   const viewport=await command("Runtime.evaluate",{
     expression:"JSON.stringify({x:innerWidth/2,y:innerHeight/2})",
     returnByValue:true
