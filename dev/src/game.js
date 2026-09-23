@@ -1924,16 +1924,17 @@ class Player{
     const wallFade=wallDistance<Infinity
       ? THREE.MathUtils.smoothstep(wallDistance,.18,1.25)
       : 1;
-    // Do not crush the whole beam beside a wall. Instead, reduce only the
-    // concentrated component while leaving a soft wash, matching the source
-    // AreaLight look without producing a saturated circular hotspot.
-    const washScale=.72+.28*wallFade;
-    const beamScale=.32+.68*wallFade;
+    // A physically attenuated point light can still saturate a surface when
+    // its origin is only a few centimeters from that surface. The source uses
+    // deferred AreaLights, so emulate their softer near-wall response by
+    // aggressively reducing the concentrated components only at close range.
+    const washScale=.14+.86*wallFade;
+    const beamScale=.05+.95*wallFade;
 
     this.game.flash.distance=25;
     this.game.flash.decay=2;
     this.game.flash.intensity=this.flashlight
-      ? (.48+beamPower*.72)*washScale
+      ? (.34+beamPower*.66)*washScale
       : 0;
 
     this.game.flashFill.distance=25;
@@ -1941,7 +1942,7 @@ class Player{
     this.game.flashFill.penumbra=.94;
     this.game.flashFill.decay=2;
     this.game.flashFill.intensity=this.flashlight
-      ? (.22+beamPower*.78)*beamScale
+      ? (.10+beamPower*.55)*beamScale
       : 0;
 
     this.game.flashFillTarget.position.copy(this.game.camera.position)
