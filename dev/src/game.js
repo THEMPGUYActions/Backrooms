@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
-import { makeLibrary, applyOpenGameArtPBR, applyLevel0Assets, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0assets4";
+import { makeLibrary, applyOpenGameArtPBR, applyLevel0Assets, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0assets5";
 import { level0RotationForMask, level0TransformBlock, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-lobbytemplates3";
 import { LEVEL0_SOURCE_STRUCTURES } from "./level0_source.generated.js?v=20260923-l0source3";
 
@@ -866,8 +866,8 @@ class Chunk{
           if(Math.abs(x)+Math.abs(z)===0)continue;
           pillars.push([p.x+x*spacing,p.z+z*spacing]);
         }
-        const pillarMesh=new THREE.InstancedMesh(pillarGeom,lib.pillar,pillars.length);
-        const baseMesh=new THREE.InstancedMesh(baseGeom,lib.pillar,pillars.length);
+        const pillarMesh=new THREE.InstancedMesh(pillarGeom,lib.wall,pillars.length);
+        const baseMesh=new THREE.InstancedMesh(baseGeom,lib.wall,pillars.length);
         for(let i=0;i<pillars.length;i++){
           const [px,pz]=pillars[i];
           pillarMesh.setMatrixAt(i,new THREE.Matrix4().compose(new THREE.Vector3(px,level.wallHeight/2,pz),new THREE.Quaternion(),new THREE.Vector3(.9,1,.9)));
@@ -915,12 +915,21 @@ class Chunk{
           const radius=cell*.27;
           poles.push([p.x+Math.cos(angle)*radius,p.z+Math.sin(angle)*radius]);
         }
-        const poleMesh=new THREE.InstancedMesh(poleGeom,lib.pole,poles.length);
+        const poleMesh=new THREE.InstancedMesh(poleGeom,lib.wall,poles.length);
         for(let i=0;i<poles.length;i++)poleMesh.setMatrixAt(i,new THREE.Matrix4().compose(new THREE.Vector3(poles[i][0],(level.wallHeight-.25)/2,poles[i][1]),new THREE.Quaternion(),new THREE.Vector3(1,1,1)));
         poleMesh.instanceMatrix.needsUpdate=true;poleMesh.computeBoundingSphere();g.add(poleMesh);
-        const beam=new THREE.Mesh(new THREE.BoxGeometry(cell*.64,.10,.10),lib.pole);
+        const beam=new THREE.Mesh(new THREE.BoxGeometry(cell*.64,.10,.10),lib.wall);
         beam.position.set(p.x,level.wallHeight-.3,p.z);
         g.add(beam);
+        for(const [px,pz] of poles){
+          const r=.10;
+          this.collisionSegments.push(
+            {x1:px-r,z1:pz-r,x2:px+r,z2:pz-r},
+            {x1:px+r,z1:pz-r,x2:px+r,z2:pz+r},
+            {x1:px+r,z1:pz+r,x2:px-r,z2:pz+r},
+            {x1:px-r,z1:pz+r,x2:px-r,z2:pz-r}
+          );
+        }
       }
     }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v11";
+const CACHE_NAME="backrooms-assets-v12";
 const CORE=[
   "index.html",
   "styles.css",
@@ -41,38 +41,43 @@ self.addEventListener("fetch",event=>{
   if(request.method!=="GET")return;
   const url=new URL(request.url);
   const sameOrigin=url.origin===self.location.origin;
-  const isAsset=sameOrigin&&(
-    url.pathname.includes("/assets/pbr/")||
-    url.pathname.includes("/assets/audio/")
-  );
+  const isAsset=sameOrigin&&url.pathname.includes("/assets/");
   if(!sameOrigin&&!url.hostname.includes("cdn.jsdelivr.net"))return;
 
   if(isAsset){
-    event.respondWith(
-      caches.match(request).then(cached=>{
-        const network=fetch(request).then(response=>{
-          if(response.ok){
-            const copy=response.clone();
-            caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});
-          }
-          return response;
-        }).catch(()=>cached);
-        return cached||network;
-      })
-    );
-    return;
-  }
-
-  if(sameOrigin){
-    event.respondWith(
-      fetch(request).then(response=>{
+    event.respondWith((async()=>{
+      const cached=await caches.match(request);
+      if(cached)return cached;
+      try{
+        const response=await fetch(request);
         if(response.ok){
           const copy=response.clone();
           caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});
         }
         return response;
-      }).catch(()=>caches.match(request))
-    );
+      }catch(error){
+        console.warn("[Backrooms] Asset request failed:",request.url,error);
+        return new Response("",{status:503,statusText:"Asset unavailable"});
+      }
+    })());
+    return;
+  }
+
+  if(sameOrigin){
+    event.respondWith((async()=>{
+      try{
+        const response=await fetch(request);
+        if(response.ok){
+          const copy=response.clone();
+          caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});
+        }
+        return response;
+      }catch(error){
+        const cached=await caches.match(request);
+        if(cached)return cached;
+        return new Response("",{status:503,statusText:"Offline"});
+      }
+    })());
   }
 });
 
@@ -86,6 +91,7 @@ self.addEventListener("message",event=>{
     "ceiling_tiles_color.png","ceiling_tiles_rough.png","ceiling_tiles_normal.png"
   ];
   const level0=[
+    "level0/wall_block.png",
     "level0/wall_block_2_texture.png",
     "level0/wall_block_2.png",
     "level0/wallpaper_bottom_block_texture.png",
@@ -93,8 +99,6 @@ self.addEventListener("message",event=>{
     "level0/pbr/carpet/carpet_normal.png",
     "level0/pbr/ceiling_tile/ceiling_tile_color.png",
     "level0/pbr/ceiling_tile/ceiling_tile_normal.png",
-    "level0/pole.png",
-    "level0/plastic.png"
   ];
   const audio=[
     "ambient_horror.ogg","electric_buzz.ogg",
