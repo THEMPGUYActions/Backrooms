@@ -51,7 +51,7 @@ export const LEVELS = {
     darkness: 0.24,
     holeChance: 0,
     pipeChance: 0,
-    entity: "hound",
+    entity: "smiler",
     exitStyle: "green",
     batteryChance: 0.14,
     exitAfterChunks: 4,
