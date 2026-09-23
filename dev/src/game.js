@@ -402,7 +402,19 @@ class Chunk{
       this.setEdge(spawnX,spawnZ,"north",true);
       this.setEdge(spawnX,spawnZ,"east",true);
       this.setEdge(spawnX,spawnZ,"south",true);
-      this.setEdge(spawnX,spawnZ,"west",true);    }else{
+      this.setEdge(spawnX,spawnZ,"west",true);
+      // Shared sector boundaries. The key is derived from the world-cell
+      // coordinate so both adjacent chunks make the exact same opening.
+      for(let x=0;x<cells;x++){
+        const gx=this.cx*cells+x;
+        if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h",.22))this.setEdge(x,0,"north",true);
+        if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",.22))this.setEdge(x,cells-1,"south",true);
+      }
+      for(let z=0;z<cells;z++){
+        const gz=this.cz*cells+z;
+        if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v",.22))this.setEdge(0,z,"west",true);
+        if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",.22))this.setEdge(cells-1,z,"east",true);
+      }    }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
       visited[this.index(Math.floor(cells/2),Math.floor(cells/2))]=1;
       const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
@@ -492,69 +504,63 @@ class Chunk{
     if(level.id==="0"){
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         const mask=this.walls[this.index(x,z)];
-        if(mask&1)edges.push({x,z,side:"north"});
-        if(mask&8)edges.push({x,z,side:"west"});
-        if(z===cells-1&&(mask&4))edges.push({x,z,side:"south"});
-        if(x===cells-1&&(mask&2))edges.push({x,z,side:"east"});
-        const fixtureChance=this.level0Blackout?0:.32;
+        const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
+        const addEdge=(side)=>{
+          if(side==="north"){
+            const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,safeWallY,pz-cell/2);
+            pushMat(trimH,px,.065,pz-cell/2);
+            pushMat(topH,px,level.wallHeight-.04,pz-cell/2);
+            edges.push({x,z,side});
+          }else if(side==="south"){
+            const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,safeWallY,pz+cell/2);
+            pushMat(trimH,px,.065,pz+cell/2);
+            pushMat(topH,px,level.wallHeight-.04,pz+cell/2);
+            edges.push({x,z,side});
+          }else if(side==="west"){
+            const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px-cell/2,safeWallY,pz);
+            pushMat(trimV,px-cell/2,.065,pz);
+            pushMat(topV,px-cell/2,level.wallHeight-.04,pz);
+            edges.push({x,z,side});
+          }else{
+            const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px+cell/2,safeWallY,pz);
+            pushMat(trimV,px+cell/2,.065,pz);
+            pushMat(topV,px+cell/2,level.wallHeight-.04,pz);
+            edges.push({x,z,side});
+          }
+        };
+        if(mask&1)addEdge("north");
+        if(mask&8)addEdge("west");
+        if(z===cells-1&&(mask&4))addEdge("south");
+        if(x===cells-1&&(mask&2))addEdge("east");
+        const fixtureChance=this.level0Blackout?0:.34;
         if(rngBase.next()<fixtureChance){
-          const fixtureMat=this.level0RedRoom?lib.redLight:lib.light;
-          const material=fixtureMat.clone();
-          material.emissiveIntensity=this.level0RedRoom?1.45:2.7;
+          const material=(this.level0RedRoom?lib.redLight:lib.light).clone();
+          material.emissiveIntensity=this.level0RedRoom?1.35:2.5;
           const rotation=rngBase.next()<.5?0:Math.PI/2;
-          const fixture=box(
-            g,new THREE.BoxGeometry(1.5,.055,.46),material,
-            this.originX+x*cell+cell/2,level.wallHeight-.09,this.originZ+z*cell+cell/2,0,rotation,0
-          );
+          const fixture=box(g,new THREE.BoxGeometry(1.5,.055,.46),material,px,level.wallHeight-.08,pz,0,rotation,0);
           fixture.userData.light=true;
           fixture.userData.baseEmissive=material.emissiveIntensity;
           this.fixtures.push(fixture);
           this.lightSources.push({
-            position:new THREE.Vector3(this.originX+x*cell+cell/2,level.wallHeight-.24,this.originZ+z*cell+cell/2),
+            position:new THREE.Vector3(px,level.wallHeight-.24,pz),
             color:this.level0RedRoom?0x7a1717:level.theme.light,
-            baseIntensity:this.level0RedRoom?95:220,
-            intensity:this.level0RedRoom?95:220,
+            baseIntensity:this.level0RedRoom?95:190,
+            intensity:this.level0RedRoom?95:190,
             distance:this.level0RedRoom?18:0,
             decay:2,fixture
           });
         }
       }
-      const positions=[],normals=[],uvs=[],indices=[];
-      const pushQuad=(verts,normal,uv)=>{
-        const base=positions.length/3;
-        for(const v of verts){positions.push(v[0],v[1],v[2]);normals.push(normal[0],normal[1],normal[2]);}
-        for(const p of uv)uvs.push(p[0],p[1]);
-        indices.push(base,base+1,base+2,base,base+2,base+3);
-      };
-      const appendBox=(x0,x1,z0,z1)=>{
-        const y0=0,y1=safeWallHeight,t=wallThickness/2;
-        pushQuad([[x0,y0,z0-t],[x0,y1,z0-t],[x1,y1,z0-t],[x1,y0,z0-t]],[0,0,-1],[[0,0],[x1-x0,y1],[x1-x0,0],[0,y1]]);
-        pushQuad([[x1,y0,z1+t],[x1,y1,z1+t],[x0,y1,z1+t],[x0,y0,z1+t]],[0,0,1],[[0,0],[x1-x0,y1],[x1-x0,0],[0,y1]]);
-        pushQuad([[x0-t,y0,z1],[x0-t,y1,z1],[x0-t,y1,z0],[x0-t,y0,z0]],[-1,0,0],[[0,0],[z1-z0,y1],[z1-z0,0],[0,y1]]);
-        pushQuad([[x1+t,y0,z0],[x1+t,y1,z0],[x1+t,y1,z1],[x1+t,y0,z1]],[1,0,0],[[0,0],[z1-z0,y1],[z1-z0,0],[0,y1]]);
-        pushQuad([[x0,y1,z0],[x0,y1,z1],[x1,y1,z1],[x1,y1,z0]],[0,1,0],[[0,0],[x1-x0,0],[x1-x0,z1-z0],[0,z1-z0]]);
-      };
-      for(const e of edges){
-        const px=this.originX+e.x*cell+cell/2;
-        const pz=this.originZ+e.z*cell+cell/2;
-        if(e.side==="north")appendBox(px-cell/2,px+cell/2,pz-cell/2,pz-cell/2);
-        else if(e.side==="south")appendBox(px-cell/2,px+cell/2,pz+cell/2,pz+cell/2);
-        else if(e.side==="west")appendBox(px-cell/2,px-cell/2,pz-cell/2,pz+cell/2);
-        else appendBox(px+cell/2,px+cell/2,pz-cell/2,pz+cell/2);
-      }
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
-      geometry.setIndex(indices);geometry.computeBoundingBox();geometry.computeBoundingSphere();
-      const mesh=new THREE.Mesh(geometry,wallMaterial);mesh.name="level0_continuous_walls";mesh.frustumCulled=true;g.add(mesh);
       this.collisionSegments=edges.map(e=>{
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         return e.side==="north"||e.side==="south"
           ? {x1:px-cell/2,z1:e.side==="north"?pz-cell/2:pz+cell/2,x2:px+cell/2,z2:e.side==="north"?pz-cell/2:pz+cell/2}
           : {x1:e.side==="west"?px-cell/2:px+cell/2,z1:pz-cell/2,x2:e.side==="west"?px-cell/2:px+cell/2,z2:pz+cell/2};
       });
-    }else{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
         const addEdge=(side)=>{
@@ -612,7 +618,9 @@ class Chunk{
           });
         }
       }
-    }    const addInstanced=(geometry,material,data)=>{
+    }
+    
+    const addInstanced=(geometry,material,data)=>{
       if(!data.length)return;
       const mesh=new THREE.InstancedMesh(geometry,material,data.length);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
@@ -1835,7 +1843,7 @@ export class BackroomsGame{
     const seedBuffer=new Int32Array(1);
     const cryptoApi=globalThis.crypto;
     if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
-    this.seed=(seedBuffer[0]||Math.floor(Math.random()*2147483647))|0;
+    this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={
