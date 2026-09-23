@@ -561,7 +561,65 @@ class Chunk{
           ? {x1:px-cell/2,z1:e.side==="north"?pz-cell/2:pz+cell/2,x2:px+cell/2,z2:e.side==="north"?pz-cell/2:pz+cell/2}
           : {x1:e.side==="west"?px-cell/2:px+cell/2,z1:pz-cell/2,x2:e.side==="west"?px-cell/2:px+cell/2,z2:pz+cell/2};
       });
-    }else{    const addInstanced=(geometry,material,data)=>{
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
+        const addEdge=(side)=>{
+          if(side==="north"){
+            const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,safeWallY,pz-cell/2);
+            pushMat(trimH,px,.065,pz-cell/2);
+            pushMat(topH,px,level.wallHeight-.04,pz-cell/2);
+            edges.push({x,z,side});
+          }else if(side==="south"){
+            const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,safeWallY,pz+cell/2);
+            pushMat(trimH,px,.065,pz+cell/2);
+            pushMat(topH,px,level.wallHeight-.04,pz+cell/2);
+            edges.push({x,z,side});
+          }else if(side==="west"){
+            const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px-cell/2,safeWallY,pz);
+            pushMat(trimV,px-cell/2,.065,pz);
+            pushMat(topV,px-cell/2,level.wallHeight-.04,pz);
+            edges.push({x,z,side});
+          }else{
+            const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px+cell/2,safeWallY,pz);
+            pushMat(trimV,px+cell/2,.065,pz);
+            pushMat(topV,px+cell/2,level.wallHeight-.04,pz);
+            edges.push({x,z,side});
+          }
+        };
+        if(mask&1)addEdge("north");
+        if(mask&8)addEdge("west");
+        if(z===cells-1&&(mask&4))addEdge("south");
+        if(x===cells-1&&(mask&2))addEdge("east");
+        const fixtureChance=level.id==="1"?0:.13;
+        if(rngBase.next()<fixtureChance){
+          const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light;
+          const material=fixtureMat.clone();
+          material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
+          const rotation=rngBase.next()<.5?0:Math.PI/2;
+          const fixture=box(
+            g,
+            new THREE.BoxGeometry(level.id==="0"?1.5:3.7,.055,level.id==="0"?.46:.72),
+            material,
+            px,level.wallHeight-.09,pz,
+            0,rotation,0
+          );
+          fixture.userData.light=true;
+          fixture.userData.baseEmissive=material.emissiveIntensity;
+          this.fixtures.push(fixture);
+          const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
+          const intensity=level.id==="3"?220:level.id==="4"?110:170;
+          this.lightSources.push({
+            position:new THREE.Vector3(px,level.wallHeight-.24,pz),
+            color:lightColor,baseIntensity:intensity,intensity,distance:0,decay:2,fixture
+          });
+        }
+      }
+    }
+    
       if(!data.length)return;
       const mesh=new THREE.InstancedMesh(geometry,material,data.length);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
