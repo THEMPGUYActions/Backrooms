@@ -50,13 +50,6 @@
       "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
       "bytes": 145370,
       "sha256": "1f5312d3fe9ac117975e8ac805ac7d7f81001e9230f88fab8d17410c95f25fc9"
-    },
-    "level0/pbr/ceiling_tile/ceiling_tile_normal.png": {
-      "url": "https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/0c46c8301fc512c318ac93e23b669355b7d4b180/src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_normal.png",
-      "source": "https://github.com/SpacePotatoee/MinecraftFoundFootage",
-      "commit": "0c46c8301fc512c318ac93e23b669355b7d4b180",
-      "bytes": 247685,
-      "sha256": "2810f51120e7b1fe6b1230dcabcda432443e2f57a10c6621d3dae4782b3a53cf"
     }
   }
 }
