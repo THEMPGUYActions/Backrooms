@@ -24,6 +24,7 @@ const SPB_FILES = [
   {name:"fluorescent_light.png",path:"src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png"},
   {name:"wall_trim_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png"},
   {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"},
+  {name:"level0/wall_block.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block.png"},
   {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png"},
   {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png"},
   {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png"},
