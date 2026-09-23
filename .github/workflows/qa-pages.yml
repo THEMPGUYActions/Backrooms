@@ -81,6 +81,8 @@ jobs:
 
       - name: Build production
         run: npm run build
+        env:
+          BACKROOMS_PRODUCTION_BUILD: "1"
 
       - name: Publish main to Pages root
         uses: peaceiris/actions-gh-pages@v4
