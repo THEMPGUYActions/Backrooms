@@ -180,7 +180,7 @@ class Chunk{
     this.walls.fill(15);this.rooms=[];
 
     if(level.id==="1"){
-      // SpacePotato's Level 1 uses two real generation paths:
+      // Level 1 uses two generation paths:
       // a 10x10 DFS maze and a Perlin-selected large parking-garage room.
       // There is no separate procedural "hall/corridor" generator.
       const forceStart=this.cx===0&&this.cz===0;
@@ -260,13 +260,13 @@ class Chunk{
         }
       }
     }else if(level.id==="0"){
-      // SpacePotato's Level 0 uses a 5x5 maze made from 16-block cells,
+      // Level 0 uses a 5x5 maze made from 16-block cells,
       // with occasional large megaroom structures. Port that topology into
       // the browser's 80x80 streamed sector instead of reusing Level 1 rules.
       const isStart=this.cx===0&&this.cz===0;
       const megaRoll=isStart?1:rng.int(1,2);
       const roomType=isStart?1:(megaRoll===1?rng.int(1,6):0);
-      this.spacePotatoMegaType=roomType||null;
+      this.megaType=roomType||null;
 
       const generateMaze=()=>{
         const visited=new Uint8Array(cells*cells);
@@ -295,7 +295,7 @@ class Chunk{
       };
 
       if(roomType===1||roomType===2){
-        // SpacePotato megaroom1/2 spans a large open area. Keep only the
+        // The large Level 0 macro rooms span a wide footprint. Keep only the
         // perimeter so the sector can still stitch to neighboring sectors.
         this.zone="mega";
         this.walls.fill(0);
@@ -379,7 +379,7 @@ class Chunk{
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
     const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
     if(level.id==="1"){
-      // SpacePotato's Level1ChunkGenerator places the level2 stairwell on
+      // The Level 1 generator places the level2 stairwell on
       // maze-grid sectors outside the starting area, using a 50% roll.
       if(level1ExitSector&&rng2.next()<.5){
         const candidates=[];
@@ -770,7 +770,7 @@ class Chunk{
     };
 
     if(this.zone==="mega"){
-      const type=this.spacePotatoMegaType===2?2:1;
+      const type=this.megaType===2?2:1;
       if(type===1||type===2){
         for(const x of [-8,24])for(const z of [-8,24])addMega(type,x,z);
       }else addMega(type,0,0);
@@ -781,7 +781,7 @@ class Chunk{
         const covered=this.rooms.some(r=>r.type==="mega"&&x>=r.x&&x<r.x+r.w&&z>=r.z&&z<r.z+r.h);
         if(!covered)addRoom(this.originX+x*cell+cell/2,this.originZ+z*cell+cell/2,mask,variant);
       }
-      if(this.spacePotatoMegaType>=3)addMega(this.spacePotatoMegaType,0,0);
+      if(this.megaType>=3)addMega(this.megaType,0,0);
     }
   }
 
@@ -836,7 +836,7 @@ class Chunk{
 
     if(this.zone==="mega"){
       // 5x5 parking-column rhythm. This is the dominant Level 1 shape in
-      // SpacePotato's megaroom1: long sightlines with repeating square
+      // The Level 0 macro room 1: long sightlines with repeating square
       // concrete pillars and low structural beams.
       const columnGeom=new THREE.BoxGeometry(1.22,level.wallHeight,.1);
       const pillarGeom=new THREE.BoxGeometry(1.22,level.wallHeight,1.22);
