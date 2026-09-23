@@ -21,10 +21,10 @@ No ripped game files or Backrooms Wiki photographs are bundled by this project.
 
 ## SpacePotato Found Footage assets
 
-The development build also downloads a small pinned set of Level 1 reference textures from:
+The development build also downloads a pinned set of reference textures from:
 
 https://github.com/SpacePotatoee/MinecraftFoundFootage/tree/0c46c8301fc512c318ac93e23b669355b7d4b180
 
-The build script places them under `dist/assets/spb-ff/` so the browser can load them locally. They are used for Level 1 concrete, white-brick corridors, crates, fluorescent fixtures, wall trim and stairs.
+The build script places them under `dist/assets/spb-ff/`. The Level 0 set includes the original wall texture, wall-base texture, carpet PBR maps, ceiling-tile PBR maps and fluorescent-light texture. Level 1 continues to use its concrete, white-brick, crate, fluorescent, trim and stair assets.
 
-The upstream repository's root `LICENSE` and its mod metadata should be treated as the source of the applicable third-party terms. These assets are not claimed as original THEMPGUY material.
+The upstream repository's root `LICENSE` and its mod metadata should be treated as the source of the applicable third-party terms. These files remain third-party assets and are not relicensed as original THEMPGUY material.
