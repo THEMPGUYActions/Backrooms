@@ -3,10 +3,10 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20260923-1950";
-import { AudioDirector } from "./audio.js?v=20260923-1950";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1950";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1950";
+import { InputManager } from "./input.js?v=20260923-2032";
+import { AudioDirector } from "./audio.js?v=20260923-2032";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2032";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2032";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -259,43 +259,89 @@ class Chunk{
         }
       }
     }else if(level.id==="0"){
-      const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
-      if(mega){
-        this.walls.fill(0);
-        for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
-        for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
-        const partitions=rng.int(0,3);
-        for(let i=0;i<partitions;i++){
-          const vertical=rng.next()<.5;
-          if(vertical){const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false)}
-          else{const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false)}
-        }
-      }else{
-        const visited=new Uint8Array(cells*cells),stack=[[0,0]];visited[this.index(0,0)]=1;
+      // SpacePotato's Level 0 uses a 5x5 maze made from 16-block cells,
+      // with occasional large megaroom structures. Port that topology into
+      // the browser's 80x80 streamed sector instead of reusing Level 1 rules.
+      const isStart=this.cx===0&&this.cz===0;
+      const megaRoll=isStart?1:rng.int(1,2);
+      const roomType=isStart?1:(megaRoll===1?rng.int(1,6):0);
+      this.spacePotatoMegaType=roomType||null;
+
+      const generateMaze=()=>{
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+        const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
+
         while(stack.length){
           const [x,z]=stack[stack.length-1],options=[];
-          for(const [dx,dz,b,ob,side] of [[0,-1,1,4,"north"],[1,0,2,8,"east"],[0,1,4,1,"south"],[-1,0,8,2,"west"]]){
+          for(const [dx,dz,b,ob] of dirs){
             const nx=x+dx,nz=z+dz;
-            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob,side]);
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)]){
+              options.push([nx,nz,b,ob]);
+            }
           }
-          if(!options.length){stack.pop();continue}
+          if(!options.length){
+            stack.pop();
+            continue;
+          }
           const [nx,nz,b,ob]=rng.pick(options);
-          this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;
-          visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
         }
-        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.18)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.18)this.setEdge(x,z,"south",true);
+      };
+
+      if(roomType===1||roomType===2){
+        // SpacePotato megaroom1/2 spans a large open area. Keep only the
+        // perimeter so the sector can still stitch to neighboring sectors.
+        this.zone="mega";
+        this.walls.fill(0);
+        for(let z=0;z<cells;z++){
+          this.walls[this.index(0,z)]|=8;
+          this.walls[this.index(cells-1,z)]|=2;
+        }
+        for(let x=0;x<cells;x++){
+          this.walls[this.index(x,0)]|=1;
+          this.walls[this.index(x,cells-1)]|=4;
+        }
+      }else{
+        // Level0MazeGenerator: randomized DFS over a 5x5 grid, then connect
+        // the four sector edges in SpacePotato's alternating pattern.
+        this.zone="maze";
+        generateMaze();
+
+        if(roomType>=3){
+          // megaroom3-6 are a 32x32 structure embedded in the maze. A 2x2
+          // group of 16x16 cells gives the same footprint in the browser.
+          this.rooms.push({x:1,z:1,w:2,h:2,type:"mega"});
+          this.setEdge(1,1,"east",true);
+          this.setEdge(1,2,"east",true);
+          this.setEdge(1,1,"south",true);
+          this.setEdge(2,1,"south",true);
+          this.setEdge(1,1,"north",true);
+          this.setEdge(2,1,"north",true);
+          this.setEdge(2,1,"east",true);
+          this.setEdge(2,2,"east",true);
         }
       }
-      if(cells>=5){
-        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
-        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
-        if(this.cz%2===0)this.setEdge(0,2,"west",true);
-        if(this.cx%2===0)this.setEdge(cells-1,2,"east",true);
-      }
-      if(this.cx===0&&this.cz===0){
-        this.setEdge(2,2,"north",true);this.setEdge(2,2,"east",true);this.setEdge(2,2,"south",true);this.setEdge(2,2,"west",true);
+
+      // Exact Level0MazeGenerator cross-sector openings:
+      // top row south, right edge west, bottom row north, left edge east.
+      for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
+      for(let i=0;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
+      for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
+      for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
+
+      // Give the starting sector a clean four-way opening around spawn,
+      // matching the large connected start room while keeping the rest of
+      // the generator deterministic.
+      if(isStart){
+        this.setEdge(2,2,"north",true);
+        this.setEdge(2,2,"east",true);
+        this.setEdge(2,2,"south",true);
+        this.setEdge(2,2,"west",true);
       }
     }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
@@ -316,7 +362,7 @@ class Chunk{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true)}
     }
 
-    if(level.id!=="1"){
+    if(level.id!=="1"&&level.id!=="0"){
       const boundaryChance=.19;
       for(let x=0;x<cells;x++){
         const gx=this.cx*cells+x;
@@ -1189,7 +1235,7 @@ class Player{
     const viewAlpha=1-Math.exp(-dt*20);
     this.viewYaw+=yawDiff*viewAlpha;
     this.viewPitch+=(this.pitch-this.viewPitch)*viewAlpha;
-    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?4.75:2.85;
+    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.2:2.85;
     const forward=new THREE.Vector3(-Math.sin(this.viewYaw),0,-Math.cos(this.viewYaw)),right=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
     const oldX=this.position.x,oldZ=this.position.z;
