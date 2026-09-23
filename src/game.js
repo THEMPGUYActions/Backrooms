@@ -199,6 +199,14 @@ class Chunk{
           this.walls[this.index(x,0)]|=1;
           this.walls[this.index(x,cells-1)]|=4;
         }
+        // Keep large garage sectors connected. These openings are the
+        // browser equivalent of the neighboring megaroom connections.
+        for(const i of [2,7]){
+          this.setEdge(i,0,"north",true);
+          this.setEdge(i,cells-1,"south",true);
+          this.setEdge(0,i,"west",true);
+          this.setEdge(cells-1,i,"east",true);
+        }
       }else{
         // Exact Level1MazeGenerator topology: randomized DFS over 10x10
         // cells, starting at [0,0], with no extra loop carving.
