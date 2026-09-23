@@ -1053,31 +1053,18 @@ class Chunk{
       {dx:0,dy:1,dz:0,n:[0,1,0],v:(x,y,z)=>[[x,y+1,z+1],[x+1,y+1,z+1],[x+1,y+1,z],[x,y+1,z]],uv:0}
     ];
 
-    const sourceMaterials=new Map();
-    const sourceMaterial=(kind)=>{
-      if(sourceMaterials.has(kind))return sourceMaterials.get(kind);
-      let base=lib.wall;
-      if(kind==="wall")base=lib.wall;
-      else if(kind==="wall2")base=lib.wall2;
-      else if(kind==="floor")base=lib.floor;
-      else if(kind==="ceiling")base=lib.ceiling;
-      else if(kind==="emergency")base=lib.light;
-
-      const material=base.clone();
-      const textureRepeat=kind==="floor"?1.25:kind==="ceiling"?1:1;
-      for(const key of ["map","roughnessMap","normalMap"]){
-        const texture=material[key];
-        if(!texture)continue;
-        material[key]=texture.clone();
-        material[key].wrapS=THREE.RepeatWrapping;
-        material[key].wrapT=THREE.RepeatWrapping;
-        material[key].repeat.set(textureRepeat,textureRepeat);
-        material[key].offset.set(0,0);
-      }
-      sourceMaterials.set(kind,material);
-      return material;
+    // Level 0 source blocks own the floor/ceiling tiling. Unlike the large
+    // fallback planes used by other levels, these meshes use one source block
+    // per texture tile, so the live library materials can receive the real
+    // SpacePotato textures when the asynchronous asset load completes.
+    const materialForKind=kind=>{
+      if(kind==="wall")return lib.wall;
+      if(kind==="wall2")return lib.wall2;
+      if(kind==="floor")return lib.floor;
+      if(kind==="ceiling")return lib.ceiling;
+      if(kind==="emergency")return lib.light;
+      return lib.wall;
     };
-    const materialForKind=kind=>sourceMaterial(kind);
 
     const appendFace=(bucket,verts,normal,uvRotation=0)=>{
       const base=bucket.positions.length/3;
@@ -1522,18 +1509,18 @@ class WorldStreamer{
     this.surfaceSize=4096;
     this.library=makeLibrary(this.game.level);
 
-    this.floorSurface=new THREE.Mesh(
-      new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
-      this.library.floor
-    );
-    this.floorSurface.rotation.x=-Math.PI/2;
-    this.floorSurface.position.set(0,-.001,0);
-    this.floorSurface.updateMatrix();
-    this.floorSurface.matrixAutoUpdate=false;
-    this.floorSurface.frustumCulled=false;
-    this.floorSurface.renderOrder=-2;
-
     if(this.game.level.id!=="0"){
+      this.floorSurface=new THREE.Mesh(
+        new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
+        this.library.floor
+      );
+      this.floorSurface.rotation.x=-Math.PI/2;
+      this.floorSurface.position.set(0,-.001,0);
+      this.floorSurface.updateMatrix();
+      this.floorSurface.matrixAutoUpdate=false;
+      this.floorSurface.frustumCulled=false;
+      this.floorSurface.renderOrder=-2;
+
       this.ceilingSurface=new THREE.Mesh(
         new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
         this.library.ceiling
@@ -1546,7 +1533,7 @@ class WorldStreamer{
       this.ceilingSurface.renderOrder=-2;
     }
 
-    this.game.scene.add(this.floorSurface);
+    if(this.floorSurface)this.game.scene.add(this.floorSurface);
     if(this.ceilingSurface)this.game.scene.add(this.ceilingSurface);
     if(this.game.level.id==="1"){
       this.library.floor.color.setHex(0x666a68);
@@ -1597,15 +1584,16 @@ class WorldStreamer{
   }
 
   updateSurfaceTiling(){
-    const surfaces=this.game.level.id==="1"
+    const isLevel0=this.game.level.id==="0";
+    const surfaces=isLevel0
       ? [
-          {material:this.library?.floor,tileWorld:5.4},
-          {material:this.library?.ceiling,tileWorld:5.4}
+          {material:this.library?.floor,tileWorld:1.25},
+          {material:this.library?.ceiling,tileWorld:1.0}
         ]
-      : this.game.level.id==="0"
+      : this.game.level.id==="1"
         ? [
-            {material:this.library?.floor,tileWorld:1.25},
-            {material:this.library?.ceiling,tileWorld:1.0}
+            {material:this.library?.floor,tileWorld:5.4},
+            {material:this.library?.ceiling,tileWorld:5.4}
           ]
         : [
             {material:this.library?.floor,tileWorld:3.0},
@@ -1614,7 +1602,7 @@ class WorldStreamer{
 
     for(const {material,tileWorld} of surfaces){
       if(!material)continue;
-      const repeat=this.surfaceSize/tileWorld;
+      const repeat=isLevel0?tileWorld:this.surfaceSize/tileWorld;
       for(const key of ["map","roughnessMap","normalMap"]){
         const texture=material[key];
         if(!texture)continue;
