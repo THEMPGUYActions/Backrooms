@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
-import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0wiki4";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0scale2";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -190,7 +190,7 @@ class Chunk{
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
     // Level 0 follows the source generator's 80-block sector origin: chunkStart - 32.
     // Keep the streamer and the generated geometry on the same coordinate grid.
-    const originOffset=this.game.level.id==="0"?32:world.size/2;
+    const originOffset=world.size/2;
     this.originX=cx*world.size-originOffset;this.originZ=cz*world.size-originOffset;
     this.group=new THREE.Group();this.group.name="chunk_"+cx+"_"+cz;
     this.bounds=new THREE.Sphere(
@@ -678,7 +678,7 @@ class Chunk{
       }
       const pg=new THREE.BoxGeometry(1.25,level.wallHeight,1.25),bg=new THREE.BoxGeometry(1.5,.16,1.5);
       const addLocal=(geometry,material,data)=>{if(!data.length)return;const m=new THREE.InstancedMesh(geometry,material,data.length);m.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((v,i)=>m.setMatrixAt(i,v));m.instanceMatrix.needsUpdate=true;m.computeBoundingSphere();g.add(m)};
-      addLocal(pg,lib.wall,pillarData);addLocal(bg,lib.wall,baseData);
+      addLocal(pg,lib.pillar,pillarData);addLocal(bg,lib.wall,baseData);
       for(const m of pillarData){const px=m.elements[12],pz=m.elements[14],r=.64;this.collisionSegments.push({x1:px-r,z1:pz-r,x2:px+r,z2:pz-r},{x1:px+r,z1:pz-r,x2:px+r,z2:pz+r},{x1:px+r,z1:pz+r,x2:px-r,z2:pz+r},{x1:px-r,z1:pz+r,x2:px-r,z2:pz-r})}
     }
 
@@ -1103,7 +1103,10 @@ class WorldStreamer{
     void (async()=>{
       try{
         if(this.game.level.id==="1")await applyLevel1Assets(this.library,this.game.level,onProgress);
-        else await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+        else if(this.game.level.id==="0"){
+          await applyFoundFootageLevel0Assets(this.library,this.game.level,onProgress);
+          await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+        }else await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
       }catch(error){
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
@@ -1158,12 +1161,12 @@ class WorldStreamer{
     }
   }
   chunkAt(x,z){
-    const offset=this.game.level.id==="0"?32:this.size/2;
+    const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     return this.chunks.get(this.key(cx,cz))||null;
   }
   ensureAround(x,z){
-    const offset=this.game.level.id==="0"?32:this.size/2;
+    const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
       if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
@@ -1254,7 +1257,7 @@ class WorldStreamer{
     };
 
     if(this.game.level.id==="0"){
-      const offset=32;
+      const offset=this.size/2;
       const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
       for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
         const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
@@ -1291,7 +1294,7 @@ class WorldStreamer{
     return Math.hypot(c.exit.position.x-x,c.exit.position.z-z)<1.25;
   }
   lightProximity(x,z){
-    const offset=this.game.level.id==="0"?32:this.size/2;
+    const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     let best=Infinity;
     for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
@@ -1304,7 +1307,7 @@ class WorldStreamer{
   }
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
-    const offset=this.game.level.id==="0"?32:this.size/2;
+    const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     const span=this.game.level.id==="0"?1:2;
     for(let dz=-span;dz<=span;dz++)for(let dx=-span;dx<=span;dx++){
@@ -1325,7 +1328,7 @@ class WorldStreamer{
   }
   flashlightWallDistance(x,z,dx,dz,maxDistance=2.5){
     if(this.game.level.id!=="0")return Infinity;
-    const offset=32;
+    const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     let best=Infinity;
     const rayX=dx,rayZ=dz;
