@@ -15,13 +15,10 @@ const OPEN_GAME_ART_SOURCE = "https://opengameart.org/content/backrooms-pbr-text
 const SPB_SOURCE_REPO = "https://github.com/SpacePotatoee/MinecraftFoundFootage";
 const SPB_SOURCE_COMMIT = "0c46c8301fc512c318ac93e23b669355b7d4b180";
 const SPB_ASSET_FILES = [
-  "pbr/concrete/concrete_color.png",
-  "pbr/concrete/concrete_normal.png",
-  "pbr/bricks/bricks_color.png",
-  "pbr/crate/crate_color.png",
-  "fluorescent_light.png",
-  "wall_trim_texture.png",
-  "newstairs_texture.png"
+  "pbr/concrete/concrete_color.png","pbr/concrete/concrete_normal.png","pbr/bricks/bricks_color.png","pbr/crate/crate_color.png",
+  "fluorescent_light.png","wall_trim_texture.png","newstairs_texture.png",
+  "level0/wall_block.png","level0/wall_block_2_texture.png","level0/wall_block_2.png","level0/wallpaper_bottom_block_texture.png",
+  "level0/pole.png","level0/plastic.png","level0/power_pole_texture.png","level0/power_pole_top_texture.png"
 ];
 const PBR_ASSET_FILES = [
   "wallpaper_color.png",
@@ -302,7 +299,7 @@ async function checkAssetSources() {
   }
 }
 async function checkSpacePotatoAssets(){
-  const manifestPath=join(root,"dist/assets/spb-ff/manifest.json");
+  const manifestPath=join(root,"dist/assets/found-footage/manifest.json");
   try{
     const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
     if(manifest.source!==SPB_SOURCE_REPO)fail("SpacePotato asset manifest source mismatch");
@@ -315,7 +312,7 @@ async function checkSpacePotatoAssets(){
       }
       if(entry.commit!==SPB_SOURCE_COMMIT||entry.source!==SPB_SOURCE_REPO)fail("SpacePotato asset metadata mismatch: "+filename);
       if(!Number.isInteger(entry.bytes)||entry.bytes<=0||!/^[a-f0-9]{64}$/.test(entry.sha256||""))fail("SpacePotato asset checksum metadata invalid: "+filename);
-      const assetPath=join(root,"dist/assets/spb-ff",filename);
+      const assetPath=join(root,"dist/assets/found-footage",filename);
       try{
         const data=await readFile(assetPath);
         const sha256=createHash("sha256").update(data).digest("hex");
