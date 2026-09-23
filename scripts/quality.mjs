@@ -116,6 +116,18 @@ async function checkJavaScript(files) {
   }
 }
 
+async function checkThreeApiCompatibility(files){
+  const deprecated=[
+    [/\\.applyToVector3\\s*\\(/,"Matrix4.applyToVector3() is not available in pinned Three.js r186; use Vector3.applyMatrix4()"],
+    [/\\.multiplyVector3\\s*\\(/,"multiplyVector3() is obsolete; use Vector3.applyMatrix3()/applyMatrix4() as appropriate"],
+    [/\\.applyProjection\\s*\\(/,"Vector3.applyProjection() is obsolete; use Vector3.applyMatrix4()"]
+  ];
+  for(const file of files.filter(file=>extname(file)===".js"||extname(file)===".mjs")){
+    const source=await readFile(file,"utf8");
+    for(const [pattern,message] of deprecated)if(pattern.test(source))fail("Three.js API compatibility: "+file+": "+message);
+  }
+}
+
 async function checkHtml() {
   const htmlPath = join(root, "index.html");
   const html = await readFile(htmlPath, "utf8");
@@ -418,6 +430,7 @@ const files = await walk(root);
 const jsFiles = files.filter(file => extname(file) === ".js" || extname(file) === ".mjs");
 
 await checkJavaScript(files);
+await checkThreeApiCompatibility(files);
 const { imports } = await checkHtml();
 await checkCss();
 await checkModuleGraph(jsFiles, imports);
