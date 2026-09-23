@@ -862,6 +862,7 @@ class Chunk{
     // Render only exposed surfaces of the union of wall blocks. This removes
     // internal coplanar faces, which is both cheaper and immune to z-fighting.
     const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
+    const wallTileSize=1.0;
     const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
       const base=positions.length/3;
       for(const v of verts){
@@ -883,7 +884,7 @@ class Chunk{
       if(!has(x,z-1)){
         appendFace(
           [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
-          0,0,-1,0,0,1,h
+          0,0,-1,0,0,1,h/wallTileSize
         );
         pushBottomH((minX+maxX)/2,minZ);
 
@@ -892,7 +893,7 @@ class Chunk{
       if(!has(x,z+1)){
         appendFace(
           [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
-          0,0,1,0,0,1,h
+          0,0,1,0,0,1,h/wallTileSize
         );
         pushBottomH((minX+maxX)/2,maxZ);
 
@@ -901,7 +902,7 @@ class Chunk{
       if(!has(x-1,z)){
         appendFace(
           [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
-          -1,0,0,0,0,1,h
+          -1,0,0,0,0,1,h/wallTileSize
         );
         pushBottomV(minX,(minZ+maxZ)/2);
 
@@ -910,7 +911,7 @@ class Chunk{
       if(!has(x+1,z)){
         appendFace(
           [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
-          1,0,0,0,0,1,h
+          1,0,0,0,0,1,h/wallTileSize
         );
         pushBottomV(maxX,(minZ+maxZ)/2);
       }
@@ -994,6 +995,24 @@ class Chunk{
         const rotated=lightRng.next()>=.5;
         if(!roof2)continue;
 
+        // Source Level0ChunkGenerator skips a roof structure whenever the
+        // 18Y probe contains cyan wool. Cyan wool is the structure marker used
+        // by the large Level 0 rooms. Recreate that exclusion from the same
+        // footprints instead of putting lights through macro-room ceilings.
+        const sourceTileX=tileX,sourceTileZ=tileZ;
+        const inMacro=(type)=>{
+          const t=LEVEL0_MEGA_TEMPLATES[type];
+          if(!t)return false;
+          const bx=type>=3?16:0,bz=type>=3?16:0;
+          const span=t.size||0;
+          return sourceTileX>=bx&&sourceTileX<bx+span&&sourceTileZ>=bz&&sourceTileZ<bz+span;
+        };
+        if(
+          (this.megaType===2&&inMacro(2)) ||
+          ((this.megaType===3||this.megaType===4||this.megaType===5)&&inMacro(this.megaType)) ||
+          (this.megaType===6&&sourceTileX>=16&&sourceTileX<32&&sourceTileZ>=16&&sourceTileZ<32)
+        )continue;
+
         for(const localZ of [1,5])for(const localX of [2,6]){
           const lx=rotated?7-localZ:localX;
           const lz=rotated?localX:localZ;
@@ -1019,9 +1038,11 @@ class Chunk{
       mat.emissiveIntensity=1.0;
       const fixture=box(
         g,
-        new THREE.BoxGeometry(1.0,.06,1.0),
+        // Source fluorescent_light occupies a complete 1x1x1 block and is
+        // rendered as the same fluorescent texture on all six faces.
+        new THREE.BoxGeometry(1.0,1.0,1.0),
         mat,
-        candidate.px,level.wallHeight-.025,candidate.pz,
+        candidate.px,level.wallHeight+.5,candidate.pz,
         0,0,0
       );
       fixture.userData.light=true;
@@ -1908,7 +1929,7 @@ export class BackroomsGame{
     this.localLights=[];
     const localLightCount=this.level.id==="0"?(isTouchControlsDevice()?8:14):(isTouchControlsDevice()?14:24);
     for(let i=0;i<localLightCount;i++){
-      const light=new THREE.PointLight(0xfff064,0,13,2);
+      const light=new THREE.PointLight(0xfff064,0,13,1);
       light.name="dynamic_fluorescent_"+i;
       light.visible=true;
       this.localLights.push(light);
