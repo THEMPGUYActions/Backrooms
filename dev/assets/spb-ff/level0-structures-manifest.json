@@ -416,6 +416,15 @@
       "palette": 5,
       "blockBytes": 7169
     },
+    "stairwell_0": {
+      "size": [
+        17,
+        22,
+        17
+      ],
+      "palette": 36,
+      "blockBytes": 22529
+    },
     "roof1": {
       "size": [
         8,
