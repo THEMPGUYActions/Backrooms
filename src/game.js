@@ -194,6 +194,24 @@ function level0SourceMarkers(name){
   return out;
 }
 
+function level0RotateSourceState(state,rotation){
+  const props=state?.properties;
+  if(!props)return state;
+  const quarter=((Math.round(rotation/(Math.PI/2))%4)+4)%4;
+  if(!quarter)return state;
+  const next={...props};
+  if(next.facing){
+    const cycle=["north","east","south","west"];
+    const index=cycle.indexOf(String(next.facing));
+    if(index>=0)next.facing=cycle[(index+quarter)%4];
+  }
+  if(next.axis&&(quarter===1||quarter===3)){
+    if(next.axis==="x")next.axis="z";
+    else if(next.axis==="z")next.axis="x";
+  }
+  return {...state,properties:next};
+}
+
 function level0SourceStateAt(map,x,sourceY,z){
   return map.get(x+"|"+sourceY+"|"+z)||null;
 }
@@ -902,7 +920,7 @@ class Chunk{
       if(!size)return;
       for(const packed of structure.blocks){
         const block=level0SourcePackedBlock(packed);
-        const state=structure.palette[block.state];
+        const state=level0RotateSourceState(structure.palette[block.state],rotation);
         const transformed=level0TransformBlock(block.x,block.z,rotation,size);
         putVoxel(
           baseX+transformed.x,
