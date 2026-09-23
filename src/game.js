@@ -1007,7 +1007,7 @@ class Chunk{
 
     fixtureCandidates.sort((a,b)=>a.d-b.d);
 
-    const maxFixtures=40;
+    const maxFixtures=96;
     let fixtureCount=0;
     for(const candidate of fixtureCandidates){
       if(fixtureCount>=maxFixtures)break;
@@ -1695,12 +1695,12 @@ class Player{
     const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.16);
     this.game.flash.position.copy(flashOrigin);
     this.game.flashFill.position.copy(flashOrigin);
-    this.game.flash.intensity=this.flashlight?(2.15+beamPower*4.6):0;
+    this.game.flash.intensity=this.flashlight?(1.55+beamPower*3.05):0;
     this.game.flash.distance=25;
     this.game.flash.angle=.25;
     this.game.flash.penumbra=.88;
     this.game.flash.decay=2;
-    this.game.flashFill.intensity=this.flashlight?(.20+beamPower*.62):0;
+    this.game.flashFill.intensity=this.flashlight?(.18+beamPower*.48):0;
     this.game.flashFill.distance=25;
     this.game.flashFill.decay=2;
     this.game.flashTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
