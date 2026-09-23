@@ -712,7 +712,6 @@ class Chunk{
   buildLevel0Set(level,lib,rng){
     const g=this.group,cells=this.gridSize(),cell=level.cellSize;
     const wallCells=new Set();
-
     const addWall=(x,z)=>wallCells.add(x+","+z);
 
     const addRoom=(cellX,cellZ,mask)=>{
@@ -738,6 +737,7 @@ class Chunk{
 
     if(this.zone==="mega"){
       if(this.megaType===1||this.megaType===2){
+        // Four 48x48 placements exactly tile the 80x80 sector.
         for(const ox of [0,32])for(const oz of [0,32])
           addMacro(this.megaType,this.originX+ox,this.originZ+oz);
       }
@@ -750,45 +750,55 @@ class Chunk{
       if(this.megaType>=3)addMacro(this.megaType,this.originX+16,this.originZ+16);
     }
 
-    // Collapse duplicate wall blocks into horizontal runs. This both matches
-    // the source block footprint and prevents overlapping meshes from z-fighting.
-    const rows=new Map();
-    for(const key of wallCells){
-      const [x,z]=key.split(",").map(Number);
-      if(!rows.has(z))rows.set(z,[]);
-      rows.get(z).push(x);
-    }
-
-    const runs=[];
-    for(const [z,xs0] of [...rows.entries()].sort((a,b)=>a[0]-b[0])){
-      const xs=xs0.sort((a,b)=>a-b);
-      if(!xs.length)continue;
-      let start=xs[0],end=xs[0];
-      for(let i=1;i<xs.length;i++){
-        if(xs[i]===end+1)end=xs[i];
-        else{runs.push([z,start,end]);start=end=xs[i]}
-      }
-      runs.push([z,start,end]);
-    }
-
+    // Render only exposed surfaces of the union of wall blocks. This removes
+    // internal coplanar faces, which is both cheaper and immune to z-fighting.
     const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
     const appendFace=(verts,nx,ny,nz,u1,v1)=>{
       const base=positions.length/3;
-      for(let i=0;i<verts.length;i++){
-        positions.push(verts[i][0],verts[i][1],verts[i][2]);
+      for(const v of verts){
+        positions.push(v[0],v[1],v[2]);
         normals.push(nx,ny,nz);
       }
       uvs.push(0,0,u1,0,u1,v1,0,v1);
       indices.push(base,base+1,base+2,base,base+2,base+3);
     };
 
-    for(const [z,start,end] of runs){
-      const minX=start,maxX=end+1,minZ=z,maxZ=z+1,width=maxX-minX;
-      appendFace([[minX,0,minZ],[maxX,0,minZ],[maxX,h,minZ],[minX,h,minZ]],0,0,-1,width,h);
-      appendFace([[maxX,0,maxZ],[minX,0,maxZ],[minX,h,maxZ],[maxX,h,maxZ]],0,0,1,width,h);
-      appendFace([[minX,0,maxZ],[minX,0,minZ],[minX,h,minZ],[minX,h,maxZ]],-1,0,0,1,h);
-      appendFace([[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],1,0,0,1,h);
-      this.collisionSegments.push({x1:minX,z1:(minZ+maxZ)*.5,x2:maxX,z2:(minZ+maxZ)*.5});
+    const has=(x,z)=>wallCells.has(x+","+z);
+    for(const key of wallCells){
+      const [x,z]=key.split(",").map(Number);
+      const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
+
+      if(!has(x,z-1)){
+        appendFace(
+          [[minX,0,minZ],[maxX,0,minZ],[maxX,h,minZ],[minX,h,minZ]],
+          0,0,-1,1,h
+        );
+        this.collisionSegments.push({x1:minX,z1:minZ,x2:maxX,z2:minZ});
+      }
+
+      if(!has(x,z+1)){
+        appendFace(
+          [[maxX,0,maxZ],[minX,0,maxZ],[minX,h,maxZ],[maxX,h,maxZ]],
+          0,0,1,1,h
+        );
+        this.collisionSegments.push({x1:minX,z1:maxZ,x2:maxX,z2:maxZ});
+      }
+
+      if(!has(x-1,z)){
+        appendFace(
+          [[minX,0,maxZ],[minX,0,minZ],[minX,h,minZ],[minX,h,maxZ]],
+          -1,0,0,1,h
+        );
+        this.collisionSegments.push({x1:minX,z1:minZ,x2:minX,z2:maxZ});
+      }
+
+      if(!has(x+1,z)){
+        appendFace(
+          [[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
+          1,0,0,1,h
+        );
+        this.collisionSegments.push({x1:maxX,z1:minZ,x2:maxX,z2:maxZ});
+      }
     }
 
     if(positions.length){
@@ -799,6 +809,7 @@ class Chunk{
       geometry.setIndex(indices);
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
+
       const mesh=new THREE.Mesh(geometry,lib.wall);
       mesh.name="level0_walls";
       mesh.frustumCulled=true;
@@ -1278,7 +1289,7 @@ class WorldStreamer{
     if(this.game.admin?.noclip)return {x:position.x,z:position.z};
     const chunk=this.chunkAt(position.x,position.z);
     if(!chunk)return position;
-    const wallRadius=radius+.5;
+    const wallRadius=this.game.level.id==="0"?radius:radius+.11;
     let x=position.x,z=position.z;
 
     const testSegment=(x1,z1,x2,z2)=>{
