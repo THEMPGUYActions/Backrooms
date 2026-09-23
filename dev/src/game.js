@@ -347,9 +347,17 @@ class Chunk{
           const [nx,nz,b,ob]=rng.pick(options);
           this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
         }
+        // Merge adjacent cells into irregular office/retail spaces instead of
+        // leaving the player inside a uniform one-cell maze.
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.13)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.13)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.24)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.24)this.setEdge(x,z,"south",true);
+        }
+        for(let z=0;z<cells;z+=2)for(let x=1;x<cells-1;x+=3){
+          if(rng.next()<.72)this.setEdge(x,z,"east",true);
+        }
+        for(let x=0;x<cells;x+=2)for(let z=1;z<cells-1;z+=3){
+          if(rng.next()<.62)this.setEdge(x,z,"south",true);
         }
       }
 
@@ -1061,10 +1069,10 @@ class WorldStreamer{
     {
       this.floorSurface=new THREE.Mesh(
         new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
-        this.game.level.id==="0"?this.library.dark:this.library.floor
+        this.library.floor
       );
       this.floorSurface.rotation.x=-Math.PI/2;
-      this.floorSurface.position.set(0,this.game.level.id==="0"?-5.5:-.001,0);
+      this.floorSurface.position.set(0,this.game.level.id==="0"?0:-.001,0);
       this.floorSurface.updateMatrix();
       this.floorSurface.matrixAutoUpdate=false;
       this.floorSurface.frustumCulled=false;
