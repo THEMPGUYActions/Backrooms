@@ -1830,6 +1830,7 @@ export class BackroomsGame{
     try{
       if(this.running&&!this.paused)this.update(dt);
       this.render();
+      if(window.backroomsAdmin?.ready)window.backroomsAdmin.update();
     }catch(error){
       if(!this.runtimeFaulted){
         this.runtimeFaulted=true;
