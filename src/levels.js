@@ -10,10 +10,10 @@ export const LEVELS = {
       wall: 0xb69c4b,
       wallRough: 0.88,
       floor: 0x5b4c3b,
-      ceiling: 0xc9b64f,
+      ceiling: 0x9c998e,
       fog: 0x000000,
       accent: 0xffe992,
-      light: 0xffcf42,
+      light: 0xffd66a,
       ambient: 0x100e08
     },
     gridSize: 16,
