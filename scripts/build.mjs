@@ -23,6 +23,7 @@ const SPB_LEVEL0_STRUCTURES = Object.freeze([
     Array.from({length:8},(_,i)=>({name:`${prefix}_${i+1}.nbt`,path:`${SPB_LEVEL0_STRUCTURE_ROOT}/${prefix}_${i+1}.nbt`}))
   ),
   ...Array.from({length:6},(_,i)=>({name:`megaroom${i+1}.nbt`,path:`${SPB_LEVEL0_STRUCTURE_ROOT}/megaroom${i+1}.nbt`})),
+  {name:"stairwell_0.nbt",path:`${SPB_LEVEL0_STRUCTURE_ROOT}/stairwell_0.nbt`},
   {name:"roof1.nbt",path:`${SPB_LEVEL0_STRUCTURE_ROOT}/roof1.nbt`},
   {name:"roof2.nbt",path:`${SPB_LEVEL0_STRUCTURE_ROOT}/roof2.nbt`}
 ]);
