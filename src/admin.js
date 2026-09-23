@@ -1,7 +1,5 @@
 import { LEVELS } from "./levels.js";
 
-const enabled = new URLSearchParams(location.search).get("admin") === "1";
-
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 
 export class BackroomsAdmin{
@@ -13,6 +11,7 @@ export class BackroomsAdmin{
   }
   activate(){
     if(this.ready)return;
+    if(!this.game.admin.enabled)return;
     this.build();
     this.bind();
     this.opener=document.createElement("button");
@@ -166,7 +165,7 @@ export class BackroomsAdmin{
       const code=event.code;
       const key=event.key;
       const toggle=code==="Minus"||code==="Equal"||code==="NumpadSubtract"||code==="NumpadAdd"||code==="Backquote"||key==="-"||key==="=";
-      if(this.ready&&enabled&&toggle&&!event.repeat){
+      if(this.ready&&this.game.admin.enabled&&toggle&&!event.repeat){
         event.preventDefault();
         event.stopPropagation();
         this.opened?this.close():this.open();
@@ -321,7 +320,7 @@ export class BackroomsAdmin{
     this.opened=false;
     this.root.classList.add("hidden");
     if(this.opener){
-      this.opener.hidden=!enabled;
+      this.opener.hidden=!this.game.admin.enabled;
       this.opener.setAttribute("aria-expanded","false");
     }
   }
