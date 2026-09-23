@@ -277,73 +277,70 @@ class Chunk{
         }
       }
     }else if(level.id==="0"){
-      // Restored Level 0: dense 16x16 / 5m maze sectors, not a 5x5 open room.
-      // This follows the older procedural topology: DFS core, deliberate loops,
-      // rare wider architectural rooms, and deterministic sector connections.
-      const visited=new Uint8Array(cells*cells);
-      const startCell=Math.floor(cells/2);
-      const stack=[[startCell,startCell]];
-      visited[this.index(startCell,startCell)]=1;
-      const dirs=[
-        [0,-1,1,4],
-        [1,0,2,8],
-        [0,1,4,1],
-        [-1,0,8,2]
-      ];
+      // Known-good Level 0 topology: five 16m cells across each streamed
+      // sector, with open-room sectors mixed with classic maze sectors.
+      const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
+      this.zone=mega?"mega":"maze";
 
-      while(stack.length){
-        const [x,z]=stack[stack.length-1],options=[];
-        for(const [dx,dz,b,ob] of dirs){
-          const nx=x+dx,nz=z+dz;
-          if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])
-            options.push([nx,nz,b,ob]);
+      if(mega){
+        this.walls.fill(0);
+        for(let z=0;z<cells;z++){
+          this.walls[this.index(0,z)]|=8;
+          this.walls[this.index(cells-1,z)]|=2;
         }
-        if(!options.length){stack.pop();continue}
-        const [nx,nz,b,ob]=rng.pick(options);
-        this.walls[this.index(x,z)]&=~b;
-        this.walls[this.index(nx,nz)]&=~ob;
-        visited[this.index(nx,nz)]=1;
-        stack.push([nx,nz]);
-      }
-
-      const loopChance=.24;
-      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
-        if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true);
-      }
-
-      // Preserve maze density while introducing the real Level 0 visual
-      // variations: occasional wide pillar rooms and arch rooms.
-      for(let z=3;z<cells-3;z+=5)for(let x=3;x<cells-3;x+=5){
-        if(rng.next()>.38)continue;
-        const room={x,z,w:3,h:3,type:rng.next()<.72?"pillars":"arches",entry:null};
-
-        for(let rz=room.z;rz<room.z+room.h;rz++)for(let rx=room.x;rx<room.x+room.w;rx++){
-          if(rx<room.x+room.w-1)this.setEdge(rx,rz,"east",true);
-          if(rz<room.z+room.h-1)this.setEdge(rx,rz,"south",true);
+        for(let x=0;x<cells;x++){
+          this.walls[this.index(x,0)]|=1;
+          this.walls[this.index(x,cells-1)]|=4;
         }
 
-        const side=rng.int(0,3);
-        if(side===0){
-          room.entry={side:"north",x:room.x+rng.int(0,room.w-1),z:room.z};
-          this.setEdge(room.entry.x,room.entry.z,"north",true);
-        }else if(side===1){
-          room.entry={side:"east",x:room.x+room.w-1,z:room.z+rng.int(0,room.h-1)};
-          this.setEdge(room.entry.x,room.entry.z,"east",true);
-        }else if(side===2){
-          room.entry={side:"south",x:room.x+rng.int(0,room.w-1),z:room.z+room.h-1};
-          this.setEdge(room.entry.x,room.entry.z,"south",true);
-        }else{
-          room.entry={side:"west",x:room.x,z:room.z+rng.int(0,room.h-1)};
-          this.setEdge(room.entry.x,room.entry.z,"west",true);
+        const partitions=rng.int(0,3);
+        for(let i=0;i<partitions;i++){
+          const vertical=rng.next()<.5;
+          if(vertical){
+            const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);
+            for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false);
+          }else{
+            const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);
+            for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false);
+          }
         }
-        this.rooms.push(room);
+      }else{
+        const visited=new Uint8Array(cells*cells),stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob] of [[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]]){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])
+              options.push([nx,nz,b,ob]);
+          }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
+        }
+        const loopChance=.18;
+        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+          if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"south",true);
+        }
       }
 
-      for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
-      for(let i=1;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
-      for(let i=cells-2;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
-      for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
+      // Deterministic sector stitching plus a fully open spawn cell.
+      if(cells>=5){
+        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
+        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
+        if((this.cz%2)===0)this.setEdge(0,2,"west",true);
+        if((this.cx%2)===0)this.setEdge(cells-1,2,"east",true);
+      }
+      if(this.cx===0&&this.cz===0){
+        this.setEdge(2,2,"north",true);
+        this.setEdge(2,2,"east",true);
+        this.setEdge(2,2,"south",true);
+        this.setEdge(2,2,"west",true);
+      }
     }else{
       const visited=new Uint8Array(cells*cells);
       const center=Math.floor(cells/2);
@@ -435,7 +432,9 @@ class Chunk{
     const cells=this.gridSize();
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
     const wallThickness=.18;
-    const hGeom=new THREE.BoxGeometry(cell,level.wallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,level.wallHeight,cell);
+    const safeWallHeight=level.wallHeight-.04;
+    const safeWallY=safeWallHeight/2+.02;
+    const hGeom=new THREE.BoxGeometry(cell,safeWallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,safeWallHeight,cell);
     const trimHGeom=new THREE.BoxGeometry(cell,.11,.12),trimVGeom=new THREE.BoxGeometry(.12,.11,cell);
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
     const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
@@ -450,25 +449,25 @@ class Chunk{
       const addEdge=(side)=>{
         if(side==="north"){
           const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
-          pushMat(hData,px,level.wallHeight/2,pz-cell/2);
+          pushMat(hData,px,safeWallY,pz-cell/2);
           pushMat(trimH,px,.065,pz-cell/2);
           pushMat(topH,px,level.wallHeight-.04,pz-cell/2);
           edges.push({x,z,side});
         }else if(side==="south"){
           const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
-          pushMat(hData,px,level.wallHeight/2,pz+cell/2);
+          pushMat(hData,px,safeWallY,pz+cell/2);
           pushMat(trimH,px,.065,pz+cell/2);
           pushMat(topH,px,level.wallHeight-.04,pz+cell/2);
           edges.push({x,z,side});
         }else if(side==="west"){
           const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
-          pushMat(vData,px-cell/2,level.wallHeight/2,pz);
+          pushMat(vData,px-cell/2,safeWallY,pz);
           pushMat(trimV,px-cell/2,.065,pz);
           pushMat(topV,px-cell/2,level.wallHeight-.04,pz);
           edges.push({x,z,side});
         }else{
           const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
-          pushMat(vData,px+cell/2,level.wallHeight/2,pz);
+          pushMat(vData,px+cell/2,safeWallY,pz);
           pushMat(trimV,px+cell/2,.065,pz);
           pushMat(topV,px+cell/2,level.wallHeight-.04,pz);
           edges.push({x,z,side});
@@ -567,39 +566,6 @@ class Chunk{
       return{position:new THREE.Vector3(px+cell/2+offset,y,pz),rotation:Math.PI/2};
     };
 
-    if(level.id==="0"&&this.rooms.length){
-      for(const room of this.rooms){
-        if(room.type==="pillars"){
-          const pillarGeom=new THREE.BoxGeometry(.42,level.wallHeight,.42);
-          const pillarData=[];
-          for(let rz=1;rz<room.h;rz++)for(let rx=1;rx<room.w;rx++){
-            pillarData.push(new THREE.Matrix4().makeTranslation(
-              this.originX+(room.x+rx)*cell,
-              level.wallHeight/2,
-              this.originZ+(room.z+rz)*cell
-            ));
-          }
-          if(pillarData.length){
-            const mesh=new THREE.InstancedMesh(pillarGeom,lib.wall,pillarData.length);
-            mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-            pillarData.forEach((m,i)=>mesh.setMatrixAt(i,m));
-            mesh.instanceMatrix.needsUpdate=true;
-            mesh.computeBoundingSphere();
-            mesh.frustumCulled=true;
-            g.add(mesh);
-          }
-        }else if(room.type==="arches"&&room.entry){
-          const p=wallPoint(room.entry,.11,.0);
-          const arch=new THREE.Group();
-          arch.position.copy(p.position);
-          arch.rotation.y=p.rotation;
-          box(arch,new THREE.BoxGeometry(.24,2.35,.24),lib.wall,-.98,1.18,0);
-          box(arch,new THREE.BoxGeometry(.24,2.35,.24),lib.wall,.98,1.18,0);
-          box(arch,new THREE.BoxGeometry(2.2,.24,.24),lib.wall,0,2.35,0);
-          g.add(arch);
-        }
-      }
-    }
 
     for(let i=0;i<Math.min(9,edges.length);i++){
       const e=edges[(rngBase.int(0,edges.length-1)+i*11)%edges.length];
@@ -756,192 +722,7 @@ class Chunk{
       }
     }
   }
-  buildLevel0Set(level,lib,rng){
-    const g=this.group,cells=this.gridSize(),cell=level.cellSize;
-    const roomRng=new RNG(this.seedKey()^0x5d11f);
-    const lightRng=new RNG(this.seedKey()^0x6a11c);
-    const next=()=>lightRng.next();
-    const wallCells=new Set();
-    const addWall=(x,z)=>wallCells.add(x+","+z);
 
-    const addRoom=(cellX,cellZ,mask)=>{
-      const variant=roomRng.int(0,7);
-      const template=level0RoomRows(mask,variant),rotation=level0RotationForMask(mask);
-      const baseX=this.originX+cellX*cell,baseZ=this.originZ+cellZ*cell;
-      for(let z=0;z<16;z++){
-        const bits=template.rows[z]>>>0;
-        for(let x=0;x<16;x++){
-          if(!(bits&(1<<x)))continue;
-          const p=level0TransformBlock(x,z,rotation,16);
-          addWall(baseX+p.x,baseZ+p.z);
-        }
-      }
-    };
-
-    const addMacro=(type,baseX,baseZ)=>{
-      const template=LEVEL0_MEGA_TEMPLATES[type];
-      if(!template)return;
-      for(const [z,start,end] of template.runs||[]){
-        for(let x=start;x<=end;x++)addWall(baseX+x,baseZ+z);
-      }
-    };
-
-    if(this.zone==="mega"){
-      if(this.megaType===1||this.megaType===2){
-        // Four 48x48 placements exactly tile the 80x80 sector.
-        for(const ox of [0,32])for(const oz of [0,32])
-          addMacro(this.megaType,this.originX+ox,this.originZ+oz);
-      }
-    }else{
-      const blocked=new Set((this.macroBlockedCells||[]).map(r=>r.x+","+r.z));
-      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(blocked.has(x+","+z))continue;
-        addRoom(x,z,this.walls[this.index(x,z)]);
-      }
-      if(this.megaType>=3)addMacro(this.megaType,this.originX+16,this.originZ+16);
-    }
-
-    // Render only exposed surfaces of the union of wall blocks. This removes
-    // internal coplanar faces, which is both cheaper and immune to z-fighting.
-    const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
-    const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
-      const base=positions.length/3;
-      for(const v of verts){
-        positions.push(v[0],v[1],v[2]);
-        normals.push(nx,ny,nz);
-      }
-      uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
-      indices.push(base,base+1,base+2,base,base+2,base+3);
-    };
-
-    const has=(x,z)=>wallCells.has(x+","+z);
-    for(const key of wallCells){
-      const [x,z]=key.split(",").map(Number);
-      const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
-
-      if(!has(x,z-1)){
-        appendFace(
-          [[minX,0,minZ],[maxX,0,minZ],[maxX,h,minZ],[minX,h,minZ]],
-          0,0,-1,minX,0,maxX,h
-        );
-
-      }
-
-      if(!has(x,z+1)){
-        appendFace(
-          [[maxX,0,maxZ],[minX,0,maxZ],[minX,h,maxZ],[maxX,h,maxZ]],
-          0,0,1,minX,0,maxX,h
-        );
-
-      }
-
-      if(!has(x-1,z)){
-        appendFace(
-          [[minX,0,maxZ],[minX,0,minZ],[minX,h,minZ],[minX,h,maxZ]],
-          -1,0,0,minZ,0,maxZ,h
-        );
-
-      }
-
-      if(!has(x+1,z)){
-        appendFace(
-          [[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
-          1,0,0,minZ,0,maxZ,h
-        );
-      }
-
-      // wall_block is a solid Minecraft cube. Keep its caps so isolated
-      // columns/posts do not render as hollow or cross-shaped.
-      appendFace(
-        [[minX,0.001,minZ],[maxX,0.001,minZ],[maxX,0.001,maxZ],[minX,0.001,maxZ]],
-        0,-1,0,minX,0,maxX,1
-      );
-      appendFace(
-        [[minX,h,minZ],[minX,h,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
-        0,1,0,minX,0,maxX,1
-      );
-    }
-
-    const horizontal=new Map(),vertical=new Map();
-    for(const key of wallCells){
-      const cut=key.indexOf(",");
-      const x=Number(key.slice(0,cut)),z=Number(key.slice(cut+1));
-      if(!has(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
-      if(!has(x,z+1))level0AddBoundaryInterval(horizontal,z+1,x,x+1);
-      if(!has(x-1,z))level0AddBoundaryInterval(vertical,x,z,z+1);
-      if(!has(x+1,z))level0AddBoundaryInterval(vertical,x+1,z,z+1);
-    }
-    this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
-      .concat(level0MergeBoundaryIntervals(vertical,false));
-
-    if(positions.length){
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
-      geometry.setIndex(indices);
-      geometry.computeBoundingBox();
-      geometry.computeBoundingSphere();
-
-      const mesh=new THREE.Mesh(geometry,lib.wall);
-      mesh.name="level0_walls";
-      mesh.frustumCulled=true;
-      g.add(mesh);
-      this.level0WallMesh=mesh;
-    }
-    // The source roof is an 8x8 block structure. roof1 has no light;
-    // roof2 replaces four ceiling blocks with one-block fluorescent lights.
-    const fixtureCandidates=[];
-    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
-      for(let tileX=0;tileX<this.world.size;tileX+=8){
-        const roof2=lightRng.next()<.2;
-        const rotated=lightRng.next()>=.5;
-        if(!roof2)continue;
-
-        for(const localZ of [1,5])for(const localX of [2,6]){
-          const lx=rotated?7-localZ:localX;
-          const lz=rotated?localX:localZ;
-          const px=this.originX+tileX+lx+.5;
-          const pz=this.originZ+tileZ+lz+.5;
-          const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
-          fixtureCandidates.push({px,pz,d:dx*dx+dz*dz});
-        }
-      }
-    }
-
-    fixtureCandidates.sort((a,b)=>a.d-b.d);
-
-    const maxFixtures=40;
-    let fixtureCount=0;
-    for(const candidate of fixtureCandidates){
-      if(fixtureCount>=maxFixtures)break;
-
-      const mat=lib.light.clone();
-      mat.emissiveIntensity=1.55+next()*.4;
-      const fixture=box(
-        g,
-        new THREE.BoxGeometry(.92,.08,.92),
-        mat,
-        candidate.px,level.wallHeight-.015,candidate.pz,
-        0,0,0
-      );
-      fixture.userData.light=true;
-      fixture.userData.baseEmissive=mat.emissiveIntensity;
-      this.fixtures.push(fixture);
-
-      const intensity=82+next()*18;
-      this.lightSources.push({
-        position:new THREE.Vector3(candidate.px,level.wallHeight-.25,candidate.pz),
-        color:0xffff78,
-        baseIntensity:intensity,
-        intensity,
-        distance:18,
-        decay:2,
-        fixture
-      });
-      fixtureCount++;
-    }
-  }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
