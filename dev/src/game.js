@@ -735,11 +735,15 @@ class Chunk{
   }
   buildLevel0Set(level,lib,rng){
     const g=this.group,cells=this.gridSize(),cell=level.cellSize;
+    const roomRng=new RNG(this.seedKey()^0x5d11f);
+    const lightRng=new RNG(this.seedKey()^0x6a11c);
+    const next=()=>lightRng.next();
     const wallCells=new Set();
     const addWall=(x,z)=>wallCells.add(x+","+z);
 
     const addRoom=(cellX,cellZ,mask)=>{
-      const template=level0RoomRows(mask,0),rotation=level0RotationForMask(mask);
+      const variant=roomRng.int(0,7);
+      const template=level0RoomRows(mask,variant),rotation=level0RotationForMask(mask);
       const baseX=this.originX+cellX*cell,baseZ=this.originZ+cellZ*cell;
       for(let z=0;z<16;z++){
         const bits=template.rows[z]>>>0;
@@ -777,13 +781,13 @@ class Chunk{
     // Render only exposed surfaces of the union of wall blocks. This removes
     // internal coplanar faces, which is both cheaper and immune to z-fighting.
     const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
-    const appendFace=(verts,nx,ny,nz,u1,v1)=>{
+    const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
       const base=positions.length/3;
       for(const v of verts){
         positions.push(v[0],v[1],v[2]);
         normals.push(nx,ny,nz);
       }
-      uvs.push(0,0,u1,0,u1,v1,0,v1);
+      uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
       indices.push(base,base+1,base+2,base,base+2,base+3);
     };
 
@@ -795,7 +799,7 @@ class Chunk{
       if(!has(x,z-1)){
         appendFace(
           [[minX,0,minZ],[maxX,0,minZ],[maxX,h,minZ],[minX,h,minZ]],
-          0,0,-1,1,h
+          0,0,-1,minX,0,maxX,h
         );
 
       }
@@ -803,7 +807,7 @@ class Chunk{
       if(!has(x,z+1)){
         appendFace(
           [[maxX,0,maxZ],[minX,0,maxZ],[minX,h,maxZ],[maxX,h,maxZ]],
-          0,0,1,1,h
+          0,0,1,minX,0,maxX,h
         );
 
       }
@@ -811,7 +815,7 @@ class Chunk{
       if(!has(x-1,z)){
         appendFace(
           [[minX,0,maxZ],[minX,0,minZ],[minX,h,minZ],[minX,h,maxZ]],
-          -1,0,0,1,h
+          -1,0,0,minZ,0,maxZ,h
         );
 
       }
@@ -819,7 +823,7 @@ class Chunk{
       if(!has(x+1,z)){
         appendFace(
           [[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
-          1,0,0,1,h
+          1,0,0,minZ,0,maxZ,h
         );
 
       }
@@ -852,41 +856,72 @@ class Chunk{
       g.add(mesh);
       this.level0WallMesh=mesh;
     }
+    // The source fills every 16x16 Minecraft chunk with four 8x8 roof
+    // structures. Each roof structure is roof1 (80%) or roof2 (20%).
+    // roof2 contains four ceiling fluorescents at local block positions
+    // (2,1), (2,5), (6,1), (6,5). Those positions are symmetric under the
+    // source's NONE/CW90 roof rotations, so the same coordinates are exact.
+    const fixtureCandidates=[];
+    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
+      for(let tileX=0;tileX<this.world.size;tileX+=8){
+        const roofIsLit=lightRng.next()<.2;
+        lightRng.next(); // consume the source NONE/CW90 rotation roll
+        if(!roofIsLit)continue;
 
-    // Keep dynamic Level 0 lighting deliberately small. Emissive fixtures do
-    // most of the work, while only six local point lights are created per chunk.
-    const lightBudget=6;
-    let lightCount=0;
-    for(let z=0;z<cells&&lightCount<lightBudget;z++){
-      for(let x=0;x<cells&&lightCount<lightBudget;x++){
-        if((x+z)%2!==0||rng.next()>.55)continue;
-        if(this.macroBlockedCells?.some(r=>r.x===x&&r.z===z))continue;
-
-        const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-        if(wallCells.has(Math.floor(px)+","+Math.floor(pz)))continue;
-        const mat=lib.light.clone();
-        mat.emissiveIntensity=1.65+rng.next()*.45;
-        const rotation=rng.next()<.5?0:Math.PI/2;
-        const fixture=box(g,new THREE.BoxGeometry(3.35,.05,.58),mat,px,h-.10,pz,0,rotation,0);
-        fixture.userData.light=true;
-        fixture.userData.baseEmissive=mat.emissiveIntensity;
-        this.fixtures.push(fixture);
-
-        const intensity=88+rng.next()*24;
-        this.lightSources.push({
-          position:new THREE.Vector3(px,h-.28,pz),
-          color:0xffd66a,
-          baseIntensity:intensity,
-          intensity,
-          distance:24,
-          decay:2,
-          fixture
-        });
-        lightCount++;
+        for(const localZ of [1,5])for(const localX of [2,6]){
+          const px=this.originX+tileX+localX;
+          const pz=this.originZ+tileZ+localZ;
+          const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
+          fixtureCandidates.push({px,pz,d:dx*dx+dz*dz});
+        }
       }
     }
-  }
 
+    fixtureCandidates.sort((a,b)=>a.d-b.d);
+
+    const clearForFixture=(x,z,rotation)=>{
+      const hx=rotation===0?1.65:.30;
+      const hz=rotation===0?.30:1.65;
+      const minX=Math.floor(x-hx),maxX=Math.floor(x+hx);
+      const minZ=Math.floor(z-hz),maxZ=Math.floor(z+hz);
+      for(let wz=minZ;wz<=maxZ;wz++)for(let wx=minX;wx<=maxX;wx++){
+        if(wallCells.has(wx+","+wz))return false;
+      }
+      return true;
+    };
+
+    const maxFixtures=24;
+    let fixtureCount=0;
+    for(const candidate of fixtureCandidates){
+      if(fixtureCount>=maxFixtures)break;
+      if(!clearForFixture(candidate.px,candidate.pz,0))continue;
+
+      const mat=lib.light.clone();
+      mat.emissiveIntensity=1.55+next()*.4;
+      const fixture=box(
+        g,
+        new THREE.BoxGeometry(3.35,.05,.58),
+        mat,
+        candidate.px,h-.10,candidate.pz,
+        0,0,0
+      );
+      fixture.userData.light=true;
+      fixture.userData.baseEmissive=mat.emissiveIntensity;
+      this.fixtures.push(fixture);
+
+      const intensity=82+next()*18;
+      this.lightSources.push({
+        position:new THREE.Vector3(candidate.px,h-.28,candidate.pz),
+        color:0xffff78,
+        baseIntensity:intensity,
+        intensity,
+        distance:18,
+        decay:2,
+        fixture
+      });
+      fixtureCount++;
+    }
+  }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
