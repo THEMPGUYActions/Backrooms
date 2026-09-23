@@ -87,7 +87,11 @@ export class AudioDirector{
         for(const result of results)if(result.status==="rejected")console.warn("[Backrooms] Audio asset unavailable; generated fallback remains active.",result.reason);
       });
     })();
-    await this.loading;this.loading=null;
+    try{
+      await this.loading;
+    }finally{
+      this.loading=null;
+    }
   }
   setVolume(v){
     this.volume=clamp(Number(v));localStorage.setItem("br.volume",this.volume);
@@ -129,7 +133,12 @@ export class AudioDirector{
       console.warn("[Backrooms] Audio unlock failed:",error);
     }
   }
-  async resume(){await this.init()}
+  async resume(){
+    await this.init();
+    if(this.ctx?.state==="suspended"){
+      try{await this.ctx.resume()}catch(error){console.warn("[Backrooms] Audio resume failed:",error)}
+    }
+  }
   connectFx(node,send=.3,delay=.18){
     node.connect(this.master);
     if(this.reverb){const g=this.ctx.createGain();g.gain.value=send;node.connect(g).connect(this.reverb)}
