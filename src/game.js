@@ -381,10 +381,44 @@ class Chunk{
         this.zone="mega";
         this.walls.fill(0);
       }else{
-            const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);
-            for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false);
+        this.zone="maze";
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+
+        const dirs=[
+          [0,1,4,1],
+          [1,0,2,8],
+          [0,-1,1,4],
+          [-1,0,8,2]
+        ];
+
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob] of dirs){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])
+              options.push([nx,nz,b,ob]);
           }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
         }
+      }
+
+      // The reference connects neighboring maze sectors here. Mega-room
+      // types 1 and 2 skip this because the maze generator is never called.
+      if(roomType===0||roomType>=3){
+        for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
+        for(let i=0;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
+        for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
+        for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
+      }
+
+    }
       }else{
         const visited=new Uint8Array(cells*cells),stack=[[0,0]];
         visited[this.index(0,0)]=1;
