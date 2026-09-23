@@ -1095,20 +1095,32 @@ class WorldStreamer{
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
-    const bounds=this._lightBounds||(this._lightBounds=new THREE.Sphere(new THREE.Vector3(),1.6));
+    const bounds=this._lightBounds||(this._lightBounds=new THREE.Sphere(new THREE.Vector3(),2.05));
+    const view=this._lightViewPosition||(this._lightViewPosition=new THREE.Vector3());
+    const verticalFov=THREE.MathUtils.degToRad(camera?.getEffectiveFOV?.()??camera?.fov??62);
+    const horizontalFov=2*Math.atan(Math.tan(verticalFov*.5)*(camera?.aspect||1));
+    const halfV=verticalFov*.5;
+    const halfH=horizontalFov*.5;
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
         if(d>Math.max(96,this.size*2.6))continue;
+        view.copy(light.position).applyMatrix4(camera.matrixWorldInverse);
+        if(view.z>=-0.05||-view.z>camera.far+20)continue;
+        if(Math.abs(Math.atan2(view.x,-view.z))>halfH||Math.abs(Math.atan2(view.y,-view.z))>halfV)continue;
         if(frustum){
           bounds.center.copy(light.position);
           if(!frustum.intersectsSphere(bounds))continue;
         }
-        out.push({light,d});
+        const horizontal=Math.abs(Math.atan2(view.x,-view.z))/Math.max(.001,halfH);
+        const vertical=Math.abs(Math.atan2(view.y,-view.z))/Math.max(.001,halfV);
+        const edge=Math.min(1,Math.max(horizontal,vertical));
+        const score=d*(1+edge*.9);
+        out.push({light,d,score});
       }
     }
-    out.sort((a,b)=>a.d-b.d);
+    out.sort((a,b)=>a.score-b.score);
     return out;
   }
   entitySpawns(){
@@ -1359,8 +1371,7 @@ export class BackroomsGame{
 
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
     this.localLights=[];
-    this._activeLightEntries=[];
-    const localLightCount=isTouchControlsDevice()?10:16;
+    const localLightCount=isTouchControlsDevice()?14:24;
     for(let i=0;i<localLightCount;i++){
       const light=new THREE.PointLight(0xffd34d,0,0,2);
       light.name="dynamic_fluorescent_"+i;
@@ -1702,17 +1713,7 @@ export class BackroomsGame{
     frustumMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse);
     lightFrustum.setFromProjectionMatrix(frustumMatrix);
     const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z,lightFrustum,this.camera);
-    const bySource=new Map(sources.map(entry=>[entry.light,entry]));
-    const next=[];
-    for(const entry of this._activeLightEntries){
-      const current=bySource.get(entry?.light);
-      if(current)next.push(current);
-    }
-    for(const entry of sources){
-      if(next.length>=this.localLights.length)break;
-      if(!next.some(active=>active.light===entry.light))next.push(entry);
-    }
-    this._activeLightEntries=next;
+    const next=sources.slice(0,this.localLights.length);
     for(let i=0;i<this.localLights.length;i++){
       const target=this.localLights[i],entry=next[i];
       if(!entry){
