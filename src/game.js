@@ -543,7 +543,7 @@ class Chunk{
         this.fixtures.push(fixture);
 
         const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-        const intensity=level.id==="0"?135:level.id==="3"?220:level.id==="4"?110:170;
+        const intensity=level.id==="0"?220:level.id==="3"?220:level.id==="4"?110:170;
         this.lightSources.push({
           position:new THREE.Vector3(px,level.wallHeight-.24,pz),
           color:lightColor,
@@ -1521,7 +1521,7 @@ class WorldStreamer{
     const out=[];
     const offset=this.game.level.id==="0"?32:this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
-    const span=this.game.level.id==="0"?1:2;
+    const span=2;
     for(let dz=-span;dz<=span;dz++)for(let dx=-span;dx<=span;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
@@ -1531,7 +1531,7 @@ class WorldStreamer{
         // A point light can illuminate geometry that is outside the camera
         // frustum. Do not cull it because the light source itself is behind
         // the camera or just outside the view.
-        if(d>Math.max(96,range+54))continue;
+        if(d>Math.max(this.game.level.id==="0"?160:96,range+54))continue;
         out.push({light,d,score:d});
       }
     }
@@ -1574,7 +1574,7 @@ class Player{
     this.viewYaw+=yawDiff*viewAlpha;
     this.viewPitch+=(this.pitch-this.viewPitch)*viewAlpha;
     const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.2:2.85;
-    const forward=new THREE.Vector3(-Math.sin(this.viewYaw),0,-Math.cos(this.viewYaw)),right=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
+    const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw)),right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
     const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
     const oldX=this.position.x,oldZ=this.position.z;
     this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
