@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
-import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0wiki2";
+import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0wiki3";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -131,7 +131,7 @@ function level0AddBoundaryInterval(map,key,start,end){
   list.push([start,end]);
 }
 
-const LEVEL0_REGION_CHUNKS=10;
+const LEVEL0_REGION_CHUNKS=20;
 const LEVEL0_RED_SIZE=3;
 const LEVEL0_HOLE_SIZE=6;
 const LEVEL0_BLACKOUT_SIZE=4;
@@ -143,9 +143,9 @@ function level0RegionAt(cx,cz,seed){
   const lx=positiveMod(cx,LEVEL0_REGION_CHUNKS),lz=positiveMod(cz,LEVEL0_REGION_CHUNKS);
   const roll=cycleHash(seed^0x6c3000,macroX,macroZ,0x51);
   if(roll<.022&&lx>=3&&lx<3+LEVEL0_RED_SIZE&&lz>=3&&lz<3+LEVEL0_RED_SIZE)return {type:"red",id:"red:"+macroX+":"+macroZ};
-  if(roll<.075)return {type:"pillars",id:"pillars:"+macroX+":"+macroZ};
-  if(roll<.135&&lx>=2&&lx<2+LEVEL0_HOLE_SIZE&&lz>=2&&lz<2+LEVEL0_HOLE_SIZE)return {type:"holes",id:"holes:"+macroX+":"+macroZ};
-  if(roll<.18&&lx>=3&&lx<3+LEVEL0_BLACKOUT_SIZE&&lz>=3&&lz<3+LEVEL0_BLACKOUT_SIZE)return {type:"blackout",id:"blackout:"+macroX+":"+macroZ};
+  if(roll>=.022&&roll<.055&&lx>=2&&lx<2+LEVEL0_HOLE_SIZE&&lz>=2&&lz<2+LEVEL0_HOLE_SIZE)return {type:"holes",id:"holes:"+macroX+":"+macroZ};
+  if(roll>=.055&&roll<.085&&lx>=3&&lx<3+LEVEL0_BLACKOUT_SIZE&&lz>=3&&lz<3+LEVEL0_BLACKOUT_SIZE)return {type:"blackout",id:"blackout:"+macroX+":"+macroZ};
+  if(roll>=.085&&roll<.15)return {type:"pillars",id:"pillars:"+macroX+":"+macroZ};
   return {type:"maze",id:"maze"};
 }
 function level0RegionSame(a,b){return a.type!=="maze"&&a.type===b.type&&a.id===b.id}
@@ -706,16 +706,35 @@ class Chunk{
 
     if(this.manilaRoom&&region==="maze"){
       const p=center(this.manilaRoom.cellX,this.manilaRoom.cellZ),w=8,h=3.15,thick=.42,doorW=1.45,doorH=2.35,side=(w-doorW)/2,wall=lib.manilaWall,wood=lib.officeWood;
-      box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x-(doorW/2+side/2),h/2,p.z-w/2);box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x+(doorW/2+side/2),h/2,p.z-w/2);
-      box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x-(doorW/2+side/2),h/2,p.z+w/2);box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x+(doorW/2+side/2),h/2,p.z+w/2);
-      box(g,new THREE.BoxGeometry(thick,h,side),wall,p.x-w/2,h/2,p.z-(doorW/2+side/2));box(g,new THREE.BoxGeometry(thick,h,side),wall,p.x-w/2,h/2,p.z+(doorW/2+side/2));
-      box(g,new THREE.BoxGeometry(thick,h,side),wall,p.x+w/2,h/2,p.z-(doorW/2+side/2));box(g,new THREE.BoxGeometry(thick,h,side),wall,p.x+w/2,h/2,p.z+(doorW/2+side/2));
-      box(g,new THREE.BoxGeometry(doorW,h-doorH,thick),wall,p.x,(h+doorH)/2,p.z-w/2);box(g,new THREE.BoxGeometry(doorW,h-doorH,thick),wall,p.x,(h+doorH)/2,p.z+w/2);
-      box(g,new THREE.BoxGeometry(thick,h-doorH,doorW),wall,p.x-w/2,(h+doorH)/2,p.z);box(g,new THREE.BoxGeometry(thick,h-doorH,doorW),wall,p.x+w/2,(h+doorH)/2,p.z);
+      const wallSegments=[];
+      const addHorizontal=(z)=>{
+        const y=h/2;
+        wallSegments.push({x1:p.x-w/2,z1:z,x2:p.x-doorW/2,z2:z},{x1:p.x+doorW/2,z1:z,x2:p.x+w/2,z2:z});
+        box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x-(doorW/2+side/2),y,z);
+        box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x+(doorW/2+side/2),y,z);
+        box(g,new THREE.BoxGeometry(doorW,h-doorH,thick),wall,p.x,(h+doorH)/2,z);
+      };
+      const addVertical=(x)=>{
+        const y=h/2;
+        wallSegments.push({x1:x,z1:p.z-w/2,x2:x,z2:p.z-doorW/2},{x1:x,z1:p.z+doorW/2,x2:x,z2:p.z+w/2});
+        box(g,new THREE.BoxGeometry(thick,h,side),wall,x,y,p.z-(doorW/2+side/2));
+        box(g,new THREE.BoxGeometry(thick,h,side),wall,x,y,p.z+(doorW/2+side/2));
+        box(g,new THREE.BoxGeometry(thick,h-doorH,doorW),wall,x,(h+doorH)/2,p.z);
+      };
+      addHorizontal(p.z-w/2);addHorizontal(p.z+w/2);addVertical(p.x-w/2);addVertical(p.x+w/2);
       for(const [name,x,z] of [["north",p.x,p.z-w/2],["east",p.x+w/2,p.z],["south",p.x,p.z+w/2],["west",p.x-w/2,p.z]]){
-        if(name===this.manilaRoom.entrySide)continue;
-        const horizontal=name==="north"||name==="south";box(g,new THREE.BoxGeometry(horizontal?doorW:.09,doorH,horizontal?.09:doorW),wood,x,doorH/2,z);
+        const horizontal=name==="north"||name==="south";
+        const isEntry=name===this.manilaRoom.entrySide;
+        const door=box(g,new THREE.BoxGeometry(horizontal?doorW:.10,doorH,horizontal?.10:doorW),wood,x,doorH/2,z,0,0,0);
+        if(isEntry){
+          door.position.x+=horizontal?doorW*.42:0;
+          door.position.z+=horizontal?0:doorW*.42;
+          door.rotation.y=horizontal?(name==="north"?-.38:.38):(name==="west"?-.38:.38);
+        }else{
+          if(horizontal)door.userData.solidDoor=true;else door.userData.solidDoor=true;
+        }
       }
+      for(const seg of wallSegments)this.collisionSegments.push(seg);
       const floor=new THREE.Mesh(new THREE.PlaneGeometry(w-.25,w-.25),wood);floor.rotation.x=-Math.PI/2;floor.position.set(p.x,.012,p.z);g.add(floor);
       const table=new THREE.Group();table.position.set(p.x,0,p.z);table.add(new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.12,8),wood));
       for(const [x,z] of [[-.62,-.46],[.62,-.46],[-.62,.46],[.62,.46]])box(table,new THREE.BoxGeometry(.09,.72,.09),wood,x,.36,z);
