@@ -361,15 +361,20 @@ class Chunk{
       this.zone="maze";
       this.megaType=null;
       const spawnX=Math.floor(cells/2),spawnZ=Math.floor(cells/2);
+      this.level0SpawnCell={x:spawnX,z:spawnZ};
+      this.level0Blackout=false;
+      this.level0PillarArea=false;
+      this.level0HoleArea=false;
+      this.level0RedRoom=false;
+      this.level0PoleArea=false;
+
+      // The source Level 0 generator uses 16-block cells in a 5x5 maze.
+      // Keep that scale and maze topology, but build the walls as normal
+      // browser geometry rather than Minecraft-style block stacks.
       const visited=new Uint8Array(cells*cells);
       const stack=[[spawnX,spawnZ]];
       visited[this.index(spawnX,spawnZ)]=1;
-      const dirs=[
-        [0,-1,1,4],
-        [1,0,2,8],
-        [0,1,4,1],
-        [-1,0,8,2]
-      ];
+      const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
       while(stack.length){
         const [x,z]=stack[stack.length-1],options=[];
         for(const [dx,dz,b,ob] of dirs){
@@ -385,63 +390,19 @@ class Chunk{
         stack.push([nx,nz]);
       }
 
-      // Level 0 is labyrinthine but not a perfect one-path maze. A few
-      // deterministic loops make the layout feel more like the source rooms.
+      // A small number of extra connections produces the irregular
+      // non-linear feel described by the current Level 0 page.
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         if(x<cells-1&&rng.next()<.13)this.setEdge(x,z,"east",true);
         if(z<cells-1&&rng.next()<.13)this.setEdge(x,z,"south",true);
       }
 
-      // Keep the center spawn room open and free from structural features.
+      // Guaranteed open center spawn. It is deliberately kept feature-free;
+      // the player never starts inside a pillar/pole/hole.
       this.setEdge(spawnX,spawnZ,"north",true);
-      this.setEdge(spawnX,spawnZ,"south",true);
-      this.setEdge(spawnX,spawnZ,"west",true);
       this.setEdge(spawnX,spawnZ,"east",true);
-      this.rooms=[];
-      this.level0Blackout=false;
-      this.level0PillarArea=false;
-      this.level0HoleArea=false;
-      this.level0RedRoom=false;
-      this.level0PoleArea=false;
-      this.level0SpawnCell={x:spawnX,z:spawnZ};    }else{
-        this.zone="maze";
-        const visited=new Uint8Array(cells*cells);
-        const stack=[[0,0]];
-        visited[this.index(0,0)]=1;
-
-        const dirs=[
-          [0,1,4,1],
-          [1,0,2,8],
-          [0,-1,1,4],
-          [-1,0,8,2]
-        ];
-
-        while(stack.length){
-          const [x,z]=stack[stack.length-1],options=[];
-          for(const [dx,dz,b,ob] of dirs){
-            const nx=x+dx,nz=z+dz;
-            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])
-              options.push([nx,nz,b,ob]);
-          }
-          if(!options.length){stack.pop();continue}
-          const [nx,nz,b,ob]=rng.pick(options);
-          this.walls[this.index(x,z)]&=~b;
-          this.walls[this.index(nx,nz)]&=~ob;
-          visited[this.index(nx,nz)]=1;
-          stack.push([nx,nz]);
-        }
-      }
-
-      // The reference connects neighboring maze sectors here. Mega-room
-      // types 1 and 2 skip this because the maze generator is never called.
-      if(roomType===0||roomType>=3){
-        for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
-        for(let i=0;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
-        for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
-        for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
-      }
-
-    }else{
+      this.setEdge(spawnX,spawnZ,"south",true);
+      this.setEdge(spawnX,spawnZ,"west",true);    }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
       visited[this.index(Math.floor(cells/2),Math.floor(cells/2))]=1;
       const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
@@ -982,7 +943,7 @@ class Chunk{
         const p=cellCenter(room.x,room.z);
         const openSide=!(room.mask&1)?"north":!(room.mask&2)?"east":!(room.mask&4)?"south":"west";
         const torus=new THREE.Mesh(new THREE.TorusGeometry(cell*.19,.11,8,18,Math.PI),lib.wall);
-        torus.position.set(p.x,p.z?2.1:2.1,p.z);
+        torus.position.set(p.x,2.1,p.z);
         torus.rotation.y=(openSide==="east"||openSide==="west")?Math.PI/2:0;
         g.add(torus);
       }
