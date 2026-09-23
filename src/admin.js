@@ -25,6 +25,7 @@ export class BackroomsAdmin{
     document.body.appendChild(this.opener);
     this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
     this.ready=true;
+    if(enabled)requestAnimationFrame(()=>this.open());
   }
 
   build(){
