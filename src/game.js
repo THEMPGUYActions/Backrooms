@@ -1345,7 +1345,7 @@ class WorldStreamer{
       this.library.floor
     );
     this.floorSurface.rotation.x=-Math.PI/2;
-    this.floorSurface.position.set(0,-.035,0);
+    this.floorSurface.position.set(0,-.001,0);
     this.floorSurface.updateMatrix();
     this.floorSurface.matrixAutoUpdate=false;
     this.floorSurface.frustumCulled=false;
@@ -1356,7 +1356,7 @@ class WorldStreamer{
       this.library.ceiling
     );
     this.ceilingSurface.rotation.x=Math.PI/2;
-    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.065,0);
+    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.002,0);
     this.ceilingSurface.updateMatrix();
     this.ceilingSurface.matrixAutoUpdate=false;
     this.ceilingSurface.frustumCulled=false;
@@ -1417,10 +1417,15 @@ class WorldStreamer{
           {material:this.library?.floor,tileWorld:5.4},
           {material:this.library?.ceiling,tileWorld:5.4}
         ]
-      : [
-          {material:this.library?.floor,tileWorld:3.0},
-          {material:this.library?.ceiling,tileWorld:1.25}
-        ];
+      : this.game.level.id==="0"
+        ? [
+            {material:this.library?.floor,tileWorld:1.25},
+            {material:this.library?.ceiling,tileWorld:1.0}
+          ]
+        : [
+            {material:this.library?.floor,tileWorld:3.0},
+            {material:this.library?.ceiling,tileWorld:1.25}
+          ];
 
     for(const {material,tileWorld} of surfaces){
       if(!material)continue;
