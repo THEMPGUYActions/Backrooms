@@ -870,11 +870,11 @@ class Chunk{
       // wall_block is a solid Minecraft cube. Keep its caps so isolated
       // columns/posts do not render as hollow or cross-shaped.
       appendFace(
-        [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
+        [[minX,0.001,minZ],[maxX,0.001,minZ],[maxX,0.001,maxZ],[minX,0.001,maxZ]],
         0,-1,0,minX,0,maxX,1
       );
       appendFace(
-        [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
+        [[minX,h,minZ],[minX,h,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
         0,1,0,minX,0,maxX,1
       );
     }
