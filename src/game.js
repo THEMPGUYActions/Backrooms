@@ -948,6 +948,15 @@ class Chunk{
       putStructure("megaroom"+type,baseX,18,baseZ,0);
     };
 
+    // The source generator explicitly fills its starting 16x16 Minecraft
+    // chunk at Y=25 before the generic 8x8 roof pass. That makes the roof pass
+    // skip these four 8x8 units because their Y=25 probe is no longer air.
+    if(this.cx===0&&this.cz===0){
+      for(let z=0;z<16;z++)for(let x=0;x<16;x++){
+        putVoxel(x,5,z,{name:(x===0&&z===0)?"ghost_ceiling_tile":"ceiling_tile",properties:null});
+      }
+    }
+
     // Source Level0ChunkGenerator's start chunk is four 48x48 megaroom1
     // placements spanning the complete 80x80 sector.
     if(this.megaType===1||this.megaType===2){
@@ -1122,7 +1131,8 @@ class Chunk{
     // placing, so do those exact logical checks against the macro block map.
     for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
       for(let tileX=0;tileX<this.world.size;tileX+=8){
-        if(level0SourceStateAt(voxels,tileX,18-LEVEL0_SOURCE_FLOOR_Y,tileZ))continue;
+        const sourceMarker=level0SourceStateAt(voxels,tileX,18-LEVEL0_SOURCE_FLOOR_Y,tileZ);
+        if(sourceMarker?.kind==="marker"&&level0SourceShortName(sourceMarker.state)==="cyan_wool")continue;
         if(level0SourceStateAt(voxels,tileX,5,tileZ))continue;
         const roofName=roofRng.next()<.2?"roof2":"roof1";
         const rotation=roofRng.next()<.5?0:Math.PI/2;
