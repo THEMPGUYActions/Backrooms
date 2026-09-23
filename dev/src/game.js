@@ -570,7 +570,6 @@ class Chunk{
         for(const side of [-1,1]){
           box(g,new THREE.BoxGeometry(.08,.92,3.9),lib.metal,px+side*2.02,.46,pz-1.4);
         }
-        addLight(px,pz,0,.82,105);
         this.exit.position=new THREE.Vector3(px,.72,pz-1.65);
       }else if(e.kind==="door"){
         buildDoor(e,true);
