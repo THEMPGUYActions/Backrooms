@@ -1,4 +1,9 @@
-import { isTouchControlsDevice } from "./platform.js";
+function isTouchControlsDevice(){
+  const coarse=matchMedia("(pointer:coarse)").matches;
+  const fine=matchMedia("(pointer:fine)").matches;
+  const touchPoints=Number.isFinite(navigator.maxTouchPoints)?navigator.maxTouchPoints:0;
+  return coarse&&!fine||(touchPoints>0&&!fine);
+}
 
 export class InputManager {
   constructor(game){
