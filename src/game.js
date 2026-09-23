@@ -3,10 +3,10 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20260923-1220";
-import { AudioDirector } from "./audio.js?v=20260923-1220";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1220";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1220";
+import { InputManager } from "./input.js?v=20260923-1830";
+import { AudioDirector } from "./audio.js?v=20260923-1830";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1830";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1830";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -250,7 +250,6 @@ class Chunk{
           }
         }
       }
-    }
     }else if(level.id==="0"){
       const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
       if(mega){
@@ -795,11 +794,7 @@ class Chunk{
   update(dt){
     const state=this.game.lightState;
     const enteredFlicker=state==="FLICKER"&&this.lastLightState!=="FLICKER";
-    if(this.game.level.id==="1"&&this.zone==="mega"){
-      this.lastLightState=this.game.lightState;
-    }else{
-      this.lastLightState=this.game.lightState;
-    }
+    this.lastLightState=this.game.lightState;
 
     if(enteredFlicker)this.startFlickerEvent();
 
