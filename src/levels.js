@@ -36,14 +36,14 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-1",
     next: "2",
     theme: {
-      wall: 0x737672,
-      wallRough: 0.97,
-      floor: 0x666966,
-      ceiling: 0x767976,
-      fog: 0x686b67,
+      wall: 0x999b98,
+      wallRough: 0.84,
+      floor: 0x666a68,
+      ceiling: 0x4e514f,
+      fog: 0x070809,
       accent: 0x92e7af,
       light: 0xf0f0e8,
-      ambient: 0x292c2a
+      ambient: 0x0d0f0f
     },
     gridSize: 10,
     cellSize: 8.0,
@@ -55,7 +55,7 @@ export const LEVELS = {
     exitStyle: "green",
     batteryChance: 0.14,
     exitAfterChunks: 4,
-    objective: "Find the stairwell. The lights do not stay on.",
+    objective: "Find the stairwell. The garage goes on forever. The lights do not stay on.",
     safe: false
   },
   "2": {
