@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-1830";
 import { AudioDirector } from "./audio.js?v=20260923-1830";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1830";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1900";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1910";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -229,7 +229,7 @@ class Chunk{
 
         // Level1MazeGenerator.spawnRandomRooms(): one 3x3 special area,
         // with storage being uncommon and the pillars structure otherwise.
-        if(rng.next()<.88){
+        {
           let room=null;
           for(let attempt=0;attempt<18&&!room;attempt++){
             const x=rng.int(1,cells-4),z=rng.int(1,cells-4);

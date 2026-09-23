@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20260923-1900";
+import { BackroomsGame } from "./game.js?v=20260923-1910";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20260923-1905";
 /* DEV_ADMIN_END */
