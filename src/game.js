@@ -1636,7 +1636,7 @@ export class BackroomsGame{
       for(let i=chunk.batteries.length-1;i>=0;i--){
         const pickup=chunk.batteries[i];
         const d=Math.hypot(p.x-pickup.group.position.x,p.z-pickup.group.position.z);
-        pickup.group.rotation.y+=dtToRad(1.5);
+        pickup.group.rotation.y+=THREE.MathUtils.degToRad(1.5);
         pickup.group.position.y=.22+Math.sin(this.gameTime*2.5+i)*.025;
         if(d<1.05&&this.player.flashBattery<100){
           const before=this.player.flashBattery;
