@@ -158,13 +158,23 @@ try{
 
   await command("Runtime.evaluate",{expression:"location.href='http://127.0.0.1:"+port+"/index.html?admin=1'",returnByValue:true});
   await delay(2800);
+  const adminProbe=await command("Runtime.evaluate",{
+    expression:"(async()=>{try{const response=await fetch('./src/admin.js?v=20260923-1304',{cache:'no-store'});const text=await response.text();let imported=false,importError='';try{await import('./src/admin.js?v=probe-'+Date.now());imported=true}catch(error){importError=String(error?.stack||error)}return JSON.stringify({http:response.status,ok:response.ok,length:text.length,imported,importError})}catch(error){return JSON.stringify({probeError:String(error?.stack||error)})}})()",
+    awaitPromise:true,
+    returnByValue:true
+  });
+  const adminProbeState=JSON.parse(adminProbe.result?.result?.result?.value||"{}");
+  if(!adminProbeState.ok||!adminProbeState.imported){
+    throw new Error("Admin module probe failed: "+JSON.stringify(adminProbeState));
+  }
+
   const adminResult=await command("Runtime.evaluate",{
     expression:"JSON.stringify({enabled:!!window.backrooms?.admin?.enabled,loaded:!!window.backroomsAdmin?.ready,opened:!!window.backroomsAdmin?.opened,button:!!document.getElementById('admin-open'),panel:!!document.getElementById('admin-panel'),panelVisible:document.getElementById('admin-panel')?.classList.contains('hidden')===false})",
     returnByValue:true
   });
   const adminState=JSON.parse(adminResult.result?.result?.value||"{}");
   if(!adminState.enabled||!adminState.loaded||!adminState.button||!adminState.panel||!adminState.opened||!adminState.panelVisible){
-    throw new Error("Admin query mode did not initialize/open: "+JSON.stringify(adminState));
+    throw new Error("Admin query mode did not initialize/open: "+JSON.stringify({...adminState,adminProbe:adminProbeState}));
   }
 
   const runtimeErrors=messages.filter(message=>
