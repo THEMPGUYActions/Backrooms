@@ -1504,11 +1504,28 @@ export class BackroomsGame{
     }
     const boot=document.getElementById("boot");
     const audioPage=document.querySelector(".intro-audio-page");
-    if(audioPage)audioPage.style.pointerEvents="none";
+    if(audioPage){
+      audioPage.style.pointerEvents="none";
+      audioPage.setAttribute("aria-hidden","true");
+    }
     if(boot){
       boot.style.pointerEvents="none";
+      boot.setAttribute("aria-hidden","true");
       boot.classList.add("fade-out");
+      // Put the intro behind the renderer immediately, then remove it after the
+      // fade. This prevents an invisible/transparent intro layer from ever
+      // competing with gameplay input or rendering.
+      boot.style.zIndex="-1";
+      const removeIntro=()=>{
+        boot.style.display="none";
+        boot.style.pointerEvents="none";
+      };
+      boot.addEventListener("transitionend",event=>{
+        if(event.propertyName==="opacity")removeIntro();
+      },{once:true});
+      setTimeout(removeIntro,1350);
     }
+    this.render();
     this.toast(this.level.objective,3);
   }
 
