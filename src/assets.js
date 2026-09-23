@@ -14,24 +14,6 @@ export const LEVEL1_ASSET_SOURCES = Object.freeze({
   stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png"
 });
 
-export const LEVEL0_ASSET_SOURCES = Object.freeze({
-  // Most Level 0 source structures use the normal wall_block. wall_block_2
-  // (Manila wallpaper) is only used by the separate megaroom4 structure.
-  wall: LOCAL_SPB_ASSET_BASE + "level0/wall_block.png",
-  wall2: LOCAL_SPB_ASSET_BASE + "level0/wall_block_2_texture.png",
-  wallBottom: LOCAL_SPB_ASSET_BASE + "level0/wallpaper_bottom_block_texture.png",
-  wallBottom2: LOCAL_SPB_ASSET_BASE + "level0/wall_block_2.png",
-  floor: {
-    color: LOCAL_SPB_ASSET_BASE + "level0/pbr/carpet/carpet_color.png",
-    normal: LOCAL_SPB_ASSET_BASE + "level0/pbr/carpet/carpet_normal.png"
-  },
-  ceiling: {
-    color: LOCAL_SPB_ASSET_BASE + "level0/pbr/ceiling_tile/ceiling_tile_color.png",
-    normal: LOCAL_SPB_ASSET_BASE + "level0/pbr/ceiling_tile/ceiling_tile_normal.png"
-  },
-  fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png"
-});
-
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
   wallpaper: {
     color: LOCAL_PBR_ASSET_BASE + "wallpaper_color.png",
@@ -126,42 +108,45 @@ export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
   const source=level.id==="0"
     ? {wall:BACKROOMS_PBR_SOURCES.wallpaper,floor:BACKROOMS_PBR_SOURCES.carpet}
     : {wall:BACKROOMS_PBR_SOURCES.paintedWall,floor:BACKROOMS_PBR_SOURCES.carpet};
-
-  const wallRepeat=level.id==="0"?2.4:3.0;
-  const floorRepeat=level.id==="0"?4.8:4.2;
-  const ceilingRepeat=1.0;
-
-  const maps=[
+  const wallRepeat=level.id==="0"?2.4:3.0,floorRepeat=level.id==="0"?4.8:4.2,ceilingRepeat=1.0;
+  const dataMaps=[
     ["wall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // wallpaper"],
     ["wall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // wallpaper"],
     ["floor","roughnessMap",source.floor.rough,false,floorRepeat,.16,"Roughness // carpet"],
     ["floor","normalMap",source.floor.normal,false,floorRepeat,.16,"Normal // carpet"],
     ["ceiling","roughnessMap",BACKROOMS_PBR_SOURCES.ceiling.rough,false,ceilingRepeat,.25,"Roughness // ceiling"],
-    ["ceiling","normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,ceilingRepeat,.25,"Normal // ceiling"],
+    ["ceiling","normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,ceilingRepeat,.25,"Normal // ceiling"]
+  ];
+  const level0Data=level.id==="0"?[
+    ["redWall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // red wallpaper"],
+    ["redWall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // red wallpaper"],
+    ["redFloor","roughnessMap",source.floor.rough,false,floorRepeat,.16,"Roughness // red carpet"],
+    ["redFloor","normalMap",source.floor.normal,false,floorRepeat,.16,"Normal // red carpet"],
+    ["manilaWall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // Manila wallpaper"],
+    ["manilaWall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // Manila wallpaper"]
+  ]:[];
+  const colorMaps=[
     ["wall","map",source.wall.color,true,wallRepeat,.28,"Color // wallpaper"],
     ["floor","map",source.floor.color,true,floorRepeat,.16,"Color // carpet"],
     ["ceiling","map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25,"Color // ceiling"]
   ];
-
-  const total=maps.length;
+  const level0Colors=level.id==="0"?[
+    ["redWall","map",source.wall.color,true,wallRepeat,.28,"Color // red wallpaper"],
+    ["redFloor","map",source.floor.color,true,floorRepeat,.16,"Color // red carpet"],
+    ["manilaWall","map",source.wall.color,true,wallRepeat,.28,"Color // Manila wallpaper"]
+  ]:[];
+  const maps=[...dataMaps,...level0Data,...colorMaps,...level0Colors];
+  const dataCount=dataMaps.length+level0Data.length,total=maps.length;
   let done=0;
   const loadOne=async(entry)=>{
     const [materialName,kind,url,color,repeat,normalStrength,label]=entry;
-    onProgress(done/total,"LOADING SURFACES",label);
+    onProgress(done/total,done<dataCount?"CALIBRATING SURFACES":"LOADING COLORS",label);
     await applyRemoteTexture(library[materialName],kind,url,color,repeat,normalStrength);
-    done++;
-    onProgress(done/total,"LOADING SURFACES",label);
+    done++;onProgress(done/total,done<=dataCount?"CALIBRATING SURFACES":"LOADING COLORS",label);
   };
-
-  // Stage 1: roughness/normal data first so the finished materials have correct light response.
-  onProgress(0,"CALIBRATING SURFACES","Loading roughness and normal maps first");
-  await Promise.all(maps.slice(0,6).map(loadOne));
-
-  // Stage 2: final color maps.
-  onProgress(6/total,"LOADING COLORS","Applying final wallpaper, carpet and ceiling textures");
-  await Promise.all(maps.slice(6).map(loadOne));
-
-  onProgress(1,"SURFACES READY","Full PBR set loaded and browser-cacheable");
+  await Promise.all(maps.slice(0,dataCount).map(loadOne));
+  await Promise.all(maps.slice(dataCount).map(loadOne));
+  onProgress(1,"SURFACES READY","Bundled PBR surfaces loaded");
   return true;
 }
 
@@ -198,46 +183,6 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
   });
   m.map.repeat.set(scale,scale);m.roughnessMap.repeat.set(scale,scale);m.normalMap.repeat.set(scale,scale);
   return m;
-}
-
-export async function applyLevel0Assets(library,level,onProgress=()=>{}){
-  if(level.id!=="0")return false;
-  const maps=[
-    [library.wall,"map",LEVEL0_ASSET_SOURCES.wall,true,1,.0,"Level 0 wall texture"],
-    [library.wall2,"map",LEVEL0_ASSET_SOURCES.wall2,true,1,.0,"Level 0 Manila wall texture"],
-    [library.wallBottom,"map",LEVEL0_ASSET_SOURCES.wallBottom,true,1,.0,"Level 0 wall base texture"],
-    [library.wallBottom2,"map",LEVEL0_ASSET_SOURCES.wallBottom2,true,1,.0,"Level 0 Manila wall base texture"],
-    [library.trim,"map",LOCAL_SPB_ASSET_BASE+"wall_trim_texture.png",true,1,.0,"Level 0 wall trim"],
-    [library.floor,"map",LEVEL0_ASSET_SOURCES.floor.color,true,1.25,.16,"Level 0 carpet color"],
-    [library.floor,"normalMap",LEVEL0_ASSET_SOURCES.floor.normal,false,1.25,.22,"Level 0 carpet normal"],
-    [library.ceiling,"map",LEVEL0_ASSET_SOURCES.ceiling.color,true,1,.18,"Level 0 ceiling color"],
-    [library.ceiling,"normalMap",LEVEL0_ASSET_SOURCES.ceiling.normal,false,1,.22,"Level 0 ceiling normal"],
-    [library.light,"map",LEVEL0_ASSET_SOURCES.fluorescent,true,1,.08,"Level 0 fluorescent fixture"]
-  ];
-  let done=0;
-  onProgress(0,"LOADING LEVEL 0 ASSETS","SpacePotato Level 0 materials");
-  await Promise.all(maps.map(async([material,kind,url,color,repeat,normalStrength,label])=>{
-    await applyRemoteTexture(material,kind,url,color,repeat,normalStrength);
-    done++;
-    onProgress(done/maps.length,"LOADING LEVEL 0 ASSETS",label);
-  }));
-
-  // SpacePotato's wall block has no normal map; it relies on the source
-  // texture and Minecraft-style per-block faces. Keep the wall roughness
-  // consistent with the source material instead of adding generated normals.
-  library.wall.roughness=.88;
-  library.wall.normalMap=null;
-  library.wall.needsUpdate=true;
-  library.wallBottom.roughness=.88;
-  library.wallBottom.normalMap=null;
-  library.wallBottom.needsUpdate=true;
-  library.wall2.roughness=.88;
-  library.wall2.normalMap=null;
-  library.wall2.needsUpdate=true;
-  library.wallBottom2.roughness=.88;
-  library.wallBottom2.normalMap=null;
-  library.wallBottom2.needsUpdate=true;
-  return true;
 }
 
 export async function applyLevel1Assets(library,level,onProgress=()=>{}){
@@ -323,6 +268,9 @@ export function makeLibrary(level){
     exitDoor:new THREE.MeshStandardMaterial({color:0xd8d1bd,roughness:.68,metalness:.03,emissive:level.theme.accent,emissiveIntensity:.12}),
     exitFrame:new THREE.MeshStandardMaterial({color:0xf3f0e4,roughness:.56,metalness:0}),
     wallAnomaly:new THREE.MeshStandardMaterial({color:0xd2bf61,roughness:.72,metalness:0,emissive:0xffdc69,emissiveIntensity:.7}),
+    redWall:createPBRMaterial({base:0x651713,seed:211,rough:.94,scale:1,normalStrength:.28}),
+    redFloor:createPBRMaterial({base:0x3d1714,seed:212,rough:.99,scale:5,normalStrength:.12}),
+    manilaWall:createPBRMaterial({base:0x8a7357,seed:213,rough:.9,scale:1.2,normalStrength:.22}),
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
     light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
