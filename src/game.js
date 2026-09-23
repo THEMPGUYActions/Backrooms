@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-1830";
 import { AudioDirector } from "./audio.js?v=20260923-1830";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1830";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1830";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1900";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1071,7 +1071,7 @@ class WorldStreamer{
     const out=[];
     for(const c of this.chunks.values()){
       if(!c.entitySpawn)continue;
-      if(this.game.level.id==="1"&&(c.zone!=="halls"||this.game.lightState==="ON"))continue;
+      if(this.game.level.id==="1"&&this.game.lightState!=="BLACKOUT")continue;
       out.push(c);
     }
     return out;
@@ -1593,18 +1593,21 @@ export class BackroomsGame{
     if(!this.running||this.paused||this.dead)return;
     this.lightEventTimer-=dt;
     if(this.lightState!=="ON"){
-      if(this.lightEventTimer<=0){this.lightState="ON";this.lightEventTimer=42+Math.random()*45}
+      if(this.lightEventTimer<=0){
+        this.lightState="ON";
+        this.lightEventTimer=this.level.id==="1"?50+Math.random()*30:42+Math.random()*45;
+      }
       return;
     }
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      this.lightEventTimer=this.level.id==="1"?18+Math.random()*34:10+Math.random()*18;
+      this.lightEventTimer=this.level.id==="1"?30:10+Math.random()*18;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
       this.lightState="FLICKER";
-      this.lightEventTimer=this.level.id==="1"?2.6+Math.random()*2.8:2.8+Math.random()*3.2;
+      this.lightEventTimer=this.level.id==="1"?10:2.8+Math.random()*3.2;
       this.audio.flicker();
       this.triggerFear(this.level.id==="1"?.20:.16);
     }
