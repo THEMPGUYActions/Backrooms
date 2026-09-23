@@ -7,7 +7,7 @@ const root = process.cwd();
 const dist = join(root, "dist");
 const pbrDir = join(dist, "assets", "pbr");
 const audioDir = join(dist, "assets", "audio");
-const spbDir = join(dist, "assets", "spb-ff");
+const ffDir = join(dist, "assets", "found-footage");
 const LOCK_PATH = join(root, "data", "pbr-assets-lock.json");
 const AUDIO_LOCK_PATH = join(root, "data", "audio-assets-lock.json");
 const MAX_ASSET_BYTES = 6 * 1024 * 1024;
@@ -25,6 +25,14 @@ const SPB_FILES = [
   {name:"fluorescent_light.png",path:"src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png"},
   {name:"wall_trim_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png"},
   {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"},
+  {name:"level0/wall_block.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block.png"},
+  {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png"},
+  {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png"},
+  {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png"},
+  {name:"level0/pole.png",path:"src/main/resources/assets/spb-revamped/textures/block/pole.png"},
+  {name:"level0/plastic.png",path:"src/main/resources/assets/spb-revamped/textures/block/plastic.png"},
+  {name:"level0/power_pole_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/power_pole_texture.png"},
+  {name:"level0/power_pole_top_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/power_pole_top_texture.png"}
 ];
 
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
@@ -59,8 +67,8 @@ async function downloadSpacePotatoAsset(entry){
   if(!data.length||data.length>MAX_SPB_BYTES)throw new Error("Invalid SpacePotato asset size for "+entry.name);
   if(data.length<8||!data.subarray(0,8).equals(PNG_SIGNATURE))throw new Error("SpacePotato asset is not a PNG: "+entry.name);
   const sha256=createHash("sha256").update(data).digest("hex");
-  await mkdir(join(spbDir, entry.name, ".."), { recursive: true });
-  await writeFile(join(spbDir,entry.name),data);
+  await mkdir(join(ffDir, entry.name, ".."), { recursive: true });
+  await writeFile(join(ffDir,entry.name),data);
   return {url,source:SPB_SOURCE_REPO,commit:sourceCommit,bytes:data.length,sha256};
 }
 
@@ -113,7 +121,7 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 await mkdir(pbrDir,{recursive:true});
 await mkdir(audioDir,{recursive:true});
-await mkdir(spbDir,{recursive:true});
+await mkdir(ffDir,{recursive:true});
 
 for (const path of ["index.html", "styles.css", "favicon.svg", "sw.js", "src", "data"]) {
   await cp(join(root, path), join(dist, path), { recursive: true });
@@ -132,9 +140,9 @@ for (const filename of PBR_FILES) {
 }
 
 await writeFile(join(pbrDir,"manifest.json"),JSON.stringify(manifest,null,2)+"\n","utf8");
-const spbManifest={source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,files:{}};
+const spbManifest={source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,license:"GPL-3.0-only",files:{}};
 for(const entry of SPB_FILES)spbManifest.files[entry.name]=await downloadSpacePotatoAsset(entry);
-await writeFile(join(spbDir,"manifest.json"),JSON.stringify(spbManifest,null,2)+"\n","utf8");const audioManifest={pack:audioLock.pack,license:audioLock.license,files:{}};
+await writeFile(join(ffDir,"manifest.json"),JSON.stringify(spbManifest,null,2)+"\n","utf8");const audioManifest={pack:audioLock.pack,license:audioLock.license,files:{}};
 for(const filename of Object.keys(audioLock.files))audioManifest.files[filename]=await downloadAudioAsset(filename);
 await writeFile(join(audioDir,"manifest.json"),JSON.stringify(audioManifest,null,2)+"\n","utf8");
 const builtMain=await readFile(join(dist,"src","main.js"),"utf8");
@@ -147,6 +155,6 @@ await writeFile(join(dist,".nojekyll"),"","utf8");
 
 console.log("Downloaded and checksum-verified "+PBR_FILES.length+" CC0 OpenGameArt PBR maps.");
 console.log("Downloaded "+Object.keys(audioLock.files).length+" CC0 OpenGameArt audio assets.");
-console.log("Downloaded "+SPB_FILES.length+" pinned SpacePotato Found Footage reference assets.");
+console.log("Downloaded "+SPB_FILES.length+" bundled Found Footage assets.");
 console.log("PBR manifest size: " + (await stat(join(pbrDir, "manifest.json"))).size + " bytes.");
 console.log("Built static site in dist/");
