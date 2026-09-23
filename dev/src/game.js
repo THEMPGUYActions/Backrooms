@@ -7,7 +7,7 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2050";
 import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2050";
-import { level0RoomRows, level0RotationForMask, level0TransformBlock, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2300";
+import { level0RoomRows, level0RotationForMask, level0TransformBlock, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2355";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -289,8 +289,9 @@ class Chunk{
       const anchorRoll=cycleHash(this.game.seed^0x4d30,this.cx,this.cz);
       let roomType=0;
 
-      // Each browser Level 0 chunk is one 80x80 source sector. Only one macro
-      // may occupy an adjacent 3x3 sector neighborhood at a time.
+      // The reference only evaluates mega-room placement at 80-block anchors.
+      // Keep that same sector size here, with an order-independent seeded
+      // selection so streaming chunks generate identically every time.
       if(isStart){
         roomType=1;
       }else if(anchorRoll<.5){
@@ -311,13 +312,88 @@ class Chunk{
       this.megaType=roomType||null;
       this.macroBlockedCells=[];
 
-      const generateMaze=()=>{
+      const markerCells=()=>{
+        if(roomType<3)return [];
+        const template=LEVEL0_MEGA_TEMPLATES[roomType];
+        const blocked=[];
+        for(const [mx,mz] of (template?.markers||[])){
+          const gx=1+mx/cell;
+          const gz=1+mz/cell;
+          if(Number.isInteger(gx)&&Number.isInteger(gz)&&gx>=0&&gx<cells&&gz>=0&&gz<cells)
+            blocked.push({x:gx,z:gz});
+        }
+        return blocked;
+      };
+
+      // For types 3-6 the macro structure is placed at origin+16 and the
+      // reference MazeGenerator sees its lime-marker cells as null grid cells.
+      // Those null cells must be excluded before DFS, not after it.
+      if(roomType>=3){
+        const blocked=markerCells();
+        this.macroBlockedCells=blocked;
+        const blockedSet=new Set(blocked.map(v=>v.x+","+v.z));
+
+        const openMarkerEdges=()=>{
+          const open=(x,z,side)=>{
+            if(x>=0&&x<cells&&z>=0&&z<cells)this.setEdge(x,z,side,true);
+          };
+          const template=LEVEL0_MEGA_TEMPLATES[roomType];
+          const baseX=this.originX+cell;
+          const baseZ=this.originZ+cell;
+          for(const [mx,mz] of (template?.markers||[])){
+            const wx=baseX+mx,wz=baseZ+mz;
+            const gx=(wx-this.originX)/cell,gz=(wz-this.originZ)/cell;
+            if(!Number.isInteger(gx)||!Number.isInteger(gz))continue;
+
+            // These are the four probes performed by checkNeighbors() when
+            // it sees a lime marker one cell away from the current cell.
+            open(gx,gz-1,"south");
+            open(gx,gz+1,"north");
+            open(gx-1,gz,"east");
+            open(gx+1,gz,"west");
+          }
+        };
+
+        openMarkerEdges();
+
         const visited=new Uint8Array(cells*cells);
         const stack=[[0,0]];
         visited[this.index(0,0)]=1;
 
         // Source neighbor order: North(+Z), West(+X), South(-Z), East(-X).
         // Browser bits: North=1(-Z), East=2(+X), South=4(+Z), West=8(-X).
+        const dirs=[
+          [0,1,4,1],
+          [1,0,2,8],
+          [0,-1,1,4],
+          [-1,0,8,2]
+        ];
+
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob] of dirs){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!blockedSet.has(nx+","+nz)&&!visited[this.index(nx,nz)])
+              options.push([nx,nz,b,ob]);
+          }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
+        }
+      }else if(roomType===1||roomType===2){
+        // The reference places four 48x48 macro structures here and does not
+        // invoke Level0MazeGenerator for these sectors.
+        this.zone="mega";
+        this.walls.fill(0);
+      }else{
+        this.zone="maze";
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+
         const dirs=[
           [0,1,4,1],
           [1,0,2,8],
@@ -339,52 +415,16 @@ class Chunk{
           visited[this.index(nx,nz)]=1;
           stack.push([nx,nz]);
         }
-      };
-
-      if(roomType===1||roomType===2){
-        this.zone="mega";
-        this.walls.fill(0);
-      }else{
-        this.zone="maze";
-        generateMaze();
-
-        if(roomType>=3){
-          const template=LEVEL0_MEGA_TEMPLATES[roomType];
-          const blocked=new Set();
-          const baseCell=1;
-          for(const [mx,mz] of (template?.markers||[])){
-            const gx=baseCell+mx/16,gz=baseCell+mz/16;
-            if(Number.isInteger(gx)&&Number.isInteger(gz)&&gx>=0&&gx<cells&&gz>=0&&gz<cells){
-              blocked.add(gx+","+gz);
-            }
-          }
-          this.macroBlockedCells=[...blocked].map(k=>{
-            const [x,z]=k.split(",").map(Number);
-            return {x,z};
-          });
-
-          // The source checks the marker one cell away from the current cell.
-          // Inverting those probes reproduces the same four edge removals.
-          const baseX=this.originX+16,baseZ=this.originZ+16;
-          for(const [mx,mz] of (template?.markers||[])){
-            const wx=baseX+mx,wz=baseZ+mz;
-            const gx=(wx-this.originX)/cell,gz=(wz-this.originZ)/cell;
-            if(!Number.isInteger(gx)||!Number.isInteger(gz))continue;
-            const open=(x,z,side)=>{
-              if(x>=0&&x<cells&&z>=0&&z<cells)this.setEdge(x,z,side,true);
-            };
-            open(gx,gz-1,"south");
-            open(gx,gz+1,"north");
-            open(gx-1,gz,"east");
-            open(gx+1,gz,"west");
-          }
-        }
       }
 
-      for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
-      for(let i=0;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
-      for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
-      for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
+      // The reference connects neighboring maze sectors here. Mega-room
+      // types 1 and 2 skip this because the maze generator is never called.
+      if(roomType===0||roomType>=3){
+        for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
+        for(let i=0;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
+        for(let i=cells-1;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
+        for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
+      }
 
     }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
@@ -912,7 +952,7 @@ class Chunk{
       const intensity=82+next()*18;
       this.lightSources.push({
         position:new THREE.Vector3(candidate.px,h-.28,candidate.pz),
-        color:0xffff78,
+        color:0xfff064,
         baseIntensity:intensity,
         intensity,
         distance:18,
