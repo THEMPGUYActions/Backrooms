@@ -825,8 +825,9 @@ class Chunk{
     return 1;
   }
   update(dt){
+    const state=this.game.lightState;
+    const enteredFlicker=state==="FLICKER"&&this.lastLightState!=="FLICKER";
     if(this.game.level.id==="1"&&this.zone==="halls"){
-      const state=this.game.lightState;
       if(state!=="ON"&&this.lastLightState==="ON"&&Math.random()<.34){
         const cell=this.game.level.cellSize;
         const bx=this.originX+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
@@ -855,8 +856,7 @@ class Chunk{
       this.lastLightState=this.game.lightState;
     }
 
-    const state=this.game.lightState;
-    if(state==="FLICKER"&&this.lastLightState!=="FLICKER")this.startFlickerEvent();
+    if(enteredFlicker)this.startFlickerEvent();
 
     if(state==="BLACKOUT"){
       for(const fixture of this.fixtures){
