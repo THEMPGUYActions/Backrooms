@@ -2,9 +2,14 @@ export const LEVELS = {
   "0": {
     id: "0",
     number: "LEVEL 0",
-    name: "THRESHOLD",
-    sourceTitle: 'Level 0 - "Threshold"',
-    sourceUrl: "https://backrooms-wiki.wikidot.com/level-0",
+    name: "The Lobby",
+    sourceTitle: 'Level 0 - "The Lobby"',
+    // "The Lobby" is the archived Level 0 title. The current live wiki page
+    // is "Threshold"; keeping the archived source here matches the game's
+    // requested naming while preserving provenance.
+    sourceUrl: "https://backrooms-wiki.wikidot.com/archived:level-0",
+    currentWikiTitle: 'Level 0 - "Threshold"',
+    currentWikiUrl: "https://backrooms-wiki.wikidot.com/level-0",
     next: "1",
     theme: {
       wall: 0xb69c4b,
