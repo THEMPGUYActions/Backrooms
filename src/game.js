@@ -336,10 +336,10 @@ class Chunk{
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
-    const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0));
+    const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
     if(level.id==="1"){
-      // SpacePotato's Level1ChunkGenerator places the level2 stairwell only
-      // in the non-megaroom path, outside the spawn radius, with a 50% roll.
+      // SpacePotato's Level1ChunkGenerator places the level2 stairwell on
+      // maze-grid sectors outside the starting area, using a 50% roll.
       if(level1ExitSector&&rng2.next()<.5){
         const candidates=[];
         for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
