@@ -7,7 +7,7 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
 import { makeLibrary, applyOpenGameArtPBR, applyLevel0Assets, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-lobbyassets3";
-import { level0RotationForMask, level0TransformBlock } from "./level0_templates.js?v=20260923-lobbytemplates3";
+import { level0RotationForMask, level0TransformBlock, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-lobbytemplates3";
 import { LEVEL0_SOURCE_STRUCTURES } from "./level0_source.generated.js?v=20260923-l0source1";
 
 const VHSShader={
@@ -201,58 +201,24 @@ function level0SourceCandidateMegaType(seed,cx,cz){
 
 function level0SourceMarkers(name){
   const structure=level0SourceStructure(name);
-  if(!structure)return [];
-  const out=[];
-  for(const packed of structure.blocks){
-    const block=level0SourcePackedBlock(packed);
-    const state=structure.palette[block.state];
-    const kind=level0SourceKind(state);
-    if(kind!=="marker")continue;
-    const markerName=level0SourceShortName(state);
-    if(markerName!=="lime_wool"&&markerName!=="red_wool"&&markerName!=="cyan_wool")continue;
-    out.push({x:block.x,y:block.y,z:block.z,name:markerName});
-  }
-  return out;
-}
-
-function level0RotateSourceState(state,rotation){
-  const props=state?.properties;
-  if(!props)return state;
-  const quarter=((Math.round(rotation/(Math.PI/2))%4)+4)%4;
-  if(!quarter)return state;
-  const next={...props};
-  if(next.facing){
-    const cycle=["north","east","south","west"];
-    const index=cycle.indexOf(String(next.facing));
-    if(index>=0)next.facing=cycle[(index+quarter)%4];
-  }
-  if(next.axis&&(quarter===1||quarter===3)){
-    if(next.axis==="x")next.axis="z";
-    else if(next.axis==="z")next.axis="x";
-  }
-  return {...state,properties:next};
-}
-
-function level0SourceStateAt(map,x,sourceY,z){
-  return map.get(x+"|"+sourceY+"|"+z)||null;
-}
-
-function level0MergeBoundaryIntervals(map,horizontal){
-  const out=[];
-  for(const [line,parts] of map){
-    parts.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
-    let start=parts[0][0],end=parts[0][1];
-    for(let i=1;i<parts.length;i++){
-      const [a,b]=parts[i];
-      if(a<=end){end=Math.max(end,b);continue}
-      if(horizontal)out.push({x1:start,z1:line,x2:end,z2:line});
-      else out.push({x1:line,z1:start,x2:line,z2:end});
-      start=a;end=b;
+  if(structure){
+    const out=[];
+    for(const packed of structure.blocks){
+      const block=level0SourcePackedBlock(packed);
+      const state=structure.palette[block.state];
+      const kind=level0SourceKind(state);
+      if(kind!=="marker")continue;
+      const markerName=level0SourceShortName(state);
+      if(markerName!=="lime_wool"&&markerName!=="red_wool"&&markerName!=="cyan_wool")continue;
+      out.push({x:block.x,y:block.y,z:block.z,name:markerName});
     }
-    if(horizontal)out.push({x1:start,z1:line,x2:end,z2:line});
-    else out.push({x1:line,z1:start,x2:line,z2:end});
+    return out;
   }
-  return out;
+
+  const match=/^megaroom([1-6])$/.exec(name);
+  if(!match)return [];
+  return (LEVEL0_MEGA_TEMPLATES[Number(match[1])]?.markers||[])
+    .map(([x,z])=>({x,y:1,z,name:"lime_wool"}));
 }
 
 class Chunk{
@@ -414,7 +380,11 @@ class Chunk{
         roomType=level0SourceCandidateMegaType(this.game.seed,this.cx,this.cz);
       }
 
-      this.megaType=roomType||null;
+      this.megaType=roomType||null;      this.zone=this.megaType===1||this.megaType===2?"mega":"maze";
+      this.level0Blackout=!isStart&&!this.megaType&&cycleHash(this.game.seed^0xB10C0,this.cx,this.cz)<.055;
+      this.level0PillarArea=isStart||this.megaType===1||(!isStart&&!this.megaType&&cycleHash(this.game.seed^0x5011,this.cx,this.cz)<.09);
+      this.level0HoleArea=!isStart&&cycleHash(this.game.seed^0xA01E,this.cx,this.cz)<.075;
+      this.level0RedRoom=!isStart&&cycleHash(this.game.seed^0x7ED0,this.cx,this.cz)<.028;
       // The reference places stairwell_0 when the initial 1/2 roll is 2 and
       // the sector is outside the 300-block configured exit-spawn radius.
       this.level0HasStairwell=!isStart&&!initialOne&&Math.hypot(anchorX,anchorZ)>300;
@@ -648,83 +618,69 @@ class Chunk{
     const key=(x,z,s)=>s+"|"+x+"|"+z;
 
     if(level.id==="0"){
-      // Level 0 uses the source room templates below. Keep logical edge
-      // metadata for doors/outlets/etc. without rendering duplicate coarse walls.
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         const mask=this.walls[this.index(x,z)];
         if(mask&1)edges.push({x,z,side:"north"});
         if(mask&8)edges.push({x,z,side:"west"});
         if(z===cells-1&&(mask&4))edges.push({x,z,side:"south"});
         if(x===cells-1&&(mask&2))edges.push({x,z,side:"east"});
-      }
-    }else{
-      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-        const addEdge=(side)=>{
-          if(side==="north"){
-            const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
-            pushMat(hData,px,safeWallY,pz-cell/2);
-            pushMat(trimH,px,.065,pz-cell/2);
-            pushMat(topH,px,level.wallHeight-.04,pz-cell/2);
-            edges.push({x,z,side});
-          }else if(side==="south"){
-            const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
-            pushMat(hData,px,safeWallY,pz+cell/2);
-            pushMat(trimH,px,.065,pz+cell/2);
-            pushMat(topH,px,level.wallHeight-.04,pz+cell/2);
-            edges.push({x,z,side});
-          }else if(side==="west"){
-            const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
-            pushMat(vData,px-cell/2,safeWallY,pz);
-            pushMat(trimV,px-cell/2,.065,pz);
-            pushMat(topV,px-cell/2,level.wallHeight-.04,pz);
-            edges.push({x,z,side});
-          }else{
-            const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
-            pushMat(vData,px+cell/2,safeWallY,pz);
-            pushMat(trimV,px+cell/2,.065,pz);
-            pushMat(topV,px+cell/2,level.wallHeight-.04,pz);
-            edges.push({x,z,side});
-          }
-        };
-
-        if(mask&1)addEdge("north");
-        if(mask&8)addEdge("west");
-        if(z===cells-1&&(mask&4))addEdge("south");
-        if(x===cells-1&&(mask&2))addEdge("east");
-
-        const fixtureChance=level.id==="0"?.47:level.id==="1"?0:.13;
+        const fixtureChance=this.level0Blackout?0:.32;
         if(rngBase.next()<fixtureChance){
-          const fixtureMat=level.id==="0"?lib.light:(level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light);
+          const fixtureMat=this.level0RedRoom?lib.redLight:lib.light;
           const material=fixtureMat.clone();
-          material.emissiveIntensity=level.id==="0"?2.7:(fixtureMat===lib.orangeLight?2.2:3.0);
+          material.emissiveIntensity=this.level0RedRoom?1.45:2.7;
           const rotation=rngBase.next()<.5?0:Math.PI/2;
           const fixture=box(
-            g,
-            new THREE.BoxGeometry(level.id==="0"?1.5:3.7,.055,level.id==="0"?.46:.72),
-            material,
-            px,level.wallHeight-.09,pz,
-            0,rotation,0
+            g,new THREE.BoxGeometry(1.5,.055,.46),material,
+            this.originX+x*cell+cell/2,level.wallHeight-.09,this.originZ+z*cell+cell/2,0,rotation,0
           );
           fixture.userData.light=true;
           fixture.userData.baseEmissive=material.emissiveIntensity;
           this.fixtures.push(fixture);
-
-          const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
-          const intensity=level.id==="0"?220:level.id==="3"?220:level.id==="4"?110:170;
           this.lightSources.push({
-            position:new THREE.Vector3(px,level.wallHeight-.24,pz),
-            color:lightColor,
-            baseIntensity:intensity,
-            intensity,
-            distance:0,
-            decay:2,
-            fixture
+            position:new THREE.Vector3(this.originX+x*cell+cell/2,level.wallHeight-.24,this.originZ+z*cell+cell/2),
+            color:this.level0RedRoom?0x7a1717:level.theme.light,
+            baseIntensity:this.level0RedRoom?95:220,
+            intensity:this.level0RedRoom?95:220,
+            distance:this.level0RedRoom?18:0,
+            decay:2,fixture
           });
         }
       }
+    }else{    if(level.id==="0"){
+      const positions=[],normals=[],uvs=[],indices=[];
+      const pushQuad=(verts,normal,uv)=>{
+        const base=positions.length/3;
+        for(const v of verts){positions.push(v[0],v[1],v[2]);normals.push(normal[0],normal[1],normal[2]);}
+        for(const p of uv)uvs.push(p[0],p[1]);
+        indices.push(base,base+1,base+2,base,base+2,base+3);
+      };
+      const appendBox=(x0,x1,z0,z1)=>{
+        const y0=0,y1=safeWallHeight,t=wallThickness/2;
+        pushQuad([[x0,y0,z0-t],[x0,y1,z0-t],[x1,y1,z0-t],[x1,y0,z0-t]],[0,0,-1],[[0,0],[x1-x0,y1],[x1-x0,0],[0,y1]]);
+        pushQuad([[x1,y0,z1+t],[x1,y1,z1+t],[x0,y1,z1+t],[x0,y0,z1+t]],[0,0,1],[[0,0],[x1-x0,y1],[x1-x0,0],[0,y1]]);
+        pushQuad([[x0-t,y0,z1],[x0-t,y1,z1],[x0-t,y1,z0],[x0-t,y0,z0]],[-1,0,0],[[0,0],[z1-z0,y1],[z1-z0,0],[0,y1]]);
+        pushQuad([[x1+t,y0,z0],[x1+t,y1,z0],[x1+t,y1,z1],[x1+t,y0,z1]],[1,0,0],[[0,0],[z1-z0,y1],[z1-z0,0],[0,y1]]);
+        pushQuad([[x0,y1,z0],[x0,y1,z1],[x1,y1,z1],[x1,y1,z0]],[0,1,0],[[0,0],[x1-x0,0],[x1-x0,z1-z0],[0,z1-z0]]);
+      };
+      for(const e of edges){
+        const p=wallPoint(e,0,0);
+        if(e.side==="north"||e.side==="south")appendBox(p.position.x-cell/2,p.position.x+cell/2,p.position.z,p.position.z);
+        else appendBox(p.position.x,p.position.x,p.position.z-cell/2,p.position.z+cell/2);
+      }
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
+      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+      geometry.setIndex(indices);geometry.computeBoundingBox();geometry.computeBoundingSphere();
+      const mesh=new THREE.Mesh(geometry,wallMaterial);mesh.name="level0_continuous_walls";mesh.frustumCulled=true;g.add(mesh);
+      this.collisionSegments=edges.map(e=>{
+        const p=wallPoint(e,0,0);
+        return e.side==="north"||e.side==="south"
+          ? {x1:p.position.x-cell/2,z1:p.position.z,x2:p.position.x+cell/2,z2:p.position.z}
+          : {x1:p.position.x,z1:p.position.z-cell/2,x2:p.position.x,z2:p.position.z+cell/2};
+      });
     }
-
     const addInstanced=(geometry,material,data)=>{
       if(!data.length)return;
       const mesh=new THREE.InstancedMesh(geometry,material,data.length);
@@ -737,7 +693,7 @@ class Chunk{
       mesh.computeBoundingSphere();
       g.add(mesh);
     };
-    addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);
+    if(level.id!=="0"){\n      addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);\n    }
     if(level.id!=="1"){
       addInstanced(trimHGeom,lib.trim,trimH);
       addInstanced(trimVGeom,lib.trim,trimV);
@@ -939,274 +895,167 @@ class Chunk{
   }
 
   buildLevel0Set(level,lib,rng){
-    const g=this.group,cells=this.gridSize(),cell=level.cellSize;
-    const roomRng=new RNG(this.seedKey()^0x5d11f);
-    const roofRng=new RNG(this.seedKey()^0x6a11c);
-    const voxels=new Map();
+    const g=this.group,cells=this.gridSize(),cell=level.cellSize,size=this.world.size;
+    const next=()=>rng.next();
 
-    const putVoxel=(x,y,z,state)=>{
-      const key=x+"|"+y+"|"+z;
-      const kind=level0SourceKind(state);
-      // Match Minecraft structure placement semantics, including explicit air
-      // records which clear an earlier block at the same coordinate.
-      if(kind==="air"){
-        voxels.delete(key);
-        return;
-      }
-      voxels.set(key,{x,y,z,state,kind});
+    const edges=[];
+    for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+      const mask=this.walls[this.index(x,z)];
+      if(mask&1)edges.push({x,z,side:"north"});
+      if(mask&8)edges.push({x,z,side:"west"});
+      if(z===cells-1&&(mask&4))edges.push({x,z,side:"south"});
+      if(x===cells-1&&(mask&2))edges.push({x,z,side:"east"});
+    }
+
+    const wallPoint=(e,offset=.095,y=.6)=>{
+      const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
+      if(e.side==="north")return{position:new THREE.Vector3(px,y,pz-cell/2-offset),rotation:0};
+      if(e.side==="south")return{position:new THREE.Vector3(px,y,pz+cell/2+offset),rotation:0};
+      if(e.side==="west")return{position:new THREE.Vector3(px-cell/2-offset,y,pz),rotation:Math.PI/2};
+      return{position:new THREE.Vector3(px+cell/2+offset,y,pz),rotation:Math.PI/2};
     };
 
-    const putStructure=(name,baseX,baseSourceY,baseZ,rotation=0)=>{
-      const structure=level0SourceStructure(name);
-      if(!structure)return;
-      const size=Number(structure.size?.[0])||0;
-      if(!size)return;
-      for(const packed of structure.blocks){
-        const block=level0SourcePackedBlock(packed);
-        const state=level0RotateSourceState(structure.palette[block.state],rotation);
-        const transformed=level0TransformBlock(block.x,block.z,rotation,size);
-        putVoxel(
-          baseX+transformed.x,
-          baseSourceY+block.y-LEVEL0_SOURCE_FLOOR_Y,
-          baseZ+transformed.z,
-          state
-        );
-      }
-    };
-
-    const roomFamily=mask=>{
-      if(mask===0)return "aroom";
-      if(mask===8||mask===4||mask===2||mask===1)return "broom";
-      if(mask===12||mask===9||mask===6||mask===3)return "croom";
-      if(mask===10||mask===5)return "droom";
-      if(mask===14||mask===7||mask===11||mask===13)return "eroom";
-      return "aroom";
-    };
-
-    const addRoom=(gridX,gridZ,mask)=>{
-      putStructure(
-        roomFamily(mask)+"_"+roomRng.int(1,8),
-        gridX*cell,
-        LEVEL0_SOURCE_FLOOR_Y,
-        gridZ*cell,
-        level0RotationForMask(mask)
+    const pillarData=[],pillarCollisions=[];
+    const addPillar=(x,z,width)=>{
+      pillarData.push({x,z,width});
+      const half=width/2;
+      pillarCollisions.push(
+        {x1:x-half,z1:z-half,x2:x+half,z2:z-half},
+        {x1:x+half,z1:z-half,x2:x+half,z2:z+half},
+        {x1:x+half,z1:z+half,x2:x-half,z2:z+half},
+        {x1:x-half,z1:z+half,x2:x-half,z2:z-half}
       );
     };
 
-    const addMacro=(type,baseX,baseZ)=>{
-      putStructure("megaroom"+type,baseX,18,baseZ,0);
-    };
-
-    // The source generator explicitly fills the starting Minecraft chunk's
-    // 16x16 ceiling at Y=25. The generic 8x8 roof pass then skips those tiles.
-    if(this.cx===0&&this.cz===0){
-      for(let z=0;z<16;z++)for(let x=0;x<16;x++){
-        putVoxel(x,5,z,{name:(x===0&&z===0)?"ghost_ceiling_tile":"ceiling_tile",properties:null});
+    if(this.level0PillarArea){
+      if(this.megaType===1){
+        const template=LEVEL0_MEGA_TEMPLATES[1];
+        const runs=(template?.runs||[]).map(r=>[Number(r[0]),Number(r[1]),Number(r[2])]);
+        const runSet=new Set(runs.map(r=>r[0]+":"+r[1]+":"+r[2]));
+        const seen=new Set();
+        for(const [z,start,end] of runs){
+          if(end-start!==1)continue;
+          if(!runSet.has((z+1)+":"+start+":"+end))continue;
+          const key=start+":"+z;
+          if(seen.has(key))continue;
+          seen.add(key);
+          addPillar(this.originX+start+1,this.originZ+z+1,2.0);
+        }
+      }
+      if(!pillarData.length){
+        const points=this.megaType
+          ? [[10,10],[30,10],[50,10],[70,10],[10,30],[30,30],[50,30],[70,30],[10,50],[30,50],[50,50],[70,50],[10,70],[30,70],[50,70],[70,70]]
+          : [[12,12],[40,12],[68,12],[12,40],[40,40],[68,40],[12,68],[40,68],[68,68]];
+        for(const [x,z] of points){
+          if(x<3||z<3||x>size-3||z>size-3)continue;
+          addPillar(this.originX+x,this.originZ+z,this.megaType?1.65:1.45);
+        }
       }
     }
 
-    // Source Level0ChunkGenerator places four 48x48 structures for types 1/2,
-    // while types 3-6 occupy the center 48x48 and then hand control to the
-    // 5x5 Level0MazeGenerator.
-    if(this.megaType===1||this.megaType===2){
-      for(const ox of [0,32])for(const oz of [0,32])
-        addMacro(this.megaType,ox,oz);
-    }else{
-      const blocked=new Set((this.macroBlockedCells||[]).map(r=>r.x+","+r.z));
+    if(pillarData.length){
+      const geometry=new THREE.BoxGeometry(1,level.wallHeight,1);
+      const baseGeometry=new THREE.BoxGeometry(1.12,.125,1.12);
+      const mesh=new THREE.InstancedMesh(geometry,lib.wall,pillarData.length);
+      const baseMesh=new THREE.InstancedMesh(baseGeometry,lib.wallBottom,pillarData.length);
+      const scale=new THREE.Vector3();
+      for(let i=0;i<pillarData.length;i++){
+        const p=pillarData[i];
+        scale.set(p.width,1,p.width);
+        mesh.setMatrixAt(i,new THREE.Matrix4().compose(new THREE.Vector3(p.x,level.wallHeight/2,p.z),new THREE.Quaternion(),scale));
+        baseMesh.setMatrixAt(i,new THREE.Matrix4().compose(new THREE.Vector3(p.x,.0625,p.z),new THREE.Quaternion(),scale));
+      }
+      mesh.instanceMatrix.needsUpdate=true;baseMesh.instanceMatrix.needsUpdate=true;
+      mesh.computeBoundingBox();mesh.computeBoundingSphere();
+      baseMesh.computeBoundingBox();baseMesh.computeBoundingSphere();
+      g.add(mesh);g.add(baseMesh);
+    }
+
+    // Arches only decorate existing dead-end openings, so they never change
+    // the generated maze collision topology.
+    if(!this.level0Blackout&&this.zone==="maze"&&next()<.34){
+      const deadEnds=[];
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(blocked.has(x+","+z))continue;
-        addRoom(x,z,this.walls[this.index(x,z)]);
+        const mask=this.walls[this.index(x,z)];
+        const closed=(mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0);
+        if(closed!==3)continue;
+        const side=!(mask&1)?"north":!(mask&2)?"east":!(mask&4)?"south":"west";
+        deadEnds.push({x,z,side});
       }
-      if(this.megaType>=3)addMacro(this.megaType,16,16);
-    }
-
-    if(this.level0HasStairwell){
-      putStructure("stairwell_0",47,4,47,0);
-    }
-
-    // Reproduce the source 8x8 roof pass before rendering anything. With the
-    // final voxel map known, every shared ceiling seam can be face-culled once.
-    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
-      for(let tileX=0;tileX<this.world.size;tileX+=8){
-        const sourceMarker=level0SourceStateAt(
-          voxels,
-          tileX,
-          18-LEVEL0_SOURCE_FLOOR_Y,
-          tileZ
-        );
-        if(sourceMarker?.kind==="marker"&&level0SourceShortName(sourceMarker.state)==="cyan_wool")continue;
-        if(level0SourceStateAt(voxels,tileX,5,tileZ))continue;
-
-        const roofName=roofRng.next()<.2?"roof2":"roof1";
-        const rotation=roofRng.next()<.5?0:Math.PI/2;
-        const baseX=rotation===0?tileX:tileX+7;
-        putStructure(roofName,baseX,25,tileZ,rotation);
+      if(deadEnds.length){
+        const chosen=deadEnds[Math.floor(next()*deadEnds.length)];
+        const p=wallPoint(chosen,0,2.12);
+        const radius=1.55,thickness=.13;
+        const torus=new THREE.Mesh(new THREE.TorusGeometry(radius,thickness,8,18,Math.PI),lib.wall);
+        torus.position.copy(p.position);
+        torus.rotation.y=(chosen.side==="east"||chosen.side==="west")?Math.PI/2:0;
+        g.add(torus);
+        const postGeom=new THREE.BoxGeometry(.24,2.12,.24);
+        if(chosen.side==="north"||chosen.side==="south"){
+          box(g,postGeom,lib.wall,p.position.x-radius,1.06,p.position.z);
+          box(g,postGeom,lib.wall,p.position.x+radius,1.06,p.position.z);
+        }else{
+          box(g,postGeom,lib.wall,p.position.x,1.06,p.position.z-radius);
+          box(g,postGeom,lib.wall,p.position.x,1.06,p.position.z+radius);
+        }
       }
     }
 
-    const faceDefs=[
-      {dx:0,dy:0,dz:-1,n:[0,0,-1],v:(x,y,z)=>[[x,y,z],[x,y+1,z],[x+1,y+1,z],[x+1,y,z]],uv:0},
-      {dx:0,dy:0,dz:1,n:[0,0,1],v:(x,y,z)=>[[x+1,y,z+1],[x+1,y+1,z+1],[x,y+1,z+1],[x,y,z+1]],uv:0},
-      {dx:-1,dy:0,dz:0,n:[-1,0,0],v:(x,y,z)=>[[x,y,z+1],[x,y+1,z+1],[x,y+1,z],[x,y,z]],uv:3},
-      {dx:1,dy:0,dz:0,n:[1,0,0],v:(x,y,z)=>[[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]],uv:1},
-      {dx:0,dy:-1,dz:0,n:[0,-1,0],v:(x,y,z)=>[[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]],uv:0},
-      {dx:0,dy:1,dz:0,n:[0,1,0],v:(x,y,z)=>[[x,y+1,z+1],[x+1,y+1,z+1],[x+1,y+1,z],[x,y+1,z]],uv:0}
-    ];
-
-    // Level 0 source blocks own the floor/ceiling tiling. Unlike the large
-    // fallback planes used by other levels, these meshes use one source block
-    // per texture tile, so the live library materials can receive the real
-    // SpacePotato textures when the asynchronous asset load completes.
-    const materialForKind=kind=>{
-      if(kind==="wall")return lib.wall;
-      if(kind==="wall2")return lib.wall2;
-      if(kind==="floor")return lib.floor;
-      if(kind==="ceiling")return lib.ceiling;
-      if(kind==="emergency")return lib.light;
-      return lib.wall;
-    };
-
-    const appendFace=(bucket,verts,normal,uvRotation=0)=>{
-      const base=bucket.positions.length/3;
-      for(const v of verts){
-        bucket.positions.push(this.originX+v[0],v[1],this.originZ+v[2]);
-        bucket.normals.push(normal[0],normal[1],normal[2]);
-      }
-      const uv=uvRotation===1
-        ? [[1,0],[1,1],[0,1],[0,0]]
-        : uvRotation===2
-          ? [[1,1],[0,1],[0,0],[1,0]]
-          : uvRotation===3
-            ? [[0,1],[0,0],[1,0],[1,1]]
-            : [[0,0],[1,0],[1,1],[0,1]];
-      for(const pair of uv){bucket.uvs.push(pair[0],pair[1])}
-      bucket.indices.push(base,base+1,base+2,base,base+2,base+3);
-    };
-
-    const buckets=new Map();
-    for(const voxel of voxels.values()){
-      if(voxel.kind==="marker"||voxel.kind==="light"||voxel.kind==="trim")continue;
-      const material=materialForKind(voxel.kind);
-      let bucket=buckets.get(voxel.kind);
-      if(!bucket){
-        bucket={material,positions:[],normals:[],uvs:[],indices:[]};
-        buckets.set(voxel.kind,bucket);
-      }
-
-      for(const face of faceDefs){
-        if(voxels.has(
-          (voxel.x+face.dx)+"|"+(voxel.y+face.dy)+"|"+(voxel.z+face.dz)
-        ))continue;
-        appendFace(bucket,face.v(voxel.x,voxel.y,voxel.z),face.n,face.uv);
+    // The wiki describes clustered, grid-like pits; the existing hazard system
+    // handles gameplay detection while this adds the visual cluster.
+    if(this.level0HoleArea){
+      const cluster=[[1,1],[2,1],[1,2],[2,2]];
+      for(const [x,z] of cluster){
+        if(!this.hazards.some(h=>h.x===x&&h.z===z))this.hazards.push({x,z,cluster:true});
       }
     }
 
-    for(const [kind,bucket] of buckets){
-      if(!bucket.positions.length)continue;
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(bucket.positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(bucket.normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(bucket.uvs,2));
-      geometry.setIndex(bucket.indices);
-      geometry.computeBoundingBox();
-      geometry.computeBoundingSphere();
-      const mesh=new THREE.Mesh(geometry,bucket.material);
-      mesh.name="level0_source_"+kind;
-      mesh.frustumCulled=true;
-      g.add(mesh);
-    }
-
-    // The source fluorescent renderer draws a complete 1x1x1 cube and creates
-    // a deferred point light one block below it. Keep those block entities
-    // separate so the existing flicker event can operate per fixture.
-    for(const voxel of voxels.values()){
-      if(voxel.kind!=="light"&&voxel.kind!=="emergency")continue;
-      const emergency=voxel.kind==="emergency";
-      // The source emergency light is white in its normal state. Red alarm
-      // illumination is controlled separately by the source light event.
-      const material=lib.light.clone();
-      material.emissiveIntensity=1.0;
-      const fixture=box(
-        g,
-        new THREE.BoxGeometry(1,1,1),
-        material,
-        this.originX+voxel.x+.5,
-        voxel.y+.5,
-        this.originZ+voxel.z+.5
-      );
-      fixture.userData.light=true;
-      fixture.userData.baseEmissive=1.0;
-      this.fixtures.push(fixture);
-      this.lightSources.push({
-        position:new THREE.Vector3(
-          this.originX+voxel.x+.5,
-          voxel.y-.5,
-          this.originZ+voxel.z+.5
-        ),
-        color:emergency?0xffffff:0xfff064,
-        baseIntensity:1.0,
-        intensity:1.0,
-        distance:emergency?15:13,
-        decay:1,
-        fixture
-      });
-    }
-
-    // Recreate the source bottom trim's 2/16-high, 18/16-wide straight
-    // element. Its source texture is wall_trim_texture, loaded into lib.trim.
-    for(const voxel of voxels.values()){
-      if(voxel.kind!=="trim")continue;
-      const props=voxel.state?.properties||{};
-      const facing=String(props.facing||"north");
-      let rotation=0,x=this.originX+voxel.x+.5,z=this.originZ+voxel.z+.98125;
-      if(facing==="south"){
-        rotation=Math.PI;
-        z=this.originZ+voxel.z+.01875;
-      }else if(facing==="east"){
-        rotation=Math.PI/2;
-        x=this.originX+voxel.x+.98125;
-        z=this.originZ+voxel.z+.5;
-      }else if(facing==="west"){
-        rotation=-Math.PI/2;
-        x=this.originX+voxel.x+.01875;
-        z=this.originZ+voxel.z+.5;
+    // Rare Red Room: reuse the real Level 0 wallpaper/carpet textures, only
+    // tinting the material so the feature remains asset-faithful.
+    if(this.level0RedRoom){
+      const candidates=[];
+      for(let z=1;z<cells-1;z++)for(let x=1;x<cells-1;x++){
+        const mask=this.walls[this.index(x,z)];
+        const closed=(mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0);
+        if(closed>=2)candidates.push({x,z,mask});
       }
-      box(
-        g,
-        new THREE.BoxGeometry(1.075,.125,.0375),
-        lib.trim,
-        x,
-        voxel.y+.0625,
-        z,
-        0,rotation,0
-      );
-    }
-
-    // Collide against the actual final wall/decor voxels in the source layout.
-    // Floor, ceiling, light entities, markers and trim remain non-solid.
-    const collisionCells=new Set();
-    for(const voxel of voxels.values()){
-      if(
-        voxel.y>=0&&
-        (voxel.kind==="wall"||voxel.kind==="wall2"||voxel.kind==="detail")
-      ){
-        collisionCells.add(voxel.x+"|"+voxel.z);
+      if(candidates.length){
+        const chosen=candidates[Math.floor(next()*candidates.length)];
+        const redWall=lib.wall.clone();redWall.color.setRGB(.55,.055,.045);
+        const redFloor=lib.floor.clone();redFloor.color.setRGB(.28,.045,.03);
+        const floor=new THREE.Mesh(new THREE.PlaneGeometry(cell-.35,cell-.35),redFloor);
+        floor.rotation.x=-Math.PI/2;
+        floor.position.set(this.originX+chosen.x*cell+cell/2,.006,this.originZ+chosen.z*cell+cell/2);
+        floor.renderOrder=-1;g.add(floor);
+        const addPanel=(side)=>{
+          const px=this.originX+chosen.x*cell+cell/2,pz=this.originZ+chosen.z*cell+cell/2;
+          const w=cell-.35,h=level.wallHeight-.2;
+          if(side==="north")box(g,new THREE.BoxGeometry(w,h,.018),redWall,px,level.wallHeight/2,pz-cell/2-.004);
+          else if(side==="south")box(g,new THREE.BoxGeometry(w,h,.018),redWall,px,level.wallHeight/2,pz+cell/2+.004);
+          else if(side==="west")box(g,new THREE.BoxGeometry(.018,h,w),redWall,px-cell/2-.004,level.wallHeight/2,pz);
+          else box(g,new THREE.BoxGeometry(.018,h,w),redWall,px+cell/2+.004,level.wallHeight/2,pz);
+        };
+        if(chosen.mask&1)addPanel("north");
+        if(chosen.mask&2)addPanel("east");
+        if(chosen.mask&4)addPanel("south");
+        if(chosen.mask&8)addPanel("west");
+        this.lightSources.push({
+          position:new THREE.Vector3(this.originX+chosen.x*cell+cell/2,level.wallHeight-.65,this.originZ+chosen.z*cell+cell/2),
+          color:0x7a1717,baseIntensity:1.6,intensity:1.6,distance:18,decay:2
+        });
       }
     }
 
-    const hasCollision=(x,z)=>collisionCells.has(x+"|"+z);
-    const horizontal=new Map(),vertical=new Map();
-    for(const key of collisionCells){
-      const parts=key.split("|"),x=Number(parts[0]),z=Number(parts[1]);
-      if(!hasCollision(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
-      if(!hasCollision(x,z+1))level0AddBoundaryInterval(horizontal,z+1,x,x+1);
-      if(!hasCollision(x-1,z))level0AddBoundaryInterval(vertical,x,z,z+1);
-      if(!hasCollision(x+1,z))level0AddBoundaryInterval(vertical,x+1,z,z+1);
+    this.collisionSegments=(this.collisionSegments||[]).concat(pillarCollisions);
+
+    if(!this.level0Blackout&&next()<.55){
+      const wetMat=lib.dark.clone();wetMat.transparent=true;wetMat.opacity=.16;
+      const wet=new THREE.Mesh(new THREE.CircleGeometry(.7+next()*1.6,18),wetMat);
+      wet.rotation.x=-Math.PI/2;
+      wet.position.set(this.originX+4+next()*(size-8),.008,this.originZ+4+next()*(size-8));
+      g.add(wet);
     }
-    this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
-      .concat(level0MergeBoundaryIntervals(vertical,false));
   }
-
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
@@ -1577,7 +1426,7 @@ class WorldStreamer{
       if(!texture)continue;
       texture.wrapS=THREE.RepeatWrapping;
       texture.wrapT=THREE.RepeatWrapping;
-      const repeat=this.game.level.cellSize<=5?1.4:1.0;
+      const repeat=1.0;
       texture.repeat.set(repeat,repeat);
       texture.offset.set(0,0);
     }
