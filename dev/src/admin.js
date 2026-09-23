@@ -1,7 +1,4 @@
-import * as THREE from "three";
 import { LEVELS } from "./levels.js";
-
-const enabled = new URLSearchParams(location.search).get("admin") === "1";
 
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 
@@ -14,6 +11,7 @@ export class BackroomsAdmin{
   }
   activate(){
     if(this.ready)return;
+    if(!this.game.admin.enabled)return;
     this.build();
     this.bind();
     this.opener=document.createElement("button");
@@ -25,6 +23,7 @@ export class BackroomsAdmin{
     document.body.appendChild(this.opener);
     this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
     this.ready=true;
+    if(this.game.admin.enabled)requestAnimationFrame(()=>this.open());
   }
 
   build(){
@@ -166,7 +165,7 @@ export class BackroomsAdmin{
       const code=event.code;
       const key=event.key;
       const toggle=code==="Minus"||code==="Equal"||code==="NumpadSubtract"||code==="NumpadAdd"||code==="Backquote"||key==="-"||key==="=";
-      if(this.ready&&enabled&&toggle&&!event.repeat){
+      if(this.ready&&this.game.admin.enabled&&toggle&&!event.repeat){
         event.preventDefault();
         event.stopPropagation();
         this.opened?this.close():this.open();
@@ -226,7 +225,8 @@ export class BackroomsAdmin{
     this.game.lightState="ON";
     this.game.lightEventTimer=48;
     this.game.intercomTimer=70;
-    this.game.scene.fog=new THREE.FogExp2(0x000000,level.id==="0"?.027:level.id==="1"?.043:level.id==="2"?.058:level.id==="3"?.052:.036);
+    const FogClass=this.game.scene.fog?.constructor;
+    if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.043:level.id==="2"?.058:level.id==="3"?.052:.036);
     this.game.ambient.color.setHex(level.theme.ambient);
     this.game.flash.color.setHex(level.id==="2"?0xd9d7ff:0xffffee);
     await this.game.world.configure();
@@ -320,7 +320,7 @@ export class BackroomsAdmin{
     this.opened=false;
     this.root.classList.add("hidden");
     if(this.opener){
-      this.opener.hidden=!enabled;
+      this.opener.hidden=!this.game.admin.enabled;
       this.opener.setAttribute("aria-expanded","false");
     }
   }

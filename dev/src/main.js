@@ -1,4 +1,7 @@
-import { BackroomsGame } from "./game.js?v=20260923-1304";
+import { BackroomsGame } from "./game.js?v=20260923-1600";
+/* DEV_ADMIN_START */
+import { BackroomsAdmin } from "./admin.js?v=20260923-1600";
+/* DEV_ADMIN_END */
 
 const registerCache=async()=>{
   if(!("serviceWorker" in navigator))return;
@@ -19,17 +22,12 @@ const registerCache=async()=>{
 
 registerCache();
 const game=new BackroomsGame();
-game.mount().then(async()=>{
-  /* DEV_ADMIN_START */
-  if(new URLSearchParams(location.search).get("admin")!=="1")return;
-  try{
-    const {BackroomsAdmin}=await import("./admin.js?v=20260923-1304");
-    window.backroomsAdmin=new BackroomsAdmin(game);
-    window.backroomsAdmin.activate();
-  }catch(error){
-    console.warn("[Backrooms] Admin module unavailable:",error);
-  }
-  /* DEV_ADMIN_END */
-});
+/* DEV_ADMIN_START */
+if(game.admin.enabled){
+  window.backroomsAdmin=new BackroomsAdmin(game);
+  window.backroomsAdmin.activate();
+}
+/* DEV_ADMIN_END */
+game.mount();
 
 window.backrooms=game;
