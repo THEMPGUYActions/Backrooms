@@ -1395,12 +1395,12 @@ class WorldStreamer{
     }
   }
   chunkAt(x,z){
-    const offset=this.size/2;
+    const offset=this.game.level.id==="0"?32:this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     return this.chunks.get(this.key(cx,cz))||null;
   }
   ensureAround(x,z){
-    const offset=this.size/2;
+    const offset=this.game.level.id==="0"?32:this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
       if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
@@ -1484,28 +1484,12 @@ class WorldStreamer{
     };
 
     if(this.game.level.id==="0"){
-      const cell=this.game.level.cellSize;
-      const offset=this.size/2;
+      const offset=32;
       const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
-
       for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
         const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
-        if(!nearby)continue;
-
-        for(let pass=0;pass<2;pass++){
-          const bx=Math.floor((x-nearby.originX)/cell);
-          const bz=Math.floor((z-nearby.originZ)/cell);
-          for(let iz=bz-1;iz<=bz+1;iz++)for(let ix=bx-1;ix<=bx+1;ix++){
-            if(ix<0||iz<0||ix>=nearby.gridSize()||iz>=nearby.gridSize())continue;
-            const mask=nearby.walls[nearby.index(ix,iz)];
-            const minX=nearby.originX+ix*cell,maxX=minX+cell;
-            const minZ=nearby.originZ+iz*cell,maxZ=minZ+cell;
-            if(mask&1)testSegment(minX,minZ,maxX,minZ);
-            if(mask&2)testSegment(maxX,minZ,maxX,maxZ);
-            if(mask&4)testSegment(minX,maxZ,maxX,maxZ);
-            if(mask&8)testSegment(minX,minZ,minX,maxZ);
-          }
-        }
+        if(!nearby?.collisionSegments?.length)continue;
+        for(let pass=0;pass<2;pass++)for(const seg of nearby.collisionSegments)testSegment(seg.x1,seg.z1,seg.x2,seg.z2);
       }
       return {x,z};
     }
@@ -1537,7 +1521,7 @@ class WorldStreamer{
     return Math.hypot(c.exit.position.x-x,c.exit.position.z-z)<1.25;
   }
   lightProximity(x,z){
-    const offset=this.size/2;
+    const offset=this.game.level.id==="0"?32:this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     let best=Infinity;
     for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
@@ -1552,7 +1536,7 @@ class WorldStreamer{
     const out=[];
     const offset=this.game.level.id==="0"?32:this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
-    const span=2;
+    const span=this.game.level.id==="0"?1:2;
     for(let dz=-span;dz<=span;dz++)for(let dx=-span;dx<=span;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
@@ -1562,7 +1546,7 @@ class WorldStreamer{
         // A point light can illuminate geometry that is outside the camera
         // frustum. Do not cull it because the light source itself is behind
         // the camera or just outside the view.
-        if(d>Math.max(this.game.level.id==="0"?160:96,range+54))continue;
+        if(d>Math.max(96,range+54))continue;
         out.push({light,d,score:d});
       }
     }
