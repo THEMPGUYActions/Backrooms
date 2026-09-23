@@ -865,8 +865,18 @@ class Chunk{
           [[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
           1,0,0,minZ,0,maxZ,h
         );
-
       }
+
+      // wall_block is a solid Minecraft cube. Keep its caps so isolated
+      // columns/posts do not render as hollow or cross-shaped.
+      appendFace(
+        [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
+        0,-1,0,minX,0,maxX,1
+      );
+      appendFace(
+        [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
+        0,1,0,minX,0,maxX,1
+      );
     }
 
     const horizontal=new Map(),vertical=new Map();
@@ -896,21 +906,20 @@ class Chunk{
       g.add(mesh);
       this.level0WallMesh=mesh;
     }
-    // The source fills every 16x16 Minecraft chunk with four 8x8 roof
-    // structures. Each roof structure is roof1 (80%) or roof2 (20%).
-    // roof2 contains four ceiling fluorescents at local block positions
-    // (2,1), (2,5), (6,1), (6,5). Those positions are symmetric under the
-    // source's NONE/CW90 roof rotations, so the same coordinates are exact.
+    // The source roof is an 8x8 block structure. roof1 has no light;
+    // roof2 replaces four ceiling blocks with one-block fluorescent lights.
     const fixtureCandidates=[];
     for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
       for(let tileX=0;tileX<this.world.size;tileX+=8){
-        const roofIsLit=lightRng.next()<.2;
-        lightRng.next(); // consume the source NONE/CW90 rotation roll
-        if(!roofIsLit)continue;
+        const roof2=lightRng.next()<.2;
+        const rotated=lightRng.next()>=.5;
+        if(!roof2)continue;
 
         for(const localZ of [1,5])for(const localX of [2,6]){
-          const px=this.originX+tileX+localX;
-          const pz=this.originZ+tileZ+localZ;
+          const lx=rotated?7-localZ:localX;
+          const lz=rotated?localX:localZ;
+          const px=this.originX+tileX+lx+.5;
+          const pz=this.originZ+tileZ+lz+.5;
           const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
           fixtureCandidates.push({px,pz,d:dx*dx+dz*dz});
         }
@@ -919,30 +928,18 @@ class Chunk{
 
     fixtureCandidates.sort((a,b)=>a.d-b.d);
 
-    const clearForFixture=(x,z,rotation)=>{
-      const hx=rotation===0?1.65:.30;
-      const hz=rotation===0?.30:1.65;
-      const minX=Math.floor(x-hx),maxX=Math.floor(x+hx);
-      const minZ=Math.floor(z-hz),maxZ=Math.floor(z+hz);
-      for(let wz=minZ;wz<=maxZ;wz++)for(let wx=minX;wx<=maxX;wx++){
-        if(wallCells.has(wx+","+wz))return false;
-      }
-      return true;
-    };
-
-    const maxFixtures=24;
+    const maxFixtures=40;
     let fixtureCount=0;
     for(const candidate of fixtureCandidates){
       if(fixtureCount>=maxFixtures)break;
-      if(!clearForFixture(candidate.px,candidate.pz,0))continue;
 
       const mat=lib.light.clone();
       mat.emissiveIntensity=1.55+next()*.4;
       const fixture=box(
         g,
-        new THREE.BoxGeometry(3.35,.05,.58),
+        new THREE.BoxGeometry(.92,.08,.92),
         mat,
-        candidate.px,h-.10,candidate.pz,
+        candidate.px,level.wallHeight-.015,candidate.pz,
         0,0,0
       );
       fixture.userData.light=true;
@@ -951,8 +948,8 @@ class Chunk{
 
       const intensity=82+next()*18;
       this.lightSources.push({
-        position:new THREE.Vector3(candidate.px,h-.28,candidate.pz),
-        color:0xfff064,
+        position:new THREE.Vector3(candidate.px,level.wallHeight-.25,candidate.pz),
+        color:0xffff78,
         baseIntensity:intensity,
         intensity,
         distance:18,
