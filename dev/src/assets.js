@@ -14,6 +14,20 @@ export const LEVEL1_ASSET_SOURCES = Object.freeze({
   stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png"
 });
 
+export const LEVEL0_ASSET_SOURCES = Object.freeze({
+  wall: LOCAL_SPB_ASSET_BASE + "level0/wall_block_2_texture.png",
+  wallBottom: LOCAL_SPB_ASSET_BASE + "level0/wallpaper_bottom_block_texture.png",
+  floor: {
+    color: LOCAL_SPB_ASSET_BASE + "level0/pbr/carpet/carpet_color.png",
+    normal: LOCAL_SPB_ASSET_BASE + "level0/pbr/carpet/carpet_normal.png"
+  },
+  ceiling: {
+    color: LOCAL_SPB_ASSET_BASE + "level0/pbr/ceiling_tile/ceiling_tile_color.png",
+    normal: LOCAL_SPB_ASSET_BASE + "level0/pbr/ceiling_tile/ceiling_tile_normal.png"
+  },
+  fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png"
+});
+
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
   wallpaper: {
     color: LOCAL_PBR_ASSET_BASE + "wallpaper_color.png",
@@ -182,6 +196,37 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
   return m;
 }
 
+export async function applyLevel0Assets(library,level,onProgress=()=>{}){
+  if(level.id!=="0")return false;
+  const maps=[
+    [library.wall,"map",LEVEL0_ASSET_SOURCES.wall,true,1,.0,"Level 0 wall texture"],
+    [library.wallBottom,"map",LEVEL0_ASSET_SOURCES.wallBottom,true,1,.0,"Level 0 wall base texture"],
+    [library.floor,"map",LEVEL0_ASSET_SOURCES.floor.color,true,1.25,.16,"Level 0 carpet color"],
+    [library.floor,"normalMap",LEVEL0_ASSET_SOURCES.floor.normal,false,1.25,.22,"Level 0 carpet normal"],
+    [library.ceiling,"map",LEVEL0_ASSET_SOURCES.ceiling.color,true,1,.18,"Level 0 ceiling color"],
+    [library.ceiling,"normalMap",LEVEL0_ASSET_SOURCES.ceiling.normal,false,1,.22,"Level 0 ceiling normal"],
+    [library.light,"map",LEVEL0_ASSET_SOURCES.fluorescent,true,1,.08,"Level 0 fluorescent fixture"]
+  ];
+  let done=0;
+  onProgress(0,"LOADING LEVEL 0 ASSETS","SpacePotato Level 0 materials");
+  await Promise.all(maps.map(async([material,kind,url,color,repeat,normalStrength,label])=>{
+    await applyRemoteTexture(material,kind,url,color,repeat,normalStrength);
+    done++;
+    onProgress(done/maps.length,"LOADING LEVEL 0 ASSETS",label);
+  }));
+
+  // SpacePotato's wall block has no normal map; it relies on the source
+  // texture and Minecraft-style per-block faces. Keep the wall roughness
+  // consistent with the source material instead of adding generated normals.
+  library.wall.roughness=.88;
+  library.wall.normalMap=null;
+  library.wall.needsUpdate=true;
+  library.wallBottom.roughness=.88;
+  library.wallBottom.normalMap=null;
+  library.wallBottom.needsUpdate=true;
+  return true;
+}
+
 export async function applyLevel1Assets(library,level,onProgress=()=>{}){
   if(level.id!=="1")return false;
   const maps=[
@@ -234,6 +279,7 @@ export function makeLibrary(level){
   return {
     floor:createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:level.id==="0"?1:3.8,normalStrength:.35}),
+    wallBottom:createPBRMaterial({base:level.theme.wall,seed:129+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.08}),
     concrete:createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
     maintenanceWall:createPBRMaterial({base:0xe4e3dc,seed:117+Number(level.id),rough:.9,scale:2.4,normalStrength:.28}),
     stairs:new THREE.MeshStandardMaterial({color:0x8b8d89,roughness:.88,metalness:0}),
