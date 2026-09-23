@@ -631,15 +631,19 @@ class Chunk{
     }
 
     const buildDoor=(entry,exitDoor)=>{
-      const p=wallPoint(entry,.105,1.95),group=new THREE.Group();group.position.copy(p.position);group.rotation.y=p.rotation;
+      const doorHeight=Math.min(2.75,level.wallHeight-.16);
+      const doorWidth=Math.min(3.1,cell-.9);
+      const frameWidth=Math.min(3.35,doorWidth+.24);
+      const p=wallPoint(entry,.105,doorHeight/2),group=new THREE.Group();
+      group.position.copy(p.position);group.rotation.y=p.rotation;
       const frameMat=exitDoor?lib.exitFrame:lib.doorFrame;
-      box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,-1.02,0,0);
-      box(group,new THREE.BoxGeometry(.16,3.9,.24),frameMat,1.02,0,0);
-      box(group,new THREE.BoxGeometry(3.35,.16,.24),frameMat,0,1.31,0);
-      const door=box(group,new THREE.BoxGeometry(3.1,3.62,.09),(exitDoor?lib.exitDoor:lib.door).clone(),0,0,0);
-      door.rotation.z=exitDoor?-0.16:-0.03;
+      box(group,new THREE.BoxGeometry(.16,doorHeight,.24),frameMat,-frameWidth/2,0,0);
+      box(group,new THREE.BoxGeometry(.16,doorHeight,.24),frameMat,frameWidth/2,0,0);
+      box(group,new THREE.BoxGeometry(frameWidth,.16,.24),frameMat,0,doorHeight/2-.08,0);
+      const door=box(group,new THREE.BoxGeometry(doorWidth,doorHeight-.08,.09),(exitDoor?lib.exitDoor:lib.door).clone(),0,0,0);
+      door.rotation.z=exitDoor?-0.12:-0.025;
       if(exitDoor)door.userData.exit=true;
-      box(group,new THREE.BoxGeometry(.08,.1,.045),lib.handle,.78,.02,.06);
+      box(group,new THREE.BoxGeometry(.08,.1,.045),lib.handle,doorWidth*.25,.02,.06);
       g.add(group);
     };
 
