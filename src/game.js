@@ -178,26 +178,25 @@ function level0SourcePackedBlock(packed){
   };
 }
 
-const level0MacroAnchorMarkerCache=new Map();
-
-function level0SourceMacroHasAnchorMarker(type){
-  if(level0MacroAnchorMarkerCache.has(type))return level0MacroAnchorMarkerCache.get(type);
+function level0SourceMacroHasRedAt(type,sectorX,sectorZ,targetX,targetZ){
+  const localTargetX=targetX-sectorX*80;
+  const localTargetZ=targetZ-sectorZ*80;
   const placements=(type===1||type===2)
-    ? [[0,0],[32,0],[0,32],[32,32]]
-    : [[16,16]];
-  let found=false;
-  for(const base of placements){
+    ? [[-32,-32],[0,-32],[-32,0],[0,0]]
+    : [[-16,-16]];
+  for(const [baseX,baseZ] of placements){
     for(const marker of level0SourceMarkers("megaroom"+type)){
-      if(marker.name!=="red_wool")continue;
-      if(base[0]+marker.x===32&&base[1]+marker.z===32){
-        found=true;
-        break;
-      }
+      if(marker.name!=="red_wool"||marker.y!==1)continue;
+      if(baseX+marker.x===localTargetX&&baseZ+marker.z===localTargetZ)return true;
     }
-    if(found)break;
   }
-  level0MacroAnchorMarkerCache.set(type,found);
-  return found;
+  return false;
+}
+
+function level0SourceCandidateMegaType(seed,cx,cz){
+  if(cx===0&&cz===0)return 1;
+  if(cycleHash(seed^0x4d30,cx,cz)>=.5)return 0;
+  return 1+Math.floor(cycleHash(seed^0x31a7,cx,cz)*6);
 }
 
 function level0SourceMarkers(name){
@@ -394,43 +393,39 @@ class Chunk{
       }
     }else if(level.id==="0"){
       const isStart=this.cx===0&&this.cz===0;
-      const initialMega=isStart||cycleHash(this.game.seed^0x4d30,this.cx,this.cz)<.5;
-      let roomType=0;
+      const initialOne=isStart||cycleHash(this.game.seed^0x4d30,this.cx,this.cz)<.5;
+      const anchorX=this.cx*80,anchorZ=this.cz*80;
 
-      // Source Level0ChunkGenerator evaluates this behavior only on its
-      // 80-block sector anchors. First it rolls 1/2 for mega-room generation;
-      // when that roll requests a mega-room, it suppresses it if a neighboring
-      // sector has a red-wool mega-room marker at the same anchor coordinate.
       const nearSourceMega=()=>{
         if(isStart)return false;
         for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
           if(!dx&&!dz)continue;
           const nx=this.cx+dx,nz=this.cz+dz;
-          const neighborInitial=cycleHash(this.game.seed^0x4d30,nx,nz)<.5||(nx===0&&nz===0);
-          if(!neighborInitial)continue;
-          const neighborType=nx===0&&nz===0
-            ? 1
-            : 1+Math.floor(cycleHash(this.game.seed^0x31a7,nx,nz)*6);
-          if(level0SourceMacroHasAnchorMarker(neighborType))return true;
+          const neighborType=level0SourceCandidateMegaType(this.game.seed,nx,nz);
+          if(neighborType&&level0SourceMacroHasRedAt(neighborType,nx,nz,anchorX,anchorZ))return true;
         }
         return false;
       };
 
+      let roomType=0;
       if(isStart){
         roomType=1;
-      }else if(initialMega&&!nearSourceMega()){
-        roomType=1+Math.floor(cycleHash(this.game.seed^0x31a7,this.cx,this.cz)*6);
+      }else if(initialOne&&!nearSourceMega()){
+        roomType=level0SourceCandidateMegaType(this.game.seed,this.cx,this.cz);
       }
 
       this.megaType=roomType||null;
+      // The reference places stairwell_0 when the initial 1/2 roll is 2 and
+      // the sector is outside the 300-block configured exit-spawn radius.
+      this.level0HasStairwell=!isStart&&!initialOne&&Math.hypot(anchorX,anchorZ)>300;
       this.macroBlockedCells=[];
 
       const markerCells=()=>{
         if(roomType<3)return [];
         const blocked=[];
         for(const marker of level0SourceMarkers("megaroom"+roomType)){
-          // The source macro is anchored at sector-local +16,+16 while
-          // Level0MazeGenerator's 5x5 grid is anchored at the sector origin.
+          // Level0MazeGenerator sees lime wool at source Y=19 as a null cell.
+          if(marker.name!=="lime_wool"||marker.y!==1)continue;
           const gx=(16+marker.x)/cell;
           const gz=(16+marker.z)/cell;
           if(Number.isInteger(gx)&&Number.isInteger(gz)&&gx>=0&&gx<cells&&gz>=0&&gz<cells)
@@ -451,20 +446,37 @@ class Chunk{
           const open=(x,z,side)=>{
             if(x>=0&&x<cells&&z>=0&&z<cells)this.setEdge(x,z,side,true);
           };
-          const template=LEVEL0_MEGA_TEMPLATES[roomType];
-          const baseX=this.originX+cell;
-          const baseZ=this.originZ+cell;
-          for(const [mx,mz] of (template?.markers||[])){
-            const wx=baseX+mx,wz=baseZ+mz;
-            const gx=(wx-this.originX)/cell,gz=(wz-this.originZ)/cell;
-            if(!Number.isInteger(gx)||!Number.isInteger(gz))continue;
+          const originSourceX=-32,originSourceZ=-32;
+          const macroBaseSourceX=-16,macroBaseSourceZ=-16;
+          for(const marker of level0SourceMarkers("megaroom"+roomType)){
+            if(marker.name!=="lime_wool"||marker.y!==1)continue;
+            const mx=macroBaseSourceX+marker.x,mz=macroBaseSourceZ+marker.z;
 
-            // These are the four probes performed by checkNeighbors() when
-            // it sees a lime marker one cell away from the current cell.
-            open(gx,gz-1,"south");
-            open(gx,gz+1,"north");
-            open(gx-1,gz,"east");
-            open(gx+1,gz,"west");
+            // These coordinates mirror Level0MazeGenerator.checkNeighbors():
+            // each lime marker opens only the adjacent edge it actually touches.
+            const northX=(mx-originSourceX)/cell,northZ=(mz-16-originSourceZ)/cell;
+            const southX=northX,southZ=(mz+16-originSourceZ)/cell;
+            const westX=(mx-16-originSourceX)/cell,westZ=(mz-originSourceZ)/cell;
+            const eastX=(mx+16-originSourceX)/cell,eastZ=westZ;
+
+            if(Number.isInteger(northX)&&Number.isInteger(northZ))open(northX,northZ,"north");
+            if(Number.isInteger(southX)&&Number.isInteger(southZ))open(southX,southZ,"south");
+            if(Number.isInteger(westX)&&Number.isInteger(westZ))open(westX,westZ,"west");
+            if(Number.isInteger(eastX)&&Number.isInteger(eastZ))open(eastX,eastZ,"east");
+          }
+
+          if(this.level0HasStairwell){
+            const stairBaseX=47,stairBaseZ=47,stairBaseY=4;
+            for(const marker of level0SourceMarkers("stairwell_0")){
+              if(marker.name!=="lime_wool")continue;
+              const mx=stairBaseX+marker.x,mz=stairBaseZ+marker.z,my=stairBaseY+marker.y;
+              if(my!==4)continue;
+
+              const northX=(mx-originSourceX)/cell,northZ=(mz-16-originSourceZ)/cell;
+              const westX=(mx-16-originSourceX)/cell,westZ=(mz-originSourceZ)/cell;
+              if(Number.isInteger(northX)&&Number.isInteger(northZ))open(northX,northZ,"north");
+              if(Number.isInteger(westX)&&Number.isInteger(westZ))open(westX,westZ,"west");
+            }
           }
         };
 
@@ -933,11 +945,15 @@ class Chunk{
     const voxels=new Map();
 
     const putVoxel=(x,y,z,state)=>{
+      const key=x+"|"+y+"|"+z;
       const kind=level0SourceKind(state);
-      if(kind==="air")return;
-      // Match Minecraft structure placement semantics: later structures replace
-      // earlier blocks at the same integer coordinate.
-      voxels.set(x+"|"+y+"|"+z,{x,y,z,state,kind});
+      // Match Minecraft structure placement semantics, including explicit air
+      // records which clear an earlier block at the same coordinate.
+      if(kind==="air"){
+        voxels.delete(key);
+        return;
+      }
+      voxels.set(key,{x,y,z,state,kind});
     };
 
     const putStructure=(name,baseX,baseSourceY,baseZ,rotation=0)=>{
@@ -1004,6 +1020,10 @@ class Chunk{
       if(this.megaType>=3)addMacro(this.megaType,16,16);
     }
 
+    if(this.level0HasStairwell){
+      putStructure("stairwell_0",47,4,47,0);
+    }
+
     // Reproduce the source 8x8 roof pass before rendering anything. With the
     // final voxel map known, every shared ceiling seam can be face-culled once.
     for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
@@ -1033,14 +1053,31 @@ class Chunk{
       {dx:0,dy:1,dz:0,n:[0,1,0],v:(x,y,z)=>[[x,y+1,z+1],[x+1,y+1,z+1],[x+1,y+1,z],[x,y+1,z]],uv:0}
     ];
 
-    const materialForKind=kind=>{
-      if(kind==="wall")return lib.wall;
-      if(kind==="wall2")return lib.wall2;
-      if(kind==="floor")return lib.floor;
-      if(kind==="ceiling")return lib.ceiling;
-      if(kind==="emergency")return lib.orangeLight;
-      return lib.wall;
+    const sourceMaterials=new Map();
+    const sourceMaterial=(kind)=>{
+      if(sourceMaterials.has(kind))return sourceMaterials.get(kind);
+      let base=lib.wall;
+      if(kind==="wall")base=lib.wall;
+      else if(kind==="wall2")base=lib.wall2;
+      else if(kind==="floor")base=lib.floor;
+      else if(kind==="ceiling")base=lib.ceiling;
+      else if(kind==="emergency")base=lib.light;
+
+      const material=base.clone();
+      const textureRepeat=kind==="floor"?1.25:kind==="ceiling"?1:1;
+      for(const key of ["map","roughnessMap","normalMap"]){
+        const texture=material[key];
+        if(!texture)continue;
+        material[key]=texture.clone();
+        material[key].wrapS=THREE.RepeatWrapping;
+        material[key].wrapT=THREE.RepeatWrapping;
+        material[key].repeat.set(textureRepeat,textureRepeat);
+        material[key].offset.set(0,0);
+      }
+      sourceMaterials.set(kind,material);
+      return material;
     };
+    const materialForKind=kind=>sourceMaterial(kind);
 
     const appendFace=(bucket,verts,normal,uvRotation=0)=>{
       const base=bucket.positions.length/3;
@@ -1098,7 +1135,9 @@ class Chunk{
     for(const voxel of voxels.values()){
       if(voxel.kind!=="light"&&voxel.kind!=="emergency")continue;
       const emergency=voxel.kind==="emergency";
-      const material=(emergency?lib.orangeLight:lib.light).clone();
+      // The source emergency light is white in its normal state. Red alarm
+      // illumination is controlled separately by the source light event.
+      const material=lib.light.clone();
       material.emissiveIntensity=1.0;
       const fixture=box(
         g,
@@ -1117,10 +1156,10 @@ class Chunk{
           voxel.y-.5,
           this.originZ+voxel.z+.5
         ),
-        color:emergency?0xffc06a:0xfff064,
-        baseIntensity:emergency?.55:1.0,
-        intensity:emergency?.55:1.0,
-        distance:emergency?10:13,
+        color:emergency?0xffffff:0xfff064,
+        baseIntensity:1.0,
+        intensity:1.0,
+        distance:emergency?15:13,
         decay:1,
         fixture
       });
@@ -1161,10 +1200,8 @@ class Chunk{
     const collisionCells=new Set();
     for(const voxel of voxels.values()){
       if(
-        voxel.y>=0&&voxel.y<5&&
-        voxel.kind!=="floor"&&voxel.kind!=="ceiling"&&
-        voxel.kind!=="light"&&voxel.kind!=="emergency"&&
-        voxel.kind!=="trim"&&voxel.kind!=="marker"
+        voxel.y>=0&&
+        (voxel.kind==="wall"||voxel.kind==="wall2"||voxel.kind==="detail")
       ){
         collisionCells.add(voxel.x+"|"+voxel.z);
       }
@@ -1496,18 +1533,21 @@ class WorldStreamer{
     this.floorSurface.frustumCulled=false;
     this.floorSurface.renderOrder=-2;
 
-    this.ceilingSurface=new THREE.Mesh(
-      new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
-      this.library.ceiling
-    );
-    this.ceilingSurface.rotation.x=Math.PI/2;
-    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.002,0);
-    this.ceilingSurface.updateMatrix();
-    this.ceilingSurface.matrixAutoUpdate=false;
-    this.ceilingSurface.frustumCulled=false;
-    this.ceilingSurface.renderOrder=-2;
+    if(this.game.level.id!=="0"){
+      this.ceilingSurface=new THREE.Mesh(
+        new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
+        this.library.ceiling
+      );
+      this.ceilingSurface.rotation.x=Math.PI/2;
+      this.ceilingSurface.position.set(0,this.game.level.wallHeight+.002,0);
+      this.ceilingSurface.updateMatrix();
+      this.ceilingSurface.matrixAutoUpdate=false;
+      this.ceilingSurface.frustumCulled=false;
+      this.ceilingSurface.renderOrder=-2;
+    }
 
-    this.game.scene.add(this.floorSurface,this.ceilingSurface);
+    this.game.scene.add(this.floorSurface);
+    if(this.ceilingSurface)this.game.scene.add(this.ceilingSurface);
     if(this.game.level.id==="1"){
       this.library.floor.color.setHex(0x666a68);
       this.library.floor.roughness=.42;
