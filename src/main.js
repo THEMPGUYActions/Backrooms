@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20260923-1232";
+import { BackroomsGame } from "./game.js?v=20260923-1245";
 
 const registerCache=async()=>{
   if(!("serviceWorker" in navigator))return;
