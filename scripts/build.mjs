@@ -24,13 +24,13 @@ const SPB_FILES = [
   {name:"fluorescent_light.png",path:"src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png"},
   {name:"wall_trim_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png"},
   {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"},
-  {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
-  {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
-  {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
-  {name:"level0/pbr/carpet/carpet_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_color.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
-  {name:"level0/pbr/carpet/carpet_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_normal.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
-  {name:"level0/pbr/ceiling_tile/ceiling_tile_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_color.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
-  {name:"level0/pbr/ceiling_tile/ceiling_tile_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_normal.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"}
+  {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png"},
+  {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png"},
+  {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png"},
+  {name:"level0/pbr/carpet/carpet_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_color.png"},
+  {name:"level0/pbr/carpet/carpet_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_normal.png"},
+  {name:"level0/pbr/ceiling_tile/ceiling_tile_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_color.png"},
+  {name:"level0/pbr/ceiling_tile/ceiling_tile_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_normal.png"}
 ];
 
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
@@ -57,7 +57,7 @@ async function downloadAudioAsset(filename){
   return {url:expected.url,source:expected.source,author:expected.author,license:expected.license,bytes:data.length,sha256};
 }
 async function downloadSpacePotatoAsset(entry){
-  const sourceCommit=entry.sourceCommit||SPB_SOURCE_COMMIT;
+  const sourceCommit=entry.sourceCommit||(entry.name.startsWith("level0/")?SPB_LEVEL0_SOURCE_COMMIT:SPB_SOURCE_COMMIT);
   const url="https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/"+sourceCommit+"/"+entry.path;
   const response=await fetch(url,{headers:{"Accept":"image/png","User-Agent":"THEMPGUY-Backrooms-build/1.0"}});
   if(!response.ok)throw new Error("SpacePotato Found Footage asset download failed for "+entry.name+": HTTP "+response.status);
@@ -154,6 +154,6 @@ await writeFile(join(dist,".nojekyll"),"","utf8");
 
 console.log("Downloaded and checksum-verified "+PBR_FILES.length+" CC0 OpenGameArt PBR maps.");
 console.log("Downloaded "+Object.keys(audioLock.files).length+" CC0 OpenGameArt audio assets.");
-console.log("Downloaded "+SPB_FILES.length+" pinned SpacePotato Found Footage Level 1 assets.");
+console.log("Downloaded "+SPB_FILES.length+" pinned SpacePotato Found Footage reference assets.");
 console.log("PBR manifest size: " + (await stat(join(pbrDir, "manifest.json"))).size + " bytes.");
 console.log("Built static site in dist/");
