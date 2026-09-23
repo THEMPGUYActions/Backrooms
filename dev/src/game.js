@@ -766,7 +766,7 @@ class Chunk{
     else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
 
     for(const hz of this.hazards){
-      const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
+      const p=new THREE.Mesh(new THREE.CircleGeometry(hz.cluster?cell*.34:cell*.22,18),lib.dark);
       p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
     }
 
@@ -1419,7 +1419,7 @@ class WorldStreamer{
     this.surfaceSize=4096;
     this.library=makeLibrary(this.game.level);
 
-    if(this.game.level.id!=="0"){
+    {
       this.floorSurface=new THREE.Mesh(
         new THREE.PlaneGeometry(this.surfaceSize,this.surfaceSize),
         this.library.floor
