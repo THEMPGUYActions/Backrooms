@@ -825,8 +825,9 @@ class Chunk{
     return 1;
   }
   update(dt){
+    const state=this.game.lightState;
+    const enteredFlicker=state==="FLICKER"&&this.lastLightState!=="FLICKER";
     if(this.game.level.id==="1"&&this.zone==="halls"){
-      const state=this.game.lightState;
       if(state!=="ON"&&this.lastLightState==="ON"&&Math.random()<.34){
         const cell=this.game.level.cellSize;
         const bx=this.originX+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
@@ -855,8 +856,7 @@ class Chunk{
       this.lastLightState=this.game.lightState;
     }
 
-    const state=this.game.lightState;
-    if(state==="FLICKER"&&this.lastLightState!=="FLICKER")this.startFlickerEvent();
+    if(enteredFlicker)this.startFlickerEvent();
 
     if(state==="BLACKOUT"){
       for(const fixture of this.fixtures){
@@ -1095,12 +1095,16 @@ class WorldStreamer{
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
+    const bounds=this._lightBounds||(this._lightBounds=new THREE.Sphere(new THREE.Vector3(),1.6));
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
         if(d>Math.max(96,this.size*2.6))continue;
-        if(frustum&&!frustum.containsPoint(light.position))continue;
+        if(frustum){
+          bounds.center.copy(light.position);
+          if(!frustum.intersectsSphere(bounds))continue;
+        }
         out.push({light,d});
       }
     }
