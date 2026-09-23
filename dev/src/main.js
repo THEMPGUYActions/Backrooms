@@ -1,6 +1,6 @@
 import { BackroomsGame } from "./game.js?v=20260923-1910";
 /* DEV_ADMIN_START */
-import { BackroomsAdmin } from "./admin.js?v=20260923-1905";
+import { BackroomsAdmin } from "./admin.js?v=20260923-1920";
 /* DEV_ADMIN_END */
 
 const registerCache=async()=>{
@@ -24,8 +24,11 @@ registerCache();
 const game=new BackroomsGame();
 /* DEV_ADMIN_START */
 if(game.admin.enabled){
-  window.backroomsAdmin=new BackroomsAdmin(game);
-  window.backroomsAdmin.activate();
+  window.addEventListener("backrooms:game-ready",()=>{
+    if(!game.running||game.introActive||window.backroomsAdmin)return;
+    window.backroomsAdmin=new BackroomsAdmin(game);
+    window.backroomsAdmin.activate();
+  },{once:true});
 }
 /* DEV_ADMIN_END */
 game.mount();

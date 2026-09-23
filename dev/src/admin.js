@@ -11,7 +11,7 @@ export class BackroomsAdmin{
   }
   activate(){
     if(this.ready)return;
-    if(!this.game.admin.enabled)return;
+    if(!this.game.admin.enabled||!this.game.mounted||!this.game.running||this.game.introActive)return;
     this.build();
     this.bind();
     this.opener=document.createElement("button");
@@ -23,7 +23,9 @@ export class BackroomsAdmin{
     document.body.appendChild(this.opener);
     this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
     this.ready=true;
-    if(this.game.admin.enabled)requestAnimationFrame(()=>this.open());
+    requestAnimationFrame(()=>{
+      if(this.game.running&&!this.game.paused&&!this.game.introActive)this.open();
+    });
   }
 
   build(){
@@ -213,7 +215,7 @@ export class BackroomsAdmin{
 
   async teleportLevel(id){
     const level=LEVELS[String(id)];
-    if(!level)return;
+    if(!level||!this.game.running||this.game.introActive||this.game.dead)return;
     this.game.paused=true;
     this.game.dead=false;
     document.getElementById("pause")?.classList.add("hidden");
@@ -251,6 +253,7 @@ export class BackroomsAdmin{
   }
 
   action(kind){
+    if(!this.ready||!this.game.running||this.game.introActive)return;
     const p=this.game.player;
     if(kind==="heal")p.health=100;
     if(kind==="stamina")p.stamina=100;
@@ -266,6 +269,7 @@ export class BackroomsAdmin{
   }
 
   event(kind){
+    if(!this.ready||!this.game.running||this.game.introActive)return;
     if(kind==="on"){this.game.lightState="ON";this.game.lightEventTimer=60}
     if(kind==="flicker"){this.game.lightState="FLICKER";this.game.lightEventTimer=2.5}
     if(kind==="blackout"){this.game.lightState="BLACKOUT";this.game.lightEventTimer=5}
@@ -288,7 +292,7 @@ export class BackroomsAdmin{
   }
 
   update(){
-    if(!this.opened&&this.game.admin.enabled)return;
+    if(!this.ready||!this.root||!this.game.running||this.game.introActive)return;
     const p=this.game.player;
     const c=this.game.world.chunkAt(p.position.x,p.position.z);
     this.root.querySelector("#admin-runtime").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
