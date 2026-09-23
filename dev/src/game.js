@@ -3,11 +3,10 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js";
-import { AudioDirector } from "./audio.js";
-import { LEVELS, levelById, cycleHash } from "./levels.js";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js";
-import { isTouchControlsDevice } from "./platform.js";
+import { InputManager } from "./input.js?v=20260923-1205";
+import { AudioDirector } from "./audio.js?v=20260923-1205";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1205";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1205";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -94,6 +93,13 @@ const VHSShader={
 const CELLS=16;
 const BASE_RADIUS=1;
 const MAX_DT=.05;
+
+function isTouchControlsDevice(){
+  const coarse=matchMedia("(pointer:coarse)").matches;
+  const fine=matchMedia("(pointer:fine)").matches;
+  const touchPoints=Number.isFinite(navigator.maxTouchPoints)?navigator.maxTouchPoints:0;
+  return coarse&&!fine||(touchPoints>0&&!fine);
+}
 
 class RNG{
   constructor(seed){this.s=(seed|0)||1}
@@ -1630,7 +1636,7 @@ export class BackroomsGame{
       for(let i=chunk.batteries.length-1;i>=0;i--){
         const pickup=chunk.batteries[i];
         const d=Math.hypot(p.x-pickup.group.position.x,p.z-pickup.group.position.z);
-        pickup.group.rotation.y+=dtToRad(1.5);
+        pickup.group.rotation.y+=THREE.MathUtils.degToRad(1.5);
         pickup.group.position.y=.22+Math.sin(this.gameTime*2.5+i)*.025;
         if(d<1.05&&this.player.flashBattery<100){
           const before=this.player.flashBattery;
