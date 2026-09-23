@@ -122,7 +122,7 @@ export async function applyFoundFootageLevel0Assets(library,level,onProgress=()=
   const entries=[
     [library.wall,FOUND_FOOTAGE_ASSET_SOURCES.wall,true,"Level 0 wall texture"],
     [library.trim,FOUND_FOOTAGE_ASSET_SOURCES.wallTrim,true,"Level 0 trim texture"],
-    [library.level1Light,FOUND_FOOTAGE_ASSET_SOURCES.fluorescent,true,"Level 0 fluorescent texture"],
+    [library.light,FOUND_FOOTAGE_ASSET_SOURCES.fluorescent,true,"Level 0 fluorescent texture"],
     [library.pole,FOUND_FOOTAGE_ASSET_SOURCES.pole,true,"Level 0 pole texture"],
     [library.pillar,FOUND_FOOTAGE_ASSET_SOURCES.plastic,true,"Level 0 pillar texture"]
   ];
