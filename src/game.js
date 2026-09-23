@@ -1007,8 +1007,13 @@ class Chunk{
           const span=t.size||0;
           return sourceTileX>=bx&&sourceTileX<bx+span&&sourceTileZ>=bz&&sourceTileZ<bz+span;
         };
+        const inMacro2=()=>{
+          // megaroom2 is placed four times at 0/32, so its cyan floor marker
+          // covers the full 80x80 sector after the overlapping placements.
+          return sourceTileX>=0&&sourceTileX<this.world.size&&sourceTileZ>=0&&sourceTileZ<this.world.size;
+        };
         if(
-          (this.megaType===2&&inMacro(2)) ||
+          (this.megaType===2&&inMacro2()) ||
           ((this.megaType===3||this.megaType===4||this.megaType===5)&&inMacro(this.megaType)) ||
           (this.megaType===6&&sourceTileX>=16&&sourceTileX<32&&sourceTileZ>=16&&sourceTileZ<32)
         )continue;
