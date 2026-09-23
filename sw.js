@@ -6,6 +6,7 @@ const CORE=[
   "src/game.js",
   "src/assets.js",
   "src/audio.js",
+  "src/platform.js",
   "src/levels.js",
   "src/admin.js",
   "favicon.svg"
