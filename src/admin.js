@@ -232,8 +232,8 @@ export class BackroomsAdmin{
       this.game.lightEventTimer=48;
       this.game.intercomTimer=70;
       const FogClass=this.game.scene.fog?.constructor;
-      if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.043:level.id==="2"?.058:level.id==="3"?.052:.036);
-      this.game.ambient.color.setHex(level.theme.ambient);
+      if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.024:level.id==="2"?.058:level.id==="3"?.052:.036);
+      this.game.ambient.color.setHex(level.theme.ambient);this.game.ambient.intensity=level.id==="1"?.026:.052;
       this.game.flash.color.setHex(level.id==="2"?0xd9d7ff:0xffffee);
 
       await this.game.world.configure();
