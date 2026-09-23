@@ -434,7 +434,8 @@ class Chunk{
             baseIntensity:intensity,
             intensity,
             distance:0,
-            decay:2
+            decay:2,
+            fixture
           });
         }
       }
@@ -647,7 +648,7 @@ class Chunk{
     const addLight=(x,z,rotation=0,scale=1,baseIntensity=this.zone==="halls"?150:105)=>{
       const fixture=box(g,new THREE.BoxGeometry(3.15*scale,.055,.44*scale),lib.level1Light,x,level.wallHeight-.14,z,0,rotation,0);
       fixture.userData.light=true;fixture.userData.baseEmissive=2.4;this.fixtures.push(fixture);
-      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:this.zone==="halls"?34:24,decay:2});
+      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:this.zone==="halls"?34:24,decay:2,fixture});
       return fixture;
     };
 
@@ -790,6 +791,39 @@ class Chunk{
     for(const material of uniqueMaterials)material.dispose();
     this.group.clear();
   }
+  startFlickerEvent(){
+    const now=this.game.gameTime;
+    const duration=2.8+Math.random()*2.8;
+    const spread=Math.min(2.4,duration*.62);
+    const fixtureCount=this.fixtures.length;
+    if(!fixtureCount)return;
+    for(let i=0;i<fixtureCount;i++){
+      const fixture=this.fixtures[i];
+      const start=(i/Math.max(1,fixtureCount-1))*spread+Math.random()*.34;
+      const pulses=[];
+      let cursor=start;
+      const burstCount=2+Math.floor(Math.random()*3);
+      for(let burst=0;burst<burstCount;burst++){
+        cursor+=Math.random()*.12;
+        if(cursor>=duration-.08)break;
+        const offDuration=.065+Math.random()*.12;
+        pulses.push([cursor,cursor+offDuration]);
+        cursor+=offDuration+.16+Math.random()*.46;
+        if(cursor>=duration)break;
+      }
+      fixture.userData.flickerPulses=pulses;
+      fixture.userData.flickerEventStart=now;
+    }
+  }
+  flickerScale(fixture){
+    const pulses=fixture?.userData?.flickerPulses;
+    if(!pulses?.length)return 1;
+    const elapsed=this.game.gameTime-(fixture.userData.flickerEventStart??this.game.gameTime);
+    for(const [start,end] of pulses){
+      if(elapsed>=start&&elapsed<end)return .018;
+    }
+    return 1;
+  }
   update(dt){
     if(this.game.level.id==="1"&&this.zone==="halls"){
       const state=this.game.lightState;
@@ -821,38 +855,37 @@ class Chunk{
       this.lastLightState=this.game.lightState;
     }
 
-    if(this.game.lightState==="ON"){
-      for(const fixture of this.fixtures){
-        if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)
-          fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
-      }
-      for(const light of this.lightSources)light.intensity=light.baseIntensity;
-    }
+    const state=this.game.lightState;
+    if(state==="FLICKER"&&this.lastLightState!=="FLICKER")this.startFlickerEvent();
 
-    if(this.game.lightState!=="ON"){
-      const blackout=this.game.lightState==="BLACKOUT";
-      const flicker=Math.sin(this.game.gameTime*87+this.cx*11+this.cz*17)>-.18;
-      const scale=blackout?0:(flicker?1:.028);
+    if(state==="BLACKOUT"){
       for(const fixture of this.fixtures){
         if(fixture.material?.emissive)
-          fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??.8)*scale;
+          fixture.material.emissiveIntensity=0;
       }
-      for(const light of this.lightSources)light.intensity=light.baseIntensity*scale;
+      for(const light of this.lightSources)light.intensity=0;
       return;
     }
 
-    this.flickerTimer-=dt;
-    if(this.flickerTimer<=0&&this.fixtures.length){
-      for(let i=0;i<Math.min(2,this.fixtures.length);i++){
-        const f=this.fixtures[Math.floor(Math.random()*this.fixtures.length)];
-        if(f.material?.emissive&&f.userData.baseEmissive!==undefined)
-          f.material.emissiveIntensity=Math.random()<.55?.08:f.userData.baseEmissive;
+    if(state==="FLICKER"){
+      for(const fixture of this.fixtures){
+        const scale=this.flickerScale(fixture);
+        if(fixture.material?.emissive)
+          fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??.8)*scale;
       }
       for(const light of this.lightSources){
-        if(Math.random()<.35)light.intensity=light.baseIntensity*(Math.random()<.55?.025:1);
+        const scale=this.flickerScale(light.fixture);
+        light.intensity=light.baseIntensity*scale;
       }
-      this.flickerTimer=11+Math.random()*24;
+      return;
     }
+
+    for(const fixture of this.fixtures){
+      if(fixture.material?.emissive&&fixture.userData.baseEmissive!==undefined)
+        fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
+      fixture.userData.flickerPulses=null;
+    }
+    for(const light of this.lightSources)light.intensity=light.baseIntensity;
   }
 }
 
@@ -1062,24 +1095,17 @@ class WorldStreamer{
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
-    const view=this._lightViewPosition||(this._lightViewPosition=new THREE.Vector3());
-    const margin=THREE.MathUtils.degToRad(7);
-    const verticalFov=THREE.MathUtils.degToRad(camera?.getEffectiveFOV?.()??camera?.fov??62);
-    const horizontalFov=2*Math.atan(Math.tan(verticalFov*.5)*(camera?.aspect||1));
-    const halfV=verticalFov*.5+margin,halfH=horizontalFov*.5+margin;
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        view.copy(light.position).applyMatrix4(camera.matrixWorldInverse);
-        if(view.z>=-0.05||-view.z>camera.far+20)continue;
-        if(Math.abs(Math.atan2(view.x,-view.z))>halfH)continue;
-        if(Math.abs(Math.atan2(view.y,-view.z))>halfV)continue;
+        if(d>Math.max(96,this.size*2.6))continue;
+        if(frustum&&!frustum.containsPoint(light.position))continue;
         out.push({light,d});
       }
     }
     out.sort((a,b)=>a.d-b.d);
-    return out.slice(0,this.game.localLights?.length||8);
+    return out;
   }
   entitySpawns(){
     const out=[];
@@ -1329,7 +1355,9 @@ export class BackroomsGame{
 
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
     this.localLights=[];
-    for(let i=0;i<8;i++){
+    this._activeLightEntries=[];
+    const localLightCount=isTouchControlsDevice()?10:16;
+    for(let i=0;i<localLightCount;i++){
       const light=new THREE.PointLight(0xffd34d,0,0,2);
       light.name="dynamic_fluorescent_"+i;
       light.visible=true;
@@ -1612,12 +1640,12 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      this.lightEventTimer=this.level.id==="1"?16+Math.random()*24:1.3+Math.random()*2.5;
+      this.lightEventTimer=this.level.id==="1"?18+Math.random()*34:10+Math.random()*18;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
       this.lightState="FLICKER";
-      this.lightEventTimer=this.level.id==="1"?1.0+Math.random()*2.8:.7+Math.random()*1.7;
+      this.lightEventTimer=this.level.id==="1"?2.6+Math.random()*2.8:2.8+Math.random()*3.2;
       this.audio.flicker();
       this.triggerFear(this.level.id==="1"?.20:.16);
     }
@@ -1670,8 +1698,19 @@ export class BackroomsGame{
     frustumMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse);
     lightFrustum.setFromProjectionMatrix(frustumMatrix);
     const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z,lightFrustum,this.camera);
+    const bySource=new Map(sources.map(entry=>[entry.light,entry]));
+    const next=[];
+    for(const entry of this._activeLightEntries){
+      const current=bySource.get(entry?.light);
+      if(current)next.push(current);
+    }
+    for(const entry of sources){
+      if(next.length>=this.localLights.length)break;
+      if(!next.some(active=>active.light===entry.light))next.push(entry);
+    }
+    this._activeLightEntries=next;
     for(let i=0;i<this.localLights.length;i++){
-      const target=this.localLights[i],entry=sources[i];
+      const target=this.localLights[i],entry=next[i];
       if(!entry){
         target.intensity=0;
         target.visible=false;
