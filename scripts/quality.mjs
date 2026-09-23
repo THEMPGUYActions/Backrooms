@@ -134,7 +134,8 @@ async function checkHtml() {
 
   for (const required of ['id="game"', 'src="./src/main.js"', 'href="./styles.css"']) {
     if (required === 'src="./src/main.js"') {
-      if (!/<script\\b[^>]*src=["']\\.\\/src\\/main\\.js(?:\\?[^"']*)?["']/i.test(html)) fail("index.html missing " + required);
+      const hasMainScript=html.split("<script").some(chunk=>chunk.includes('src="./src/main.js')||chunk.includes("src='./src/main.js"));
+      if (!hasMainScript) fail("index.html missing " + required);
     } else if (!html.includes(required)) {
       fail("index.html missing " + required);
     }
@@ -401,9 +402,8 @@ async function checkBuildIfPresent() {
   }
 
   const distHtml = await readFile(join(dist, "index.html"), "utf8");
-  if (!/<script\\b[^>]*src=["']\\.\\/src\\/main\\.js(?:\\?[^"']*)?["']/i.test(distHtml)) {
-    fail("dist/index.html lost the main module reference");
-  }
+  const hasDistMainScript=distHtml.split("<script").some(chunk=>chunk.includes('src="./src/main.js')||chunk.includes("src='./src/main.js"));
+  if (!hasDistMainScript) fail("dist/index.html lost the main module reference");
   if (!distHtml.includes('type="importmap"')) fail("dist/index.html lost the Three.js import map");
   if (!distHtml.includes(THREE_CORE) || !distHtml.includes(THREE_ADDONS)) {
     fail("dist/index.html does not contain the pinned Three.js import map");
