@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
-import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0wiki3";
+import { makeLibrary, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0wiki4";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -473,7 +473,8 @@ class Chunk{
     else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
 
     for(const hz of this.hazards){
-      const p=new THREE.Mesh(new THREE.CircleGeometry(hz.cluster?cell*.34:cell*.22,18),lib.dark);
+      if(level.id==="0"&&hz.cluster)continue;
+      const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
       p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
     }
 
@@ -667,7 +668,7 @@ class Chunk{
     const center=(x,z)=>({x:this.originX+x*cell+cell/2,z:this.originZ+z*cell+cell/2});
 
     if(region==="pillars"){
-      const spacing=24,pillarData=[],baseData=[],q=new THREE.Quaternion();
+      const spacing=20,pillarData=[],baseData=[],q=new THREE.Quaternion();
       const firstX=Math.ceil((this.originX+2)/spacing)*spacing,firstZ=Math.ceil((this.originZ+2)/spacing)*spacing;
       for(let x=firstX;x<this.originX+size-2;x+=spacing)for(let z=firstZ;z<this.originZ+size-2;z+=spacing){
         if(x<=this.originX+2||x>=this.originX+size-2||z<=this.originZ+2||z>=this.originZ+size-2)continue;
@@ -731,7 +732,9 @@ class Chunk{
           door.position.z+=horizontal?0:doorW*.42;
           door.rotation.y=horizontal?(name==="north"?-.38:.38):(name==="west"?-.38:.38);
         }else{
-          if(horizontal)door.userData.solidDoor=true;else door.userData.solidDoor=true;
+          door.userData.solidDoor=true;
+          if(horizontal)this.collisionSegments.push({x1:x-doorW/2,z1:z,x2:x+doorW/2,z2:z});
+          else this.collisionSegments.push({x1:x,z1:z-doorW/2,x2:x,z2:z+doorW/2});
         }
       }
       for(const seg of wallSegments)this.collisionSegments.push(seg);
