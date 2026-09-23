@@ -7,7 +7,8 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
 import { makeLibrary, applyOpenGameArtPBR, applyLevel0Assets, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-lobbyassets2";
-import { level0RoomRows, level0RotationForMask, level0TransformBlock, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-lobbytemplates2";
+import { level0RotationForMask, level0TransformBlock } from "./level0_templates.js?v=20260923-lobbytemplates3";
+import { LEVEL0_SOURCE_STRUCTURES } from "./level0_source.generated.js?v=20260923-l0source1";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -130,6 +131,71 @@ function level0AddBoundaryInterval(map,key,start,end){
   let list=map.get(key);
   if(!list){list=[];map.set(key,list)}
   list.push([start,end]);
+}
+
+const LEVEL0_SOURCE_FLOOR_Y=20;
+
+const level0SourceDecodeCache=new Map();
+
+function level0SourceStructure(name){
+  const source=LEVEL0_SOURCE_STRUCTURES?.[name];
+  if(!source)return null;
+  if(level0SourceDecodeCache.has(name))return level0SourceDecodeCache.get(name);
+
+  const binary=atob(source.blocks);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  const blocks=new Uint32Array(bytes.buffer);
+  const decoded={size:source.size,palette:source.palette,blocks};
+  level0SourceDecodeCache.set(name,decoded);
+  return decoded;
+}
+
+function level0SourceShortName(state){
+  return String(state?.name||"minecraft:air").split(":").pop();
+}
+
+function level0SourceKind(state){
+  const name=level0SourceShortName(state);
+  if(name==="air"||name==="cave_air"||name==="void_air"||name==="structure_void")return "air";
+  if(name.endsWith("_wool")||name==="red_wool"||name==="lime_wool"||name==="cyan_wool")return "marker";
+  if(name==="wall_block_2")return "wall2";
+  if(name==="wall_block")return "wall";
+  if(name==="bottom_trim")return "trim";
+  if(name==="carpet_block"||name==="carpet")return "floor";
+  if(name==="ceiling_tile"||name==="ghost_ceiling_tile")return "ceiling";
+  if(name==="fluorescent_light"||name==="thin_fluorescent_light"||name==="tiny_fluorescent_light")return "light";
+  if(name.includes("emergency_light"))return "emergency";
+  return "detail";
+}
+
+function level0SourcePackedBlock(packed){
+  return {
+    x:packed&63,
+    z:(packed>>>6)&63,
+    y:(packed>>>12)&63,
+    state:(packed>>>18)&16383
+  };
+}
+
+function level0SourceMarkers(name){
+  const structure=level0SourceStructure(name);
+  if(!structure)return [];
+  const out=[];
+  for(const packed of structure.blocks){
+    const block=level0SourcePackedBlock(packed);
+    const state=structure.palette[block.state];
+    const kind=level0SourceKind(state);
+    if(kind!=="marker")continue;
+    const markerName=level0SourceShortName(state);
+    if(markerName!=="lime_wool"&&markerName!=="red_wool"&&markerName!=="cyan_wool")continue;
+    out.push({x:block.x,y:block.y,z:block.z,name:markerName});
+  }
+  return out;
+}
+
+function level0SourceStateAt(map,x,sourceY,z){
+  return map.get(x+"|"+sourceY+"|"+z)||null;
 }
 
 function level0MergeBoundaryIntervals(map,horizontal){
@@ -316,11 +382,12 @@ class Chunk{
 
       const markerCells=()=>{
         if(roomType<3)return [];
-        const template=LEVEL0_MEGA_TEMPLATES[roomType];
         const blocked=[];
-        for(const [mx,mz] of (template?.markers||[])){
-          const gx=1+mx/cell;
-          const gz=1+mz/cell;
+        for(const marker of level0SourceMarkers("megaroom"+roomType)){
+          // The source macro is anchored at sector-local +16,+16 while
+          // Level0MazeGenerator's 5x5 grid is anchored at the sector origin.
+          const gx=(16+marker.x)/cell;
+          const gz=(16+marker.z)/cell;
           if(Number.isInteger(gx)&&Number.isInteger(gz)&&gx>=0&&gx<cells&&gz>=0&&gz<cells)
             blocked.push({x:gx,z:gz});
         }
@@ -817,263 +884,306 @@ class Chunk{
   buildLevel0Set(level,lib,rng){
     const g=this.group,cells=this.gridSize(),cell=level.cellSize;
     const roomRng=new RNG(this.seedKey()^0x5d11f);
-    const lightRng=new RNG(this.seedKey()^0x6a11c);
-    const next=()=>lightRng.next();
-    const wallCells=new Set();
-    const manilaCells=new Set();
-    const addWall=(x,z,manila=false)=>(manila?manilaCells:wallCells).add(x+","+z);
+    const roofRng=new RNG(this.seedKey()^0x6a11c);
+    const voxels=new Map();
+    const collisionCells=new Set();
 
-    const addRoom=(cellX,cellZ,mask)=>{
-      const variant=roomRng.int(0,7);
-      const template=level0RoomRows(mask,variant),rotation=level0RotationForMask(mask);
-      const baseX=this.originX+cellX*cell,baseZ=this.originZ+cellZ*cell;
-      for(let z=0;z<template.rows.length;z++){
-        const bits=template.rows[z]>>>0;
-        for(let x=0;x<16;x++){
-          if(!(bits&(1<<x)))continue;
-          const p=level0TransformBlock(x,z,rotation,16);
-          addWall(baseX+p.x,baseZ+p.z);
-        }
+    const putVoxel=(x,y,z,state)=>{
+      const kind=level0SourceKind(state);
+      if(kind==="air")return;
+      const key=x+"|"+y+"|"+z;
+      // Minecraft structure placement is ordered. Later placements overwrite
+      // blocks at the same coordinates, so the browser map follows that rule.
+      voxels.set(key,{x,y,z,state,kind});
+      if(
+        y>=0&&y<5 &&
+        kind!=="floor"&&kind!=="ceiling"&&kind!=="light"&&
+        kind!=="emergency"&&kind!=="trim"&&kind!=="marker"
+      ){
+        collisionCells.add(x+"|"+z);
       }
+    };
+
+    const putStructure=(name,baseX,baseSourceY,baseZ,rotation=0)=>{
+      const structure=level0SourceStructure(name);
+      if(!structure)return;
+      const size=Number(structure.size?.[0])||0;
+      if(!size)return;
+
+      for(const packed of structure.blocks){
+        const block=level0SourcePackedBlock(packed);
+        const state=structure.palette[block.state];
+        const transformed=level0TransformBlock(block.x,block.z,rotation,size);
+        putVoxel(
+          baseX+transformed.x,
+          baseSourceY+block.y-LEVEL0_SOURCE_FLOOR_Y,
+          baseZ+transformed.z,
+          state
+        );
+      }
+    };
+
+    // The family selection is the same mask routing used by MazeCell.drawWalls().
+    const roomFamily=mask=>{
+      if(mask===0)return "aroom";
+      if(mask===8||mask===4||mask===2||mask===1)return "broom";
+      if(mask===12||mask===9||mask===6||mask===3)return "croom";
+      if(mask===10||mask===5)return "droom";
+      if(mask===14||mask===7||mask===11||mask===13)return "eroom";
+      return "aroom";
+    };
+
+    const addRoom=(gridX,gridZ,mask)=>{
+      const roomNumber=roomRng.int(1,8);
+      putStructure(
+        roomFamily(mask)+"_"+roomNumber,
+        gridX*cell,
+        LEVEL0_SOURCE_FLOOR_Y,
+        gridZ*cell,
+        level0RotationForMask(mask)
+      );
     };
 
     const addMacro=(type,baseX,baseZ)=>{
-      const template=LEVEL0_MEGA_TEMPLATES[type];
-      if(!template)return;
-      const manila=type===4;
-      for(const [z,start,end] of template.runs||[]){
-        for(let x=start;x<=end;x++)addWall(baseX+x,baseZ+z,manila);
-      }
+      putStructure("megaroom"+type,baseX,18,baseZ,0);
     };
 
-    if(this.zone==="mega"){
-      if(this.megaType===1||this.megaType===2){
-        // Four 48x48 placements exactly tile the 80x80 sector.
-        for(const ox of [0,32])for(const oz of [0,32])
-          addMacro(this.megaType,this.originX+ox,this.originZ+oz);
-      }
+    // Source Level0ChunkGenerator's start chunk is four 48x48 megaroom1
+    // placements spanning the complete 80x80 sector.
+    if(this.megaType===1||this.megaType===2){
+      for(const ox of [0,32])for(const oz of [0,32])
+        addMacro(this.megaType,ox,oz);
     }else{
       const blocked=new Set((this.macroBlockedCells||[]).map(r=>r.x+","+r.z));
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         if(blocked.has(x+","+z))continue;
         addRoom(x,z,this.walls[this.index(x,z)]);
       }
-      if(this.megaType>=3)addMacro(this.megaType,this.originX+16,this.originZ+16);
+      if(this.megaType>=3)addMacro(this.megaType,16,16);
     }
 
-    // Render only exposed faces of the union of source wall blocks. Each
-    // browser wall cell is one Minecraft block wide, preserving the source
-    // texture scale instead of stretching a long generated wall.
-    const h=level.wallHeight;
-    const bottomHData=[],bottomVData=[],bottomHData2=[],bottomVData2=[];
-    const allWallCells=new Set([...wallCells,...manilaCells]);
-    const has=(x,z)=>allWallCells.has(x+","+z);
+    // Build source-equivalent geometry from the actual structure voxel list.
+    // Every source block remains a full 1x1x1 cube, then shared internal faces
+    // are removed. This gives the correct block thickness without z-fighting.
+    const grouped=new Map();
+    const faceDefs=[
+      {dx:0,dy:0,dz:-1,n:[0,0,-1],v:(x,y,z)=>[[x,y,z],[x,y+1,z],[x+1,y+1,z],[x+1,y,z]]},
+      {dx:0,dy:0,dz:1,n:[0,0,1],v:(x,y,z)=>[[x+1,y,z+1],[x+1,y+1,z+1],[x,y+1,z+1],[x,y,z+1]]},
+      {dx:-1,dy:0,dz:0,n:[-1,0,0],v:(x,y,z)=>[[x,y,z+1],[x,y+1,z+1],[x,y+1,z],[x,y,z]]},
+      {dx:1,dy:0,dz:0,n:[1,0,0],v:(x,y,z)=>[[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]]},
+      {dx:0,dy:-1,dz:0,n:[0,-1,0],v:(x,y,z)=>[[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]]},
+      {dx:0,dy:1,dz:0,n:[0,1,0],v:(x,y,z)=>[[x,y+1,z+1],[x+1,y+1,z+1],[x+1,y+1,z],[x,y+1,z]]}
+    ];
 
-    const makeWallMesh=(cellsSet,material)=>{
-      const positions=[],normals=[],uvs=[],indices=[];
-      const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
-        const base=positions.length/3;
-        for(const v of verts){
-          positions.push(v[0],v[1],v[2]);
-          normals.push(nx,ny,nz);
-        }
-        uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
-        indices.push(base,base+1,base+2,base,base+2,base+3);
-      };
-      const isManila=material===lib.wall2;
-
-      for(const key of cellsSet){
-        const [x,z]=key.split(",").map(Number);
-        const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
-        const bottomH=isManila?bottomHData2:bottomHData;
-        const bottomV=isManila?bottomVData2:bottomVData;
-
-        if(!has(x,z-1)){
-          appendFace(
-            [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
-            0,0,-1,0,0,1,h
-          );
-          bottomH.push(new THREE.Matrix4().makeTranslation((minX+maxX)/2,.0625,minZ));
-        }
-
-        if(!has(x,z+1)){
-          appendFace(
-            [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
-            0,0,1,0,0,1,h
-          );
-          bottomH.push(new THREE.Matrix4().makeTranslation((minX+maxX)/2,.0625,maxZ));
-        }
-
-        if(!has(x-1,z)){
-          appendFace(
-            [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
-            -1,0,0,0,0,1,h
-          );
-          bottomV.push(new THREE.Matrix4().makeTranslation(minX,.0625,(minZ+maxZ)/2));
-        }
-
-        if(!has(x+1,z)){
-          appendFace(
-            [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
-            1,0,0,0,0,1,h
-          );
-          bottomV.push(new THREE.Matrix4().makeTranslation(maxX,.0625,(minZ+maxZ)/2));
-        }
-
-        appendFace(
-          [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
-          0,-1,0,0,0,1,1
-        );
-        appendFace(
-          [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
-          0,1,0,0,0,1,1
-        );
-      }
-
-      if(!positions.length)return null;
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
-      geometry.setIndex(indices);
-      geometry.computeBoundingBox();
-      geometry.computeBoundingSphere();
-
-      const mesh=new THREE.Mesh(geometry,material);
-      mesh.name=isManila?"level0_manila_walls":"level0_walls";
-      mesh.frustumCulled=true;
-      g.add(mesh);
-      return mesh;
+    const materialForKind=kind=>{
+      if(kind==="wall")return lib.wall;
+      if(kind==="wall2")return lib.wall2;
+      if(kind==="floor")return lib.floor;
+      if(kind==="ceiling")return lib.ceiling;
+      if(kind==="emergency")return lib.orangeLight;
+      return lib.wall;
     };
 
-    makeWallMesh(wallCells,lib.wall);
-    makeWallMesh(manilaCells,lib.wall2);
+    const appendFace=(positions,normals,uvs,indices,verts,normal,uvRot=0)=>{
+      const base=positions.length/3;
+      for(const v of verts){positions.push(
+        this.originX+v[0],v[1],this.originZ+v[2]
+      );normals.push(normal[0],normal[1],normal[2]);}
+      const uvBase=[[0,0],[1,0],[1,1],[0,1]];
+      const uv=uvRot===1?[[1,0],[1,1],[0,1],[0,0]]:
+                uvRot===2?[[1,1],[0,1],[0,0],[1,0]]:
+                uvRot===3?[[0,1],[0,0],[1,0],[1,1]]:uvBase;
+      for(const [u,v] of uv){uvs.push(u,v)}
+      indices.push(base,base+1,base+2,base,base+2,base+3);
+    };
 
+    const meshes={};
+    for(const voxel of voxels.values()){
+      if(voxel.kind==="marker"||voxel.kind==="light"||voxel.kind==="trim")continue;
+      const material=materialForKind(voxel.kind);
+      const bucket=meshes[voxel.kind]||(meshes[voxel.kind]={
+        material,positions:[],normals:[],uvs:[],indices:[]
+      });
+      for(const face of faceDefs){
+        if(voxels.has(
+          (voxel.x+face.dx)+"|"+(voxel.y+face.dy)+"|"+(voxel.z+face.dz)
+        ))continue;
+        let uvRot=0;
+        // Match the fixed orientation of a default Minecraft cube face.
+        if(face.dx!==0)uvRot=face.dx>0?1:3;
+        appendFace(bucket.positions,bucket.normals,bucket.uvs,bucket.indices,face.v(voxel.x,voxel.y,voxel.z),face.n,uvRot);
+      }
+    }
+
+    for(const [kind,bucket] of Object.entries(meshes)){
+      if(!bucket.positions.length)continue;
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(bucket.positions,3));
+      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(bucket.normals,3));
+      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(bucket.uvs,2));
+      geometry.setIndex(bucket.indices);
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+      const mesh=new THREE.Mesh(geometry,bucket.material);
+      mesh.name="level0_source_"+kind;
+      mesh.frustumCulled=true;
+      g.add(mesh);
+    }
+
+    // The source fluorescent block is a full cube drawn by a block-entity
+    // renderer. Keep each light separate so the existing flicker event can
+    // toggle individual fixtures without changing the source structure.
+    const addLightSource=(voxel,emergency=false)=>{
+      const material=(emergency?lib.orangeLight:lib.light).clone();
+      material.emissiveIntensity=1.0;
+      const fixture=box(
+        g,
+        new THREE.BoxGeometry(1,1,1),
+        material,
+        this.originX+voxel.x+.5,
+        voxel.y+.5,
+        this.originZ+voxel.z+.5
+      );
+      fixture.userData.light=true;
+      fixture.userData.baseEmissive=1.0;
+      this.fixtures.push(fixture);
+      const distance=emergency?10:13;
+      const color=emergency?0xffc06a:0xfff064;
+      const baseIntensity=emergency?.55:1.0;
+      this.lightSources.push({
+        position:new THREE.Vector3(
+          this.originX+voxel.x+.5,
+          voxel.y-.5,
+          this.originZ+voxel.z+.5
+        ),
+        color,
+        baseIntensity,
+        intensity:baseIntensity,
+        distance,
+        decay:1,
+        fixture
+      });
+    };
+
+    for(const voxel of voxels.values()){
+      if(voxel.kind==="light")addLightSource(voxel,false);
+      else if(voxel.kind==="emergency")addLightSource(voxel,true);
+    }
+
+    // Source bottom_trim is an actual BlockBench model, not a generic wall
+    // strip. Recreate its visible 2/16-high trim with the source 18/16 span.
+    const addTrim=(voxel)=>{
+      const props=voxel.state?.properties||{};
+      const facing=String(props.facing||"north");
+      let rotation=0,x=this.originX+voxel.x+.5,z=this.originZ+voxel.z+.98125;
+      if(facing==="south"){rotation=Math.PI;x=this.originX+voxel.x+.5;z=this.originZ+voxel.z+.01875}
+      else if(facing==="east"){rotation=Math.PI/2;x=this.originX+voxel.x+.98125;z=this.originZ+voxel.z+.5}
+      else if(facing==="west"){rotation=-Math.PI/2;x=this.originX+voxel.x+.01875;z=this.originZ+voxel.z+.5}
+      const trim=box(
+        g,
+        new THREE.BoxGeometry(1.075,.125,.0375),
+        lib.trim,
+        x,.0625+voxel.y,z,
+        0,rotation,0
+      );
+      trim.frustumCulled=true;
+    };
+    for(const voxel of voxels.values())if(voxel.kind==="trim")addTrim(voxel);
+
+    // Source collision is derived from the final solid voxels after structure
+    // overwrite order has been applied. Floor, ceiling, lights, markers and trim
+    // never become horizontal collision cells.
+    collisionCells.clear();
+    for(const voxel of voxels.values()){
+      if(
+        voxel.y>=0&&voxel.y<5 &&
+        voxel.kind!=="floor"&&voxel.kind!=="ceiling"&&
+        voxel.kind!=="light"&&voxel.kind!=="emergency"&&
+        voxel.kind!=="trim"&&voxel.kind!=="marker"
+      ){
+        collisionCells.add(voxel.x+"|"+voxel.z);
+      }
+    }
+    const hasCollision=(x,z)=>collisionCells.has(x+"|"+z);
     const horizontal=new Map(),vertical=new Map();
-    for(const key of allWallCells){
-      const cut=key.indexOf(",");
-      const x=Number(key.slice(0,cut)),z=Number(key.slice(cut+1));
-      if(!has(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
-      if(!has(x,z+1))level0AddBoundaryInterval(horizontal,z+1,x,x+1);
-      if(!has(x-1,z))level0AddBoundaryInterval(vertical,x,z,z+1);
-      if(!has(x+1,z))level0AddBoundaryInterval(vertical,x+1,z,z+1);
+    for(const key of collisionCells){
+      const parts=key.split("|"),x=Number(parts[0]),z=Number(parts[1]);
+      if(!hasCollision(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
+      if(!hasCollision(x,z+1))level0AddBoundaryInterval(horizontal,z+1,x,x+1);
+      if(!hasCollision(x-1,z))level0AddBoundaryInterval(vertical,x,z,z+1);
+      if(!hasCollision(x+1,z))level0AddBoundaryInterval(vertical,x+1,z,z+1);
     }
     this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
       .concat(level0MergeBoundaryIntervals(vertical,false));
 
-    // SpacePotato's bottom-most wall block uses a 2/16-high, 18/16-wide
-    // base element. Recreate only its exposed sides so adjacent walls do not
-    // produce coplanar duplicate geometry.
-    if(bottomHData.length){
-      const mesh=new THREE.InstancedMesh(
-        new THREE.BoxGeometry(1.125,.125,.125),
-        lib.wallBottom,
-        bottomHData.length
-      );
-      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-      bottomHData.forEach((m,i)=>mesh.setMatrixAt(i,m));
-      mesh.instanceMatrix.needsUpdate=true;
-      mesh.computeBoundingBox();
-      mesh.computeBoundingSphere();
-      g.add(mesh);
-    }
-    if(bottomVData.length){
-      const mesh=new THREE.InstancedMesh(
-        new THREE.BoxGeometry(.125,.125,1.125),
-        lib.wallBottom,
-        bottomVData.length
-      );
-      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-      bottomVData.forEach((m,i)=>mesh.setMatrixAt(i,m));
-      mesh.instanceMatrix.needsUpdate=true;
-      mesh.computeBoundingBox();
-      mesh.computeBoundingSphere();
-      g.add(mesh);
-    }
-
-    // The source roof is an 8x8 block structure. roof1 has no light;
-    // roof2 replaces four ceiling blocks with one-block fluorescent lights.
-    const fixtureCandidates=[];
+    // Reproduce the source 8x8 roof as actual structure placements. The source
+    // chooses roof2 one time in five and rotates each unit NONE/CW90. The
+    // source generator probes the 18Y marker and 25Y destination before
+    // placing, so do those exact logical checks against the macro block map.
     for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
       for(let tileX=0;tileX<this.world.size;tileX+=8){
-        const roof2=lightRng.next()<.2;
-        const rotated=lightRng.next()>=.5;
-        if(!roof2)continue;
-
-        // Source Level0ChunkGenerator skips a roof structure whenever the
-        // 18Y probe contains cyan wool. Cyan wool is the structure marker used
-        // by the large Level 0 rooms. Recreate that exclusion from the same
-        // footprints instead of putting lights through macro-room ceilings.
-        const sourceTileX=tileX,sourceTileZ=tileZ;
-        const inMacro=(type)=>{
-          const t=LEVEL0_MEGA_TEMPLATES[type];
-          if(!t)return false;
-          const bx=type>=3?16:0,bz=type>=3?16:0;
-          const span=t.size||0;
-          return sourceTileX>=bx&&sourceTileX<bx+span&&sourceTileZ>=bz&&sourceTileZ<bz+span;
-        };
-        const inMacro2=()=>{
-          // megaroom2 is placed four times at 0/32, so its cyan floor marker
-          // covers the full 80x80 sector after the overlapping placements.
-          return sourceTileX>=0&&sourceTileX<this.world.size&&sourceTileZ>=0&&sourceTileZ<this.world.size;
-        };
-        if(
-          (this.megaType===2&&inMacro2()) ||
-          ((this.megaType===3||this.megaType===4||this.megaType===5)&&inMacro(this.megaType)) ||
-          (this.megaType===6&&sourceTileX>=16&&sourceTileX<32&&sourceTileZ>=16&&sourceTileZ<32)
-        )continue;
-
-        for(const localZ of [1,5])for(const localX of [2,6]){
-          const lx=rotated?7-localZ:localX;
-          const lz=rotated?localX:localZ;
-          const px=this.originX+tileX+lx+.5;
-          const pz=this.originZ+tileZ+lz+.5;
-          const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
-          fixtureCandidates.push({px,pz,d:dx*dx+dz*dz});
-        }
+        if(level0SourceStateAt(voxels,tileX,18-LEVEL0_SOURCE_FLOOR_Y,tileZ))continue;
+        if(level0SourceStateAt(voxels,tileX,5,tileZ))continue;
+        const roofName=roofRng.next()<.2?"roof2":"roof1";
+        const rotation=roofRng.next()<.5?0:Math.PI/2;
+        const baseX=rotation===0?tileX:tileX+7;
+        putStructure(roofName,baseX,25,tileZ,rotation);
       }
     }
 
-    fixtureCandidates.sort((a,b)=>a.d-b.d);
+    // Roof placement happens after the initial macro/maze structure in the
+    // source generator, so any new ceiling/light blocks are added to the voxel
+    // map above. Render their newly added exposed faces and lights.
+    const roofBuckets={};
+    for(const voxel of voxels.values()){
+      if(voxel.y<5)continue;
+      if(voxel.kind==="marker"||voxel.kind==="trim"||voxel.kind==="light"||voxel.kind==="emergency")continue;
+      // Only add roof blocks once; lower source structure blocks have already
+      // been rendered in the previous pass.
+      const roofKey=voxel.x+"|"+voxel.y+"|"+voxel.z;
+      if(roofKey.split("|")[1]==="5"){
+        const bucket=roofBuckets[voxel.kind]||(roofBuckets[voxel.kind]={
+          material:materialForKind(voxel.kind),positions:[],normals:[],uvs:[],indices:[]
+        });
+        for(const face of faceDefs){
+          if(voxels.has((voxel.x+face.dx)+"|"+(voxel.y+face.dy)+"|"+(voxel.z+face.dz)))continue;
+          appendFace(bucket.positions,bucket.normals,bucket.uvs,bucket.indices,face.v(voxel.x,voxel.y,voxel.z),face.n,face.dx?face.dx>0?1:3:0);
+        }
+      }
+    }
+    for(const [kind,bucket] of Object.entries(roofBuckets)){
+      if(!bucket.positions.length)continue;
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(bucket.positions,3));
+      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(bucket.normals,3));
+      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(bucket.uvs,2));
+      geometry.setIndex(bucket.indices);
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+      const mesh=new THREE.Mesh(geometry,bucket.material);
+      mesh.name="level0_source_roof_"+kind;
+      mesh.frustumCulled=true;
+      g.add(mesh);
+    }
 
-    const maxFixtures=96;
-    let fixtureCount=0;
-    for(const candidate of fixtureCandidates){
-      if(fixtureCount>=maxFixtures)break;
-
-      const mat=lib.light.clone();
-      // The source fluorescent block is a full 1x1 ceiling block rendered
-      // full-bright while ON. Keep its web equivalent at a stable source-like
-      // emissive level instead of overdriving it.
-      mat.emissiveIntensity=1.0;
-      const fixture=box(
-        g,
-        // Source fluorescent_light occupies a complete 1x1x1 block and is
-        // rendered as the same fluorescent texture on all six faces.
-        new THREE.BoxGeometry(1.0,1.0,1.0),
-        mat,
-        candidate.px,level.wallHeight+.5,candidate.pz,
-        0,0,0
+    // Any roof fluorescent lights appended after the first light pass need
+    // their block-entity equivalents too.
+    const renderedLights=new Set(this.fixtures.map(mesh =>
+      mesh.position.x.toFixed(4)+"|"+mesh.position.y.toFixed(4)+"|"+mesh.position.z.toFixed(4)
+    ));
+    for(const voxel of voxels.values()){
+      if(voxel.y<5||voxel.kind!=="light")continue;
+      const key=(
+        (this.originX+voxel.x+.5).toFixed(4)+"|"+
+        (voxel.y+.5).toFixed(4)+"|"+
+        (this.originZ+voxel.z+.5).toFixed(4)
       );
-      fixture.userData.light=true;
-      fixture.userData.baseEmissive=mat.emissiveIntensity;
-      this.fixtures.push(fixture);
-
-      // Source value: radius 13, brightness 1.0, RGB (255,240,100), with
-      // the light positioned one block below the ceiling tile center.
-      const intensity=1.0;
-      this.lightSources.push({
-        position:new THREE.Vector3(candidate.px,level.wallHeight-.5,candidate.pz),
-        color:0xfff064,
-        baseIntensity:intensity,
-        intensity,
-        distance:13,
-        decay:1,
-        fixture
-      });
-      fixtureCount++;
+      if(renderedLights.has(key))continue;
+      addLightSource(voxel,false);
+      renderedLights.add(key);
     }
   }
+
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
