@@ -3,10 +3,10 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20260923-1205";
-import { AudioDirector } from "./audio.js?v=20260923-1205";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1205";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1205";
+import { InputManager } from "./input.js?v=20260923-1220";
+import { AudioDirector } from "./audio.js?v=20260923-1220";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-1220";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1220";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1424,7 +1424,8 @@ export class BackroomsGame{
       setTimeout(activateAudioGate,16500);
     }
     const handleAudioGesture=event=>{
-      if(!this.introActive||!audioGateReady)return;
+      if(!audioGateReady&&audioPage?.classList.contains("intro-audio-active"))audioGateReady=true;
+      if(!this.introActive||!audioGateReady||!audioPage?.classList.contains("intro-audio-active"))return;
       if(gate&&!gate.contains(event.target)&&!audioPage?.contains(event.target))return;
       event.stopPropagation();
       begin(event);
