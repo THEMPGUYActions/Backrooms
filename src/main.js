@@ -24,8 +24,11 @@ registerCache();
 const game=new BackroomsGame();
 /* DEV_ADMIN_START */
 if(game.admin.enabled){
-  window.backroomsAdmin=new BackroomsAdmin(game);
-  window.backroomsAdmin.activate();
+  window.addEventListener("backrooms:game-ready",()=>{
+    if(!game.running||game.introActive||window.backroomsAdmin)return;
+    window.backroomsAdmin=new BackroomsAdmin(game);
+    window.backroomsAdmin.activate();
+  },{once:true});
 }
 /* DEV_ADMIN_END */
 game.mount();
