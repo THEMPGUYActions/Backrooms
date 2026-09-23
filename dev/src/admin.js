@@ -232,15 +232,15 @@ export class BackroomsAdmin{
       this.game.lightEventTimer=48;
       this.game.intercomTimer=70;
       const FogClass=this.game.scene.fog?.constructor;
-      if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.043:level.id==="2"?.058:level.id==="3"?.052:.036);
-      this.game.ambient.color.setHex(level.theme.ambient);
+      if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.024:level.id==="2"?.058:level.id==="3"?.052:.036);
+      this.game.ambient.color.setHex(level.theme.ambient);this.game.ambient.intensity=level.id==="1"?.026:.052;
       this.game.flash.color.setHex(level.id==="2"?0xd9d7ff:0xffffee);
 
       await this.game.world.configure();
       this.game.world.ensureAround(0,0);
       this.game.entityManager.clear();
       this.game.player.reset();
-      if(String(id)==="1")this.game.player.position.set(6,this.game.player.eyeY,3);
+      if(String(id)==="1")this.game.player.position.set(20,this.game.player.eyeY,20);
       else this.game.player.position.set(0,this.game.player.eyeY,0);
 
       this.game.running=true;
