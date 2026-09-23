@@ -99,13 +99,54 @@ function loadRemoteTexture(url,color=false){
   return promise;
 }
 
+function yellowizeCarpetTexture(texture){
+  const image=texture.image;
+  if(!image||typeof document==="undefined")return texture;
+  const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d",{willReadFrequently:true});
+  if(!ctx)return texture;
+  canvas.width=image.naturalWidth||image.width;canvas.height=image.naturalHeight||image.height;
+  if(!canvas.width||!canvas.height)return texture;
+  ctx.drawImage(image,0,0,canvas.width,canvas.height);
+  const data=ctx.getImageData(0,0,canvas.width,canvas.height),px=data.data;
+  for(let i=0;i<px.length;i+=4){
+    const r=px[i]/255,g=px[i+1]/255,b=px[i+2]/255;
+    const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+    let h=0,s=max?d/max:0,v=max;
+    if(d){
+      if(max===r)h=((g-b)/d)%6;
+      else if(max===g)h=(b-r)/d+2;
+      else h=(r-g)/d+4;
+      h/=6;if(h<0)h+=1;
+    }
+    // Preserve the carpet's brightness/variation, but shift its orange
+    // albedo into the yellow range used by Level 0.
+    h=.135;s=Math.min(1,Math.max(.18,s*1.12));
+    const hh=h*6,c=Math.min(1,v)*s,x=c*(1-Math.abs(hh%2-1)),m=v-c;
+    let rr=0,gg=0,bb=0;
+    if(hh<1)[rr,gg,bb]=[c,x,0];else if(hh<2)[rr,gg,bb]=[x,c,0];
+    else if(hh<3)[rr,gg,bb]=[0,c,x];else if(hh<4)[rr,gg,bb]=[0,x,c];
+    else if(hh<5)[rr,gg,bb]=[x,0,c];else [rr,gg,bb]=[c,0,x];
+    px[i]=Math.round((rr+m)*255);px[i+1]=Math.round((gg+m)*255);px[i+2]=Math.round((bb+m)*255);
+  }
+  ctx.putImageData(data,0,0);
+  const shifted=new THREE.CanvasTexture(canvas);
+  shifted.colorSpace=THREE.SRGBColorSpace;
+  shifted.wrapS=texture.wrapS;shifted.wrapT=texture.wrapT;shifted.repeat.copy(texture.repeat);
+  shifted.userData.backroomsOwned=true;
+  texture.dispose();
+  return shifted;
+}
+
 async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength){
   try{
     const texture=await loadRemoteTexture(url,color);
     texture.repeat.set(repeat,repeat);
     const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:material.normalMap;
     if(previous?.userData?.backroomsOwned)previous.dispose();
-    if(kind==="map")material.map=texture;
+    if(kind==="map"){
+      material.map=texture;
+      if(material.userData?.level0Carpet)material.map=yellowizeCarpetTexture(texture);
+    }
     else if(kind==="roughnessMap")material.roughnessMap=texture;
     else material.normalMap=texture;
     if(kind==="normalMap")material.normalScale.set(normalStrength,normalStrength);
@@ -156,6 +197,7 @@ export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
     ["manilaWall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // Manila wallpaper"],
     ["manilaWall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // Manila wallpaper"]
   ]:[];
+  if(level.id==="0")library.floor.userData.level0Carpet=true;
   const colorMaps=[
     ...(level.id==="0"?[]:[["wall","map",source.wall.color,true,wallRepeat,.28,"Color // wallpaper"]]),
     ["floor","map",source.floor.color,true,floorRepeat,.16,"Color // carpet"],
