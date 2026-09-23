@@ -156,6 +156,17 @@ try{
   if(state.hud==="none")throw new Error("HUD remained hidden after gameplay start");
   if(state.bootDisplay!=="none"||state.bootPointerEvents!=="none")throw new Error("Intro overlay still blocked gameplay after activation: "+JSON.stringify(state));
 
+  await command("Runtime.evaluate",{expression:"location.href='http://127.0.0.1:"+port+"/index.html?admin=1'",returnByValue:true});
+  await delay(2800);
+  const adminResult=await command("Runtime.evaluate",{
+    expression:"JSON.stringify({enabled:!!window.backrooms?.admin?.enabled,loaded:!!window.backroomsAdmin?.ready,opened:!!window.backroomsAdmin?.opened,button:!!document.getElementById('admin-open'),panel:!!document.getElementById('admin-panel'),panelVisible:document.getElementById('admin-panel')?.classList.contains('hidden')===false})",
+    returnByValue:true
+  });
+  const adminState=JSON.parse(adminResult.result?.result?.value||"{}");
+  if(!adminState.enabled||!adminState.loaded||!adminState.button||!adminState.panel||!adminState.opened||!adminState.panelVisible){
+    throw new Error("Admin query mode did not initialize/open: "+JSON.stringify(adminState));
+  }
+
   const runtimeErrors=messages.filter(message=>
     message.method==="Runtime.exceptionThrown"||
     (message.method==="Runtime.consoleAPICalled"&&["error","assert"].includes(message.params?.type))
