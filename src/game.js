@@ -176,7 +176,7 @@ class Chunk{
     }
   }
   buildMaze(){
-    const cells=this.gridSize(),level=this.game.level;
+    const cells=this.gridSize(),level=this.game.level,cell=level.cellSize;
     const rng=new RNG((Math.imul(this.cx,73856093)^Math.imul(this.cz,19349663)^this.game.seed)|0);
     this.walls.fill(15);this.rooms=[];
 
