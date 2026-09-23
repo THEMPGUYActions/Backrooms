@@ -334,6 +334,7 @@ async function checkLevel0SourceBuild(){
     const names=["aroom","broom","croom","droom","eroom"];
     for(const prefix of names)for(let i=1;i<=8;i++)if(!source.includes("\""+prefix+"_"+i+"\""))fail("Level 0 generated source is missing "+prefix+"_"+i);
     for(let i=1;i<=6;i++)if(!source.includes("\"megaroom"+i+"\""))fail("Level 0 generated source is missing megaroom"+i);
+    if(!source.includes("\"stairwell_0\""))fail("Level 0 generated source is missing stairwell_0");
     for(const name of ["roof1","roof2"])if(!source.includes("\""+name+"\""))fail("Level 0 generated source is missing "+name);
   }catch(e){fail("Level 0 generated source missing or invalid: "+e.message)}
 }
