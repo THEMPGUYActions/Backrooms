@@ -202,7 +202,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.collisionSegments=[];this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -705,6 +705,17 @@ class Chunk{
     if(region==="blackout"){
       const wetRng=new RNG(this.seedKey()^0x9c31);
       for(let i=0;i<3;i++)if(wetRng.next()<.72){const p=center(wetRng.int(0,cells-1),wetRng.int(0,cells-1));const puddle=new THREE.Mesh(new THREE.CircleGeometry(1.8+wetRng.next()*2.2,18),lib.water);puddle.rotation.x=-Math.PI/2;puddle.position.set(p.x,.009,p.z);g.add(puddle)}
+    }
+
+    if(region==="maze"&&!this.manilaRoom){
+      // Extremely rare Level 0 anomaly: stepping on this pebble transitions to Level 1.
+      const pebbleRng=new RNG(this.seedKey()^0x5e771);
+      if(pebbleRng.next()<.015){
+        const p=center(pebbleRng.int(1,Math.max(1,cells-2)),pebbleRng.int(1,Math.max(1,cells-2)));
+        const pebble=new THREE.Mesh(new THREE.IcosahedronGeometry(.09,1),new THREE.MeshStandardMaterial({color:0x6b6254,roughness:.95,metalness:0}));
+        pebble.position.set(p.x,.075,p.z);pebble.scale.set(1,.65,.85);g.add(pebble);
+        this.pebbles.push({x:p.x,z:p.z,r:.58,mesh:pebble});
+      }
     }
 
     if(region==="red"){
@@ -1291,6 +1302,12 @@ class WorldStreamer{
       }
     }
     return {x,z};
+  }
+  pebbleAt(x,z){
+    for(const c of this.chunks.values())for(const p of c.pebbles||[]){
+      if((x-p.x)*(x-p.x)+(z-p.z)*(z-p.z)<p.r*p.r)return true;
+    }
+    return false;
   }
   hazardAt(x,z){
     const c=this.chunkAt(x,z);if(!c)return false;const cell=this.game.level.cellSize;
