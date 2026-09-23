@@ -277,29 +277,110 @@ class Chunk{
         }
       }
     }else if(level.id==="0"){
-      // Known-good Level 0 topology: five 16m cells across each streamed
-      // sector, with open-room sectors mixed with classic maze sectors.
-      const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
-      this.zone=mega?"mega":"maze";
+      const isStart=this.cx===0&&this.cz===0;
+      const anchorRoll=cycleHash(this.game.seed^0x4d30,this.cx,this.cz);
+      let roomType=0;
 
-      if(mega){
+      // The reference only evaluates mega-room placement at 80-block anchors.
+      // Keep that same sector size here, with an order-independent seeded
+      // selection so streaming chunks generate identically every time.
+      if(isStart){
+        roomType=1;
+      }else if(anchorRoll<.5){
+        let blocked=false;
+        for(let dz=-1;dz<=1&&!blocked;dz++)for(let dx=-1;dx<=1;dx++){
+          if(!dx&&!dz)continue;
+          const nx=this.cx+dx,nz=this.cz+dz;
+          if(nx===0&&nz===0){blocked=true;break}
+          const neighborRoll=cycleHash(this.game.seed^0x4d30,nx,nz);
+          if(neighborRoll<.5&&neighborRoll<anchorRoll){blocked=true;break}
+        }
+        if(!blocked){
+          const typeRoll=cycleHash(this.game.seed^0x31a7,this.cx,this.cz);
+          roomType=1+Math.floor(typeRoll*6);
+        }
+      }
+
+      this.megaType=roomType||null;
+      this.macroBlockedCells=[];
+
+      const markerCells=()=>{
+        if(roomType<3)return [];
+        const template=LEVEL0_MEGA_TEMPLATES[roomType];
+        const blocked=[];
+        for(const [mx,mz] of (template?.markers||[])){
+          const gx=1+mx/cell;
+          const gz=1+mz/cell;
+          if(Number.isInteger(gx)&&Number.isInteger(gz)&&gx>=0&&gx<cells&&gz>=0&&gz<cells)
+            blocked.push({x:gx,z:gz});
+        }
+        return blocked;
+      };
+
+      // For types 3-6 the macro structure is placed at origin+16 and the
+      // reference MazeGenerator sees its lime-marker cells as null grid cells.
+      // Those null cells must be excluded before DFS, not after it.
+      if(roomType>=3){
+        const blocked=markerCells();
+        this.macroBlockedCells=blocked;
+        const blockedSet=new Set(blocked.map(v=>v.x+","+v.z));
+
+        const openMarkerEdges=()=>{
+          const open=(x,z,side)=>{
+            if(x>=0&&x<cells&&z>=0&&z<cells)this.setEdge(x,z,side,true);
+          };
+          const template=LEVEL0_MEGA_TEMPLATES[roomType];
+          const baseX=this.originX+cell;
+          const baseZ=this.originZ+cell;
+          for(const [mx,mz] of (template?.markers||[])){
+            const wx=baseX+mx,wz=baseZ+mz;
+            const gx=(wx-this.originX)/cell,gz=(wz-this.originZ)/cell;
+            if(!Number.isInteger(gx)||!Number.isInteger(gz))continue;
+
+            // These are the four probes performed by checkNeighbors() when
+            // it sees a lime marker one cell away from the current cell.
+            open(gx,gz-1,"south");
+            open(gx,gz+1,"north");
+            open(gx-1,gz,"east");
+            open(gx+1,gz,"west");
+          }
+        };
+
+        openMarkerEdges();
+
+        const visited=new Uint8Array(cells*cells);
+        const stack=[[0,0]];
+        visited[this.index(0,0)]=1;
+
+        // Source neighbor order: North(+Z), West(+X), South(-Z), East(-X).
+        // Browser bits: North=1(-Z), East=2(+X), South=4(+Z), West=8(-X).
+        const dirs=[
+          [0,1,4,1],
+          [1,0,2,8],
+          [0,-1,1,4],
+          [-1,0,8,2]
+        ];
+
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob] of dirs){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!blockedSet.has(nx+","+nz)&&!visited[this.index(nx,nz)])
+              options.push([nx,nz,b,ob]);
+          }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
+        }
+      }else if(roomType===1||roomType===2){
+        // The reference places four 48x48 macro structures here and does not
+        // invoke Level0MazeGenerator for these sectors.
+        this.zone="mega";
         this.walls.fill(0);
-        for(let z=0;z<cells;z++){
-          this.walls[this.index(0,z)]|=8;
-          this.walls[this.index(cells-1,z)]|=2;
-        }
-        for(let x=0;x<cells;x++){
-          this.walls[this.index(x,0)]|=1;
-          this.walls[this.index(x,cells-1)]|=4;
-        }
-
-        const partitions=rng.int(0,3);
-        for(let i=0;i<partitions;i++){
-          const vertical=rng.next()<.5;
-          if(vertical){
-            const x=rng.int(1,cells-2),gap=rng.int(1,cells-2);
-            for(let z=1;z<cells-1;z++)if(z!==gap)this.setEdge(x,z,"east",false);
-          }else{
+      }else{
             const z=rng.int(1,cells-2),gap=rng.int(1,cells-2);
             for(let x=1;x<cells-1;x++)if(x!==gap)this.setEdge(x,z,"south",false);
           }
@@ -444,7 +525,18 @@ class Chunk{
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
 
-    for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+    if(level.id==="0"){
+      // Level 0 uses the source room templates below. Keep logical edge
+      // metadata for doors/outlets/etc. without rendering duplicate coarse walls.
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)];
+        if(mask&1)edges.push({x,z,side:"north"});
+        if(mask&8)edges.push({x,z,side:"west"});
+        if(z===cells-1&&(mask&4))edges.push({x,z,side:"south"});
+        if(x===cells-1&&(mask&2))edges.push({x,z,side:"east"});
+      }
+    }else{
+
       const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
       const addEdge=(side)=>{
         if(side==="north"){
@@ -508,6 +600,7 @@ class Chunk{
           fixture
         });
       }
+    
     }
 
 
@@ -532,6 +625,7 @@ class Chunk{
     }
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
+    else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
 
     for(const hz of this.hazards){
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
@@ -723,6 +817,192 @@ class Chunk{
     }
   }
 
+  buildLevel0Set(level,lib,rng){
+    const g=this.group,cells=this.gridSize(),cell=level.cellSize;
+    const roomRng=new RNG(this.seedKey()^0x5d11f);
+    const lightRng=new RNG(this.seedKey()^0x6a11c);
+    const next=()=>lightRng.next();
+    const wallCells=new Set();
+    const addWall=(x,z)=>wallCells.add(x+","+z);
+
+    const addRoom=(cellX,cellZ,mask)=>{
+      const variant=roomRng.int(0,7);
+      const template=level0RoomRows(mask,variant),rotation=level0RotationForMask(mask);
+      const baseX=this.originX+cellX*cell,baseZ=this.originZ+cellZ*cell;
+      for(let z=0;z<16;z++){
+        const bits=template.rows[z]>>>0;
+        for(let x=0;x<16;x++){
+          if(!(bits&(1<<x)))continue;
+          const p=level0TransformBlock(x,z,rotation,16);
+          addWall(baseX+p.x,baseZ+p.z);
+        }
+      }
+    };
+
+    const addMacro=(type,baseX,baseZ)=>{
+      const template=LEVEL0_MEGA_TEMPLATES[type];
+      if(!template)return;
+      for(const [z,start,end] of template.runs||[]){
+        for(let x=start;x<=end;x++)addWall(baseX+x,baseZ+z);
+      }
+    };
+
+    if(this.zone==="mega"){
+      if(this.megaType===1||this.megaType===2){
+        // Four 48x48 placements exactly tile the 80x80 sector.
+        for(const ox of [0,32])for(const oz of [0,32])
+          addMacro(this.megaType,this.originX+ox,this.originZ+oz);
+      }
+    }else{
+      const blocked=new Set((this.macroBlockedCells||[]).map(r=>r.x+","+r.z));
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        if(blocked.has(x+","+z))continue;
+        addRoom(x,z,this.walls[this.index(x,z)]);
+      }
+      if(this.megaType>=3)addMacro(this.megaType,this.originX+16,this.originZ+16);
+    }
+
+    // Render only exposed surfaces of the union of wall blocks. This removes
+    // internal coplanar faces, which is both cheaper and immune to z-fighting.
+    const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
+    const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
+      const base=positions.length/3;
+      for(const v of verts){
+        positions.push(v[0],v[1],v[2]);
+        normals.push(nx,ny,nz);
+      }
+      uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
+      indices.push(base,base+1,base+2,base,base+2,base+3);
+    };
+
+    const has=(x,z)=>wallCells.has(x+","+z);
+    for(const key of wallCells){
+      const [x,z]=key.split(",").map(Number);
+      const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
+
+      if(!has(x,z-1)){
+        appendFace(
+          [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
+          0,0,-1,minX,0,maxX,h
+        );
+
+      }
+
+      if(!has(x,z+1)){
+        appendFace(
+          [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
+          0,0,1,minX,0,maxX,h
+        );
+
+      }
+
+      if(!has(x-1,z)){
+        appendFace(
+          [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
+          -1,0,0,minZ,0,maxZ,h
+        );
+
+      }
+
+      if(!has(x+1,z)){
+        appendFace(
+          [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
+          1,0,0,minZ,0,maxZ,h
+        );
+      }
+
+      // wall_block is a solid Minecraft cube. Keep its caps so isolated
+      // columns/posts do not render as hollow or cross-shaped.
+      appendFace(
+        [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
+        0,-1,0,minX,0,maxX,1
+      );
+      appendFace(
+        [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
+        0,1,0,minX,0,maxX,1
+      );
+    }
+
+    const horizontal=new Map(),vertical=new Map();
+    for(const key of wallCells){
+      const cut=key.indexOf(",");
+      const x=Number(key.slice(0,cut)),z=Number(key.slice(cut+1));
+      if(!has(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
+      if(!has(x,z+1))level0AddBoundaryInterval(horizontal,z+1,x,x+1);
+      if(!has(x-1,z))level0AddBoundaryInterval(vertical,x,z,z+1);
+      if(!has(x+1,z))level0AddBoundaryInterval(vertical,x+1,z,z+1);
+    }
+    this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
+      .concat(level0MergeBoundaryIntervals(vertical,false));
+
+    if(positions.length){
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
+      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+      geometry.setIndex(indices);
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+
+      const mesh=new THREE.Mesh(geometry,lib.wall);
+      mesh.name="level0_walls";
+      mesh.frustumCulled=true;
+      g.add(mesh);
+      this.level0WallMesh=mesh;
+    }
+    // The source roof is an 8x8 block structure. roof1 has no light;
+    // roof2 replaces four ceiling blocks with one-block fluorescent lights.
+    const fixtureCandidates=[];
+    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
+      for(let tileX=0;tileX<this.world.size;tileX+=8){
+        const roof2=lightRng.next()<.2;
+        const rotated=lightRng.next()>=.5;
+        if(!roof2)continue;
+
+        for(const localZ of [1,5])for(const localX of [2,6]){
+          const lx=rotated?7-localZ:localX;
+          const lz=rotated?localX:localZ;
+          const px=this.originX+tileX+lx+.5;
+          const pz=this.originZ+tileZ+lz+.5;
+          const dx=px-this.game.player.position.x,dz=pz-this.game.player.position.z;
+          fixtureCandidates.push({px,pz,d:dx*dx+dz*dz});
+        }
+      }
+    }
+
+    fixtureCandidates.sort((a,b)=>a.d-b.d);
+
+    const maxFixtures=40;
+    let fixtureCount=0;
+    for(const candidate of fixtureCandidates){
+      if(fixtureCount>=maxFixtures)break;
+
+      const mat=lib.light.clone();
+      mat.emissiveIntensity=1.55+next()*.4;
+      const fixture=box(
+        g,
+        new THREE.BoxGeometry(.92,.08,.92),
+        mat,
+        candidate.px,level.wallHeight-.015,candidate.pz,
+        0,0,0
+      );
+      fixture.userData.light=true;
+      fixture.userData.baseEmissive=mat.emissiveIntensity;
+      this.fixtures.push(fixture);
+
+      const intensity=82+next()*18;
+      this.lightSources.push({
+        position:new THREE.Vector3(candidate.px,level.wallHeight-.25,candidate.pz),
+        color:0xffff78,
+        baseIntensity:intensity,
+        intensity,
+        distance:18,
+        decay:2,
+        fixture
+      });
+      fixtureCount++;
+    }
+  }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
