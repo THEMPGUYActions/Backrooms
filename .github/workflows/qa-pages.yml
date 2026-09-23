@@ -40,6 +40,7 @@ jobs:
         run: |
           test -s dist/index.html
           test -s dist/src/main.js
+          test -s dist/src/admin.js
           test -s dist/styles.css
           test -f dist/.nojekyll
 
