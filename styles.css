@@ -126,8 +126,16 @@ h2{font-size:clamp(26px,5vw,44px)}
 }
 .intro-audio-page{
   animation:intro-audio-sequence 1s ease 15.25s forwards;
-  pointer-events:auto;
+  pointer-events:none;
   touch-action:manipulation;
+}
+.intro-audio-page.intro-audio-active{
+  pointer-events:auto;
+}
+#audio-gate{
+  width:100%;height:100%;
+  display:grid;place-items:center;
+  pointer-events:auto;
 }
 .title-stack{
   display:flex;flex-direction:column;align-items:center;
