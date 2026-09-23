@@ -1,6 +1,6 @@
-import { BackroomsGame } from "./game.js?v=20260923-1930-1910";
+import { BackroomsGame } from "./game.js?v=20260923-1940";
 /* DEV_ADMIN_START */
-import { BackroomsAdmin } from "./admin.js?v=20260923-1930-1920";
+import { BackroomsAdmin } from "./admin.js?v=20260923-1940";
 /* DEV_ADMIN_END */
 
 const registerCache=async()=>{
