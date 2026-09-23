@@ -40,6 +40,8 @@ const SPB_FILES = [
   {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png"},
   {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png"},
   {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png"},
+  {name:"level0/pole.png",path:"src/main/resources/assets/spb-revamped/textures/block/pole.png"},
+  {name:"level0/plastic.png",path:"src/main/resources/assets/spb-revamped/textures/block/plastic.png"},
   {name:"level0/pbr/carpet/carpet_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_color.png"},
   {name:"level0/pbr/carpet/carpet_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_normal.png"},
   {name:"level0/pbr/ceiling_tile/ceiling_tile_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_color.png"},
