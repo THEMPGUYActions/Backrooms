@@ -99,8 +99,6 @@ self.addEventListener("message",event=>{
     "level0/pbr/carpet/carpet_normal.png",
     "level0/pbr/ceiling_tile/ceiling_tile_color.png",
     "level0/pbr/ceiling_tile/ceiling_tile_normal.png",
-    "level0/pole.png",
-    "level0/plastic.png"
   ];
   const audio=[
     "ambient_horror.ogg","electric_buzz.ogg",
