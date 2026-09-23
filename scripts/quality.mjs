@@ -326,6 +326,18 @@ async function checkSpacePotatoAssets(){
   }catch(e){fail("SpacePotato asset manifest invalid or missing: "+e.message)}
 }
 
+async function checkLevel0SourceBuild(){
+  const path=join(root,"dist","src","level0_source.generated.js");
+  try{
+    const source=await readFile(path,"utf8");
+    if(!source.includes("0c46c8301fc512c318ac93e23b669355b7d4b180"))fail("Level 0 generated source is not pinned to the expected SpacePotato commit");
+    const names=["aroom","broom","croom","droom","eroom"];
+    for(const prefix of names)for(let i=1;i<=8;i++)if(!source.includes("\""+prefix+"_"+i+"\""))fail("Level 0 generated source is missing "+prefix+"_"+i);
+    for(let i=1;i<=6;i++)if(!source.includes("\"megaroom"+i+"\""))fail("Level 0 generated source is missing megaroom"+i);
+    for(const name of ["roof1","roof2"])if(!source.includes("\""+name+"\""))fail("Level 0 generated source is missing "+name);
+  }catch(e){fail("Level 0 generated source missing or invalid: "+e.message)}
+}
+
 async function checkAudioAssets(){
   let lock;
   try{lock=JSON.parse(await readFile(join(root,"data/audio-assets-lock.json"),"utf8"))}catch(e){fail("data/audio-assets-lock.json is missing or invalid: "+e.message);return}
@@ -444,6 +456,7 @@ await checkData();
 await checkBuildIfPresent();
 await checkAssetSources();
 await checkSpacePotatoAssets();
+await checkLevel0SourceBuild();
 await checkAudioAssets();
 await checkWorkflow();
 
