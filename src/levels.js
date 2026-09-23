@@ -21,9 +21,9 @@ export const LEVELS = {
       light: 0xffcf42,
       ambient: 0x0a0804
     },
-    gridSize: 5,
-    cellSize: 16,
-    wallHeight: 7.0,
+    gridSize: 10,
+    cellSize: 8.0,
+    wallHeight: 6.0,
     darkness: 0.075,
     holeChance: 0.010,
     pipeChance: 0,
