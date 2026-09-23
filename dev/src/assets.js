@@ -15,8 +15,10 @@ export const LEVEL1_ASSET_SOURCES = Object.freeze({
 });
 
 export const LEVEL0_ASSET_SOURCES = Object.freeze({
-  wall: LOCAL_SPB_ASSET_BASE + "level0/wall_block_2_texture.png",
-  wallBottom: LOCAL_SPB_ASSET_BASE + "level0/wall_block_2.png",
+  // Most Level 0 source structures use the normal wall_block. wall_block_2
+  // (Manila wallpaper) is only used by the separate megaroom4 structure.
+  wall: LOCAL_SPB_ASSET_BASE + "level0/wall_block.png",
+  wallBottom: LOCAL_SPB_ASSET_BASE + "level0/wallpaper_bottom_block_texture.png",
   floor: {
     color: LOCAL_SPB_ASSET_BASE + "level0/pbr/carpet/carpet_color.png",
     normal: LOCAL_SPB_ASSET_BASE + "level0/pbr/carpet/carpet_normal.png"

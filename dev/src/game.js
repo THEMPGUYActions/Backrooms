@@ -862,6 +862,7 @@ class Chunk{
     // Render only exposed surfaces of the union of wall blocks. This removes
     // internal coplanar faces, which is both cheaper and immune to z-fighting.
     const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
+    const wallTileSize=1.0;
     const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
       const base=positions.length/3;
       for(const v of verts){
@@ -883,7 +884,7 @@ class Chunk{
       if(!has(x,z-1)){
         appendFace(
           [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
-          0,0,-1,0,0,1,h
+          0,0,-1,0,0,1,h/wallTileSize
         );
         pushBottomH((minX+maxX)/2,minZ);
 
@@ -892,7 +893,7 @@ class Chunk{
       if(!has(x,z+1)){
         appendFace(
           [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
-          0,0,1,0,0,1,h
+          0,0,1,0,0,1,h/wallTileSize
         );
         pushBottomH((minX+maxX)/2,maxZ);
 
@@ -901,7 +902,7 @@ class Chunk{
       if(!has(x-1,z)){
         appendFace(
           [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
-          -1,0,0,0,0,1,h
+          -1,0,0,0,0,1,h/wallTileSize
         );
         pushBottomV(minX,(minZ+maxZ)/2);
 
@@ -910,7 +911,7 @@ class Chunk{
       if(!has(x+1,z)){
         appendFace(
           [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
-          1,0,0,0,0,1,h
+          1,0,0,0,0,1,h/wallTileSize
         );
         pushBottomV(maxX,(minZ+maxZ)/2);
       }
@@ -994,6 +995,29 @@ class Chunk{
         const rotated=lightRng.next()>=.5;
         if(!roof2)continue;
 
+        // Source Level0ChunkGenerator skips a roof structure whenever the
+        // 18Y probe contains cyan wool. Cyan wool is the structure marker used
+        // by the large Level 0 rooms. Recreate that exclusion from the same
+        // footprints instead of putting lights through macro-room ceilings.
+        const sourceTileX=tileX,sourceTileZ=tileZ;
+        const inMacro=(type)=>{
+          const t=LEVEL0_MEGA_TEMPLATES[type];
+          if(!t)return false;
+          const bx=type>=3?16:0,bz=type>=3?16:0;
+          const span=t.size||0;
+          return sourceTileX>=bx&&sourceTileX<bx+span&&sourceTileZ>=bz&&sourceTileZ<bz+span;
+        };
+        const inMacro2=()=>{
+          // megaroom2 is placed four times at 0/32, so its cyan floor marker
+          // covers the full 80x80 sector after the overlapping placements.
+          return sourceTileX>=0&&sourceTileX<this.world.size&&sourceTileZ>=0&&sourceTileZ<this.world.size;
+        };
+        if(
+          (this.megaType===2&&inMacro2()) ||
+          ((this.megaType===3||this.megaType===4||this.megaType===5)&&inMacro(this.megaType)) ||
+          (this.megaType===6&&sourceTileX>=16&&sourceTileX<32&&sourceTileZ>=16&&sourceTileZ<32)
+        )continue;
+
         for(const localZ of [1,5])for(const localX of [2,6]){
           const lx=rotated?7-localZ:localX;
           const lz=rotated?localX:localZ;
@@ -1013,26 +1037,33 @@ class Chunk{
       if(fixtureCount>=maxFixtures)break;
 
       const mat=lib.light.clone();
-      mat.emissiveIntensity=1.20+next()*.22;
+      // The source fluorescent block is a full 1x1 ceiling block rendered
+      // full-bright while ON. Keep its web equivalent at a stable source-like
+      // emissive level instead of overdriving it.
+      mat.emissiveIntensity=1.0;
       const fixture=box(
         g,
-        new THREE.BoxGeometry(1.0,.06,1.0),
+        // Source fluorescent_light occupies a complete 1x1x1 block and is
+        // rendered as the same fluorescent texture on all six faces.
+        new THREE.BoxGeometry(1.0,1.0,1.0),
         mat,
-        candidate.px,level.wallHeight-.025,candidate.pz,
+        candidate.px,level.wallHeight+.5,candidate.pz,
         0,0,0
       );
       fixture.userData.light=true;
       fixture.userData.baseEmissive=mat.emissiveIntensity;
       this.fixtures.push(fixture);
 
-      const intensity=10.0+next()*2.0;
+      // Source value: radius 13, brightness 1.0, RGB (255,240,100), with
+      // the light positioned one block below the ceiling tile center.
+      const intensity=1.0;
       this.lightSources.push({
         position:new THREE.Vector3(candidate.px,level.wallHeight-.5,candidate.pz),
         color:0xfff064,
         baseIntensity:intensity,
         intensity,
         distance:13,
-        decay:2,
+        decay:1,
         fixture
       });
       fixtureCount++;
@@ -1599,6 +1630,38 @@ class WorldStreamer{
     out.sort((a,b)=>a.score-b.score);
     return out;
   }
+  flashlightWallDistance(x,z,dx,dz,maxDistance=2.5){
+    if(this.game.level.id!=="0")return Infinity;
+    const offset=32;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    let best=Infinity;
+    const rayX=dx,rayZ=dz;
+    const checkSegment=(s)=>{
+      const x1=s.x1,x2=s.x2,z1=s.z1,z2=s.z2;
+      const eps=1e-6;
+      if(Math.abs(x2-x1)<eps){
+        if(Math.abs(rayX)<eps)return;
+        const t=(x1-x)/rayX;
+        if(t<0||t>maxDistance||t>=best)return;
+        const hitZ=z+t*rayZ;
+        const lo=Math.min(z1,z2)-.03,hi=Math.max(z1,z2)+.03;
+        if(hitZ>=lo&&hitZ<=hi)best=t;
+      }else if(Math.abs(rayZ)>=eps){
+        const t=(z1-z)/rayZ;
+        if(t<0||t>maxDistance||t>=best)return;
+        const hitX=x+t*rayX;
+        const lo=Math.min(x1,x2)-.03,hi=Math.max(x1,x2)+.03;
+        if(hitX>=lo&&hitX<=hi)best=t;
+      }
+    };
+    for(let dzc=-1;dzc<=1;dzc++)for(let dxc=-1;dxc<=1;dxc++){
+      const chunk=this.chunks.get(this.key(cx+dxc,cz+dzc));
+      if(!chunk?.collisionSegments?.length)continue;
+      for(const segment of chunk.collisionSegments)checkSegment(segment);
+    }
+    return best;
+  }
+
   entitySpawns(){
     const out=[];
     for(const c of this.chunks.values()){
@@ -1695,15 +1758,26 @@ class Player{
     const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.16);
     this.game.flash.position.copy(flashOrigin);
     this.game.flashFill.position.copy(flashOrigin);
-    this.game.flash.intensity=this.flashlight?(1.55+beamPower*3.05):0;
+    // The source mod's deferred AreaLights do not have Three.js's inverse-
+    // square point-light hotspot. Suppress only the very-near-wall case so a
+    // wall cannot turn the center of the screen into a white disc.
+    const wallDistance=this.game.level.id==="0"
+      ? this.game.world.flashlightWallDistance(this.game.camera.position.x,this.game.camera.position.z,flashForward.x,flashForward.z,2.5)
+      : Infinity;
+    const wallT=wallDistance<Infinity?Math.max(0,Math.min(1,(wallDistance-.34)/.96)):1;
+    const nearWallScale=.16+.84*wallT*wallT;
+    this.game.flash.intensity=this.flashlight?(1.15+beamPower*1.85)*nearWallScale:0;
     this.game.flash.distance=25;
     this.game.flash.angle=.25;
     this.game.flash.penumbra=.88;
-    this.game.flash.decay=2;
-    this.game.flashFill.intensity=this.flashlight?(.18+beamPower*.48):0;
+    this.game.flash.decay=1;
+    this.game.flashFill.intensity=this.flashlight?(.10+beamPower*.22)*nearWallScale:0;
     this.game.flashFill.distance=25;
-    this.game.flashFill.decay=2;
+    this.game.flashFill.angle=.75;
+    this.game.flashFill.penumbra=1;
+    this.game.flashFill.decay=1;
     this.game.flashTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
+    this.game.flashFillTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
     this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance);
   }
 }
@@ -1860,7 +1934,7 @@ export class BackroomsGame{
     this.localLights=[];
     const localLightCount=this.level.id==="0"?(isTouchControlsDevice()?8:14):(isTouchControlsDevice()?14:24);
     for(let i=0;i<localLightCount;i++){
-      const light=new THREE.PointLight(0xfff064,0,13,2);
+      const light=new THREE.PointLight(0xfff064,0,13,1);
       light.name="dynamic_fluorescent_"+i;
       light.visible=true;
       this.localLights.push(light);
@@ -1871,12 +1945,17 @@ export class BackroomsGame{
     // the scene.
     this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.020);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();
-    this.flash=new THREE.SpotLight(0xfff1d5,0,25,.25,.88,2);
-    this.flashFill=new THREE.PointLight(0xfff1d5,0,25,2);
+    this.flashFillTarget=new THREE.Object3D();
+    // SpacePotato uses two deferred AreaLights for the flashlight: one broad
+    // wash and one 0.25-radian directional beam. Two spotlights are the closest
+    // portable WebGL equivalent without introducing a screen-space light decal.
+    this.flash=new THREE.SpotLight(0xfff1d5,0,25,.25,.88,1);
+    this.flashFill=new THREE.SpotLight(0xfff1d5,0,25,.75,1,1);
     this.flash.castShadow=false;
     this.flashFill.castShadow=false;
     this.flash.target=this.flashTarget;
-    this.scene.add(this.flash,this.flashFill,this.flashTarget);
+    this.flashFill.target=this.flashFillTarget;
+    this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
