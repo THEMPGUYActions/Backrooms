@@ -1867,32 +1867,47 @@ class Player{
     const batteryPower=Math.max(0,this.flashBattery/100);
     const beamPower=Math.pow(batteryPower,.72);
     const flashForward=new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion).normalize();
-    // Keep the light source slightly behind the camera. When the camera is
-    // pressed against a wall, placing the source inside the surface creates
-    // a saturated center hotspot instead of a natural flashlight wash.
-    const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.16);
+    // Keep the source slightly behind the camera so a wall can never contain
+    // the light origin. This matters most when the player is inches from a wall.
+    const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.22);
     this.game.flash.position.copy(flashOrigin);
     this.game.flashFill.position.copy(flashOrigin);
-    // The source mod's deferred AreaLights do not have Three.js's inverse-
-    // square point-light hotspot. Suppress only the very-near-wall case so a
-    // wall cannot turn the center of the screen into a white disc.
+
     const wallDistance=this.game.level.id==="0"
-      ? this.game.world.flashlightWallDistance(this.game.camera.position.x,this.game.camera.position.z,flashForward.x,flashForward.z,2.5)
+      ? this.game.world.flashlightWallDistance(
+          this.game.camera.position.x,
+          this.game.camera.position.z,
+          flashForward.x,
+          flashForward.z,
+          2.5
+        )
       : Infinity;
-    const wallT=wallDistance<Infinity?Math.max(0,Math.min(1,(wallDistance-.34)/.96)):1;
-    const nearWallScale=.16+.84*wallT*wallT;
-    this.game.flash.intensity=this.flashlight?(1.15+beamPower*1.85)*nearWallScale:0;
+    const wallFade=wallDistance<Infinity
+      ? THREE.MathUtils.smoothstep(wallDistance,.18,1.25)
+      : 1;
+    // Do not crush the whole beam beside a wall. Instead, reduce only the
+    // concentrated component while leaving a soft wash, matching the source
+    // AreaLight look without producing a saturated circular hotspot.
+    const washScale=.72+.28*wallFade;
+    const beamScale=.32+.68*wallFade;
+
     this.game.flash.distance=25;
-    this.game.flash.angle=.25;
-    this.game.flash.penumbra=.88;
-    this.game.flash.decay=1;
-    this.game.flashFill.intensity=this.flashlight?(.10+beamPower*.22)*nearWallScale:0;
+    this.game.flash.decay=2;
+    this.game.flash.intensity=this.flashlight
+      ? (.48+beamPower*.72)*washScale
+      : 0;
+
     this.game.flashFill.distance=25;
-    this.game.flashFill.angle=.75;
-    this.game.flashFill.penumbra=1;
-    this.game.flashFill.decay=1;
-    this.game.flashTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
-    this.game.flashFillTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
+    this.game.flashFill.angle=.25;
+    this.game.flashFill.penumbra=.94;
+    this.game.flashFill.decay=2;
+    this.game.flashFill.intensity=this.flashlight
+      ? (.22+beamPower*.78)*beamScale
+      : 0;
+
+    this.game.flashFillTarget.position.copy(this.game.camera.position)
+      .addScaledVector(flashForward,2.0);
+
     this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance);
   }
 }
@@ -2064,11 +2079,13 @@ export class BackroomsGame{
     // SpacePotato uses two deferred AreaLights for the flashlight: one broad
     // wash and one 0.25-radian directional beam. Two spotlights are the closest
     // portable WebGL equivalent without introducing a screen-space light decal.
-    this.flash=new THREE.SpotLight(0xfff1d5,0,25,.25,.88,1);
-    this.flashFill=new THREE.SpotLight(0xfff1d5,0,25,.75,1,1);
+    // Source uses two deferred AreaLights: one broad wash plus one
+    // 0.25-radian directional beam. A Three.js point light is a closer visual
+    // match for the broad component than another concentrated spotlight.
+    this.flash=new THREE.PointLight(0xfff1d5,0,25,2);
+    this.flashFill=new THREE.SpotLight(0xfff1d5,0,25,.25,.94,2);
     this.flash.castShadow=false;
     this.flashFill.castShadow=false;
-    this.flash.target=this.flashTarget;
     this.flashFill.target=this.flashFillTarget;
     this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
