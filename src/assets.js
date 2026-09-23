@@ -104,6 +104,7 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
 }
 
 export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
+  if(level.id==="1")return false;
   const source=level.id==="0"
     ? {wall:BACKROOMS_PBR_SOURCES.wallpaper,floor:BACKROOMS_PBR_SOURCES.carpet}
     : {wall:BACKROOMS_PBR_SOURCES.paintedWall,floor:BACKROOMS_PBR_SOURCES.carpet};
@@ -186,6 +187,8 @@ export async function applySpacePotatoLevel1Assets(library,level,onProgress=()=>
   const maps=[
     [library.floor,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete floor"],
     [library.floor,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete floor normal"],
+    [library.ceiling,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete ceiling"],
+    [library.ceiling,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete ceiling normal"],
     [library.concrete,"map",SPACEPOTATO_LEVEL1_SOURCES.concreteColor,true,3.2,.18,"Concrete walls"],
     [library.concrete,"normalMap",SPACEPOTATO_LEVEL1_SOURCES.concreteNormal,false,3.2,.22,"Concrete wall normal"],
     [library.maintenanceWall,"map",SPACEPOTATO_LEVEL1_SOURCES.brickColor,true,2.4,.20,"White brick corridors"],
@@ -223,13 +226,13 @@ export function disposeLibrary(library){
 }
 
 export function makeLibrary(level){
-  const ceiling=createPBRMaterial({base:level.theme.ceiling,seed:89+Number(level.id),rough:.9,scale:2,normalStrength:.24});
+  const ceiling=createPBRMaterial({base:level.id==="1"?0x767976:level.theme.ceiling,seed:89+Number(level.id),rough:level.id==="1"?.97:.9,scale:level.id==="1"?4:2,normalStrength:level.id==="1"?.22:.24});
   ceiling.side=THREE.FrontSide;
   ceiling.color.setHex(level.theme.ceiling);
-  ceiling.emissive=new THREE.Color(level.id==="0"?0x776621:0x5a5850);
-  ceiling.emissiveIntensity=level.id==="0"?.055:.028;
+  ceiling.emissive=new THREE.Color(level.id==="0"?0x776621:0x252725);
+  ceiling.emissiveIntensity=level.id==="0"?.055:level.id==="1"?0:.028;
   return {
-    floor:createPBRMaterial({base:level.id==="1"?0x676963:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
+    floor:createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:3.8,normalStrength:.35}),
     concrete:createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
     maintenanceWall:createPBRMaterial({base:0xe4e3dc,seed:117+Number(level.id),rough:.9,scale:2.4,normalStrength:.28}),
