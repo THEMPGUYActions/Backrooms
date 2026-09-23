@@ -179,48 +179,29 @@ class Chunk{
     this.walls.fill(15);this.rooms=[];
 
     if(level.id==="1"){
-      // Mirrors the reference mod's Level 1 layout model:
-      // 10x10 cells at 8 blocks each, a world-space Perlin-like split between
-      // giant Halls and tighter maze Corridors, plus occasional 3x3 rooms.
+      // SpacePotato's Level 1 uses two real generation paths:
+      // a 10x10 DFS maze and a Perlin-selected large parking-garage room.
+      // There is no separate procedural "hall/corridor" generator.
+      const forceStart=this.cx===0&&this.cz===0;
       const worldX=this.cx*cells*level.cellSize;
       const worldZ=this.cz*cells*level.cellSize;
-      const macro=smoothNoise2D(worldX*.002,worldZ*.002,this.game.seed^0x51a3);
-      const noise=macro-.5;
-      const forceStart=this.cx===0&&this.cz===0;
-      const hall=forceStart||noise>.0;
-      this.zone=hall?"halls":"corridors";
+      const macro=smoothNoise2D(worldX*.002,worldZ*.002,this.game.seed);
+      this.zone=(!forceStart&&macro>.5)?"mega":"maze";
 
-      if(hall){
+      if(this.zone==="mega"){
+        // Reference megaroom sectors are open concrete garage space.
         this.walls.fill(0);
-        for(let z=0;z<cells;z++){this.walls[this.index(0,z)]|=8;this.walls[this.index(cells-1,z)]|=2}
-        for(let x=0;x<cells;x++){this.walls[this.index(x,0)]|=1;this.walls[this.index(x,cells-1)]|=4}
-
-        // Large open warehouse / parking-lot sectors. Partitions are sparse,
-        // with long sightlines and only a couple of openings, like the reference.
-        const partitions=rng.int(0,2);
-        for(let i=0;i<partitions;i++){
-          const vertical=rng.next()<.5;
-          if(vertical){
-            const x=rng.int(2,cells-3),gap=rng.int(2,cells-3);
-            for(let z=1;z<cells-1;z++)if(Math.abs(z-gap)>1)this.setEdge(x,z,"east",false);
-          }else{
-            const z=rng.int(2,cells-3),gap=rng.int(2,cells-3);
-            for(let x=1;x<cells-1;x++)if(Math.abs(x-gap)>1)this.setEdge(x,z,"south",false);
-          }
+        for(let z=0;z<cells;z++){
+          this.walls[this.index(0,z)]|=8;
+          this.walls[this.index(cells-1,z)]|=2;
         }
-
-        // Keep neighboring Hall sectors connected through several wide openings.
-        for(let x=0;x<cells;x+=2){
-          if(canonicalOpen(this.game.seed,this.cx*cells+x,this.cz*cells,"h",.16))this.setEdge(x,0,"north",true);
-          if(canonicalOpen(this.game.seed,this.cx*cells+x,this.cz*cells+cells,"h",.16))this.setEdge(x,cells-1,"south",true);
-        }
-        for(let z=1;z<cells;z+=2){
-          if(canonicalOpen(this.game.seed,this.cx*cells,this.cz*cells+z,"v",.16))this.setEdge(0,z,"west",true);
-          if(canonicalOpen(this.game.seed,this.cx*cells+cells,this.cz*cells+z,"v",.16))this.setEdge(cells-1,z,"east",true);
+        for(let x=0;x<cells;x++){
+          this.walls[this.index(x,0)]|=1;
+          this.walls[this.index(x,cells-1)]|=4;
         }
       }else{
-        // SpacePotato's Level1MazeGenerator is a randomized depth-first maze
-        // over a 10x10 grid with 8-block cells. Keep that topology here.
+        // Exact Level1MazeGenerator topology: randomized DFS over 10x10
+        // cells, starting at [0,0], with no extra loop carving.
         const visited=new Uint8Array(cells*cells);
         const stack=[[0,0]];
         visited[this.index(0,0)]=1;
@@ -239,50 +220,37 @@ class Chunk{
           stack.push([nx,nz]);
         }
 
-        // A few loops prevent the corridors from feeling like a perfect tree.
-        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.045)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.045)this.setEdge(x,z,"south",true);
-        }
+        // The reference connects neighboring 10x10 maze sectors with a
+        // deterministic alternating perimeter pattern.
+        for(let i=0;i<cells;i+=2)this.walls[this.index(i,0)]&=~1;
+        for(let i=1;i<cells;i+=2)this.walls[this.index(cells-1,i)]&=~2;
+        for(let i=cells-2;i>=0;i-=2)this.walls[this.index(i,cells-1)]&=~4;
+        for(let i=cells-1;i>=0;i-=2)this.walls[this.index(0,i)]&=~8;
 
-        // Reference mod occasionally places a 3x3 structure in the maze.
-        const roomCount=rng.next()<.88?1:0;
-        for(let i=0;i<roomCount;i++){
+        // Level1MazeGenerator.spawnRandomRooms(): one 3x3 special area,
+        // with storage being uncommon and the pillars structure otherwise.
+        if(rng.next()<.88){
           let room=null;
           for(let attempt=0;attempt<18&&!room;attempt++){
-            const w=3,h=3,x=rng.int(1,cells-w-1),z=rng.int(1,cells-h-1);
-            const candidate={x,z,w,h,type:rng.next()<.125?"storage":rng.pick(["office","utility","infirmary","rubber"])};
-            const overlap=this.rooms.some(other=>candidate.x<other.x+other.w+1&&candidate.x+candidate.w+1>other.x&&candidate.z<other.z+other.h+1&&candidate.z+candidate.h+1>other.z);
-            if(!overlap)room=candidate;
+            const x=rng.int(1,cells-4),z=rng.int(1,cells-4);
+            const candidate={x,z,w:3,h:3,type:rng.next()<1/9?"storage":"pillars"};
+            if(!this.rooms.some(other=>candidate.x<other.x+other.w+1&&candidate.x+candidate.w+1>other.x&&candidate.z<other.z+other.h+1&&candidate.z+candidate.h+1>other.z))room=candidate;
           }
-          if(!room)continue;
-          for(let rz=room.z;rz<room.z+room.h;rz++)for(let rx=room.x;rx<room.x+room.w;rx++){
-            if(rx<room.x+room.w-1)this.setEdge(rx,rz,"east",true);
-            if(rz<room.z+room.h-1)this.setEdge(rx,rz,"south",true);
+          if(room){
+            for(let rz=room.z;rz<room.z+room.h;rz++)for(let rx=room.x;rx<room.x+room.w;rx++){
+              if(rx<room.x+room.w-1)this.setEdge(rx,rz,"east",true);
+              if(rz<room.z+room.h-1)this.setEdge(rx,rz,"south",true);
+            }
+            const side=rng.int(0,3);
+            if(side===0){room.entry={side:"north",x:room.x+rng.int(0,room.w-1),z:room.z};this.setEdge(room.entry.x,room.entry.z,"north",true)}
+            else if(side===1){room.entry={side:"east",x:room.x+room.w-1,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"east",true)}
+            else if(side===2){room.entry={side:"south",x:room.x+rng.int(0,room.w-1),z:room.z+room.h-1};this.setEdge(room.entry.x,room.entry.z,"south",true)}
+            else{room.entry={side:"west",x:room.x,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"west",true)}
+            this.rooms.push(room);
           }
-          const side=rng.int(0,3);
-          if(side===0){room.entry={side:"north",x:room.x+rng.int(0,room.w-1),z:room.z};this.setEdge(room.entry.x,room.entry.z,"north",true)}
-          else if(side===1){room.entry={side:"east",x:room.x+room.w-1,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"east",true)}
-          else if(side===2){room.entry={side:"south",x:room.x+rng.int(0,room.w-1),z:room.z+room.h-1};this.setEdge(room.entry.x,room.entry.z,"south",true)}
-          else{room.entry={side:"west",x:room.x,z:room.z+rng.int(0,room.h-1)};this.setEdge(room.entry.x,room.entry.z,"west",true)}
-          this.rooms.push(room);
         }
       }
-
-      // Match the reference mod's roughly 400-block generation sectors and
-      // put the stairwell/exit family well away from spawn.
-      if(cells>=5){
-        if((this.cx+this.cz)%2===0)this.setEdge(2,0,"north",true);
-        if((this.cx-this.cz)%2===0)this.setEdge(2,cells-1,"south",true);
-        if(this.cz%2===0)this.setEdge(0,2,"west",true);
-        if(this.cx%2===0)this.setEdge(cells-1,2,"east",true);
-      }
-      if(forceStart){
-        this.setEdge(2,2,"north",true);
-        this.setEdge(2,2,"east",true);
-        this.setEdge(2,2,"south",true);
-        this.setEdge(2,2,"west",true);
-      }
+    }
     }else if(level.id==="0"){
       const mega=this.cx===0&&this.cz===0||cycleHash(this.game.seed,this.cx,this.cz,77)<.38;
       if(mega){
@@ -341,16 +309,18 @@ class Chunk{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x<cells-1&&rng.next()<loopChance)this.setEdge(x,z,"east",true);if(z<cells-1&&rng.next()<loopChance*.82)this.setEdge(x,z,"south",true)}
     }
 
-    const boundaryChance=level.id==="1"?(this.zone==="halls"?.12:.07):.19;
-    for(let x=0;x<cells;x++){
-      const gx=this.cx*cells+x;
-      if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h",boundaryChance))this.setEdge(x,0,"north",true);
-      if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",boundaryChance))this.setEdge(x,cells-1,"south",true);
-    }
-    for(let z=0;z<cells;z++){
-      const gz=this.cz*cells+z;
-      if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v",boundaryChance))this.setEdge(0,z,"west",true);
-      if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",boundaryChance))this.setEdge(cells-1,z,"east",true);
+    if(level.id!=="1"){
+      const boundaryChance=.19;
+      for(let x=0;x<cells;x++){
+        const gx=this.cx*cells+x;
+        if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h",boundaryChance))this.setEdge(x,0,"north",true);
+        if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",boundaryChance))this.setEdge(x,cells-1,"south",true);
+      }
+      for(let z=0;z<cells;z++){
+        const gz=this.cz*cells+z;
+        if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v",boundaryChance))this.setEdge(0,z,"west",true);
+        if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",boundaryChance))this.setEdge(cells-1,z,"east",true);
+      }
     }
 
     const rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
@@ -359,7 +329,7 @@ class Chunk{
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
-    const level1ExitSector=level.id==="1"&&this.cx%5===0&&this.cz%5===0;
+    const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0));
     if((level.id==="1"?level1ExitSector:chunkDistance>=level.exitAfterChunks)&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
@@ -390,7 +360,7 @@ class Chunk{
     const trimHGeom=new THREE.BoxGeometry(cell,.11,.12),trimVGeom=new THREE.BoxGeometry(.12,.11,cell);
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
     const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
-    const wallMaterial=level.id==="1"?(this.zone==="corridors"?lib.maintenanceWall:lib.concrete):lib.wall;
+    const wallMaterial=level.id==="1"?(this.zone==="maze"?lib.maintenanceWall:lib.concrete):lib.wall;
     const seenH=new Set(),seenV=new Set();
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
@@ -642,130 +612,132 @@ class Chunk{
   }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
-    const cellPos=(x,z)=>({x:this.originX+x*cell+cell/2,z:this.originZ+z*cell+cell/2});
-    const randomCell=()=>cellPos(rng.int(1,Math.max(1,cells-2)),rng.int(1,Math.max(1,cells-2)));
+    const cellPos=(x,z)=>({
+      x:this.originX+x*cell+cell/2,
+      z:this.originZ+z*cell+cell/2
+    });
 
-    const addLight=(x,z,rotation=0,scale=1,baseIntensity=this.zone==="halls"?150:105)=>{
-      const fixture=box(g,new THREE.BoxGeometry(3.15*scale,.055,.44*scale),lib.level1Light,x,level.wallHeight-.14,z,0,rotation,0);
-      fixture.userData.light=true;fixture.userData.baseEmissive=2.4;this.fixtures.push(fixture);
-      this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xf0f0e8,baseIntensity,intensity:baseIntensity,distance:this.zone==="halls"?34:24,decay:2,fixture});
+    const addLight=(x,z,rotation=0,scale=1,intensity=this.zone==="mega"?145:100)=>{
+      const fixture=box(
+        g,
+        new THREE.BoxGeometry(3.15*scale,.055,.44*scale),
+        lib.level1Light,
+        x,
+        level.wallHeight-.14,
+        z,
+        0,
+        rotation,
+        0
+      );
+      fixture.userData.light=true;
+      fixture.userData.baseEmissive=2.4;
+      this.fixtures.push(fixture);
+      this.lightSources.push({
+        position:new THREE.Vector3(x,level.wallHeight-.28,z),
+        color:level.theme.light,
+        baseIntensity:intensity,
+        intensity,
+        distance:this.zone==="mega"?38:25,
+        decay:2,
+        fixture
+      });
       return fixture;
     };
 
+    // The reference start sector contains a stairwell structure. Keep the
+    // readable stair geometry here rather than dropping back to Level 0's roof.
     if(this.cx===0&&this.cz===0){
       const sx=2.8,sz=7.2,stepW=3.2,stepD=.48,stepH=.17;
-      for(let i=0;i<7;i++){
+      for(let i=0;i<8;i++){
         box(g,new THREE.BoxGeometry(stepW,stepH*(i+1),stepD),lib.stairs,sx,stepH*(i+.5),sz-i*stepD);
       }
       for(const side of [-1,1]){
-        const rail=box(g,new THREE.BoxGeometry(.07,1.3,3.6),lib.metal,sx+side*1.82,.67,sz-1.45,0,0,side*.02);
+        const rail=box(g,new THREE.BoxGeometry(.07,1.3,3.9),lib.metal,sx+side*1.82,.67,sz-1.55,0,0,side*.02);
         rail.rotation.x=side*.035;
       }
     }
 
-    if(this.zone==="halls"){
-      for(let i=0;i<3+rng.int(2,7);i++){
-        const p=randomCell();
-        box(g,new THREE.BoxGeometry(.95,level.wallHeight,.95),lib.concrete,p.x,level.wallHeight/2,p.z);
-        box(g,new THREE.BoxGeometry(1.16,.10,1.16),lib.metal,p.x,.54,p.z);
-        for(const side of [[.50,.0,.08,1.0],[0,.50,1.0,.08],[-.50,0,.08,1.0],[0,-.50,1.0,.08]]){
-          if(rng.next()<.55)box(g,new THREE.BoxGeometry(side[2],.045,side[3]),lib.warningLine,p.x+side[0],.70,p.z+side[1]);
-        }
+    if(this.zone==="mega"){
+      // Large underground parking-garage sectors: concrete support columns,
+      // long fluorescent runs, sparse storage and road markings.
+      const columnXs=[12,28,44,60];
+      const columnZs=[12,28,44,60];
+      for(const x of columnXs)for(const z of columnZs){
+        if(rng()>.72)continue;
+        box(g,new THREE.BoxGeometry(.92,level.wallHeight,.92),lib.concrete,this.originX+x,level.wallHeight/2,this.originZ+z);
+        box(g,new THREE.BoxGeometry(1.14,.10,1.14),lib.metal,this.originX+x,.52,this.originZ+z);
       }
 
-      for(let i=0;i<4+rng.int(0,4);i++){
-        const p=randomCell();
-        addLight(p.x,p.z,rng.next()<.5?0:Math.PI/2,.90+rng.next()*.30);
+      for(let x=12;x<size-8;x+=16)for(let z=12;z<size-8;z+=16){
+        if(rng()>.88)continue;
+        addLight(this.originX+x,this.originZ+z,rng()<.5?0:Math.PI/2,.92+rng()*.18,145+rng()*25);
       }
 
-      for(let i=0;i<Math.max(2,Math.round(level.puddleChance*6));i++){
-        const p=randomCell();
-        const puddle=box(g,new THREE.CircleGeometry(.75+rng.next()*1.6,18),lib.water,p.x,.016,p.z,-Math.PI/2);
-        puddle.scale.y=.45+rng.next()*.60;
+      // Concrete service beams and pipes overhead are sparse, not the dense
+      // Level 0 ceiling pattern.
+      for(let i=0;i<2;i++){
+        const beam=box(
+          g,
+          new THREE.BoxGeometry(size*.78,.13,.16),
+          lib.metal,
+          this.originX+size*.5,
+          level.wallHeight-.18-i*.16,
+          this.originZ+size*(.31+i*.38)
+        );
+        beam.rotation.y=rng()<.5?0:Math.PI/2;
       }
 
-      if(rng.next()<.82){
-        const beamY=level.wallHeight-.17;
-        for(let i=0;i<3;i++){
-          const beam=box(g,new THREE.BoxGeometry(size*.88,.12,.16),lib.metal,
-            this.originX+size*.5,beamY+i*.16,this.originZ+size*(.27+i*.23),0,0,0);
-          beam.rotation.y=rng.next()<.5?0:Math.PI/2;
-        }
+      if(rng()<.46){
+        const pipe=new THREE.Mesh(
+          new THREE.CylinderGeometry(.075,.075,size*.72,10),
+          lib.metal
+        );
+        pipe.rotation.z=Math.PI/2;
+        pipe.position.set(this.originX+size*.5,level.wallHeight-.48,this.originZ+size*.64);
+        g.add(pipe);
       }
 
-      if(rng.next()<.70){
-        const y=level.wallHeight-.35;
-        for(let i=0;i<2;i++){
-          const horizontal=rng.next()<.5;
-          const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.07+i*.025,.07+i*.025,size*.76,10),lib.metal);
-          pipe.rotation.z=horizontal?Math.PI/2:0;
-          pipe.position.set(this.originX+size*.50,y+i*.16,this.originZ+size*(horizontal?.50:.58));
-          g.add(pipe);
-        }
-      }
-
-      const crates=rng.next()<level.crateChance?1+rng.int(0,2):0;
-      for(let i=0;i<crates;i++){
-        const p=randomCell();
+      for(let i=0;i<1+rng.int(0,2);i++){
+        if(rng()<.22)continue;
+        const p=cellPos(rng.int(1,cells-2),rng.int(1,cells-2));
         const crate=box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
         box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
         box(g,new THREE.BoxGeometry(.055,.84,.055),lib.metal,p.x-.32,.4,p.z);
         this.crates.push({group:crate,unseen:0});
       }
 
-      if(rng.next()<.32){
-        for(let i=0;i<3;i++){
-          const x=this.originX+size*(.18+i*.27);
-          box(g,new THREE.BoxGeometry(.035,.01,size*.62),lib.parkingLine,x,.008,this.originZ+size*.50);
-        }
-      }
-
-      if(rng.next()<.30){
-        const stepW=2.8,stepD=.46,stepH=.16;
-        const baseX=this.originX+size*.72,baseZ=this.originZ+size*.18;
-        for(let i=0;i<6;i++)box(g,new THREE.BoxGeometry(stepW,stepH*(i+1),stepD),lib.stairs,baseX,stepH*(i+.5),baseZ+i*stepD);
-        box(g,new THREE.BoxGeometry(.07,1.2,3.0),lib.metal,baseX-stepW*.54,.6,baseZ+1.15,0,0,.08);
-        box(g,new THREE.BoxGeometry(.07,1.2,3.0),lib.metal,baseX+stepW*.54,.6,baseZ+1.15,0,0,.08);
+      if(rng()<.55){
+        const lane=this.originX+size*(.27+rng()*.46);
+        box(g,new THREE.BoxGeometry(.045,.012,size*.66),lib.parkingLine,lane,.008,this.originZ+size*.5);
       }
     }else{
-      for(const [index,room] of this.rooms.entries()){
-        const cx=this.originX+(room.x+room.w*.5)*cell,cz=this.originZ+(room.z+room.h*.5)*cell;
-        addLight(cx,cz,room.w>=room.h?0:Math.PI/2,.62,95);
+      // Tight maze sectors use the white/gray room materials and a single
+      // overhead fluorescent fixture at selected corridor cells.
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)];
+        const openings=4-((mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0));
+        if(openings<=0)continue;
+        if((x+z)%2!==0&&rng()>.38)continue;
+        const p=cellPos(x,z);
+        const horizontal=openings>=2&&((mask&1)===0||(mask&4)===0);
+        addLight(p.x,p.z,horizontal?0:Math.PI/2,.72,92+rng()*18);
+      }
 
-        if(room.type==="office"){
-          const desk=new THREE.Group();desk.position.set(cx,.02,cz);
-          box(desk,new THREE.BoxGeometry(1.5,.12,.72),lib.officeWood,0,.78,0);
-          for(const sx of [-.6,.6])for(const sz of [-.24,.24])box(desk,new THREE.BoxGeometry(.07,.77,.07),lib.officeWood,sx,.385,sz);
-          box(desk,new THREE.BoxGeometry(.78,.48,.06),lib.officePlastic,0,1.07,-.02);
-          box(desk,new THREE.BoxGeometry(.55,.08,.50),lib.officeWood,0,.47,.72);
-          box(desk,new THREE.BoxGeometry(.08,.52,.08),lib.officeWood,-.23,.26,.72);
-          box(desk,new THREE.BoxGeometry(.08,.52,.08),lib.officeWood,.23,.26,.72);
-          g.add(desk);
-        }else if(room.type==="storage"){
-          for(let i=0;i<1+rng.int(0,2);i++){const ox=(rng.next()-.5)*room.w*cell*.38,oz=(rng.next()-.5)*room.h*cell*.38;box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz)}
+      for(const room of this.rooms){
+        const cx=this.originX+(room.x+room.w*.5)*cell;
+        const cz=this.originZ+(room.z+room.h*.5)*cell;
+        if(room.type==="pillars"){
+          for(const [ox,oz] of [[-1.05,-1.05],[1.05,-1.05],[-1.05,1.05],[1.05,1.05]]){
+            box(g,new THREE.BoxGeometry(.52,level.wallHeight-.15,.52),lib.concrete,cx+ox,level.wallHeight/2,cz+oz);
+          }
         }else{
-          box(g,new THREE.BoxGeometry(.62,1.0,.48),lib.concrete,cx+.55,.5,cz-.35);
-          if(rng.next()<.45){const puddle=box(g,new THREE.CircleGeometry(.42,14),lib.water,cx-.45,.018,cz+.35,-Math.PI/2);puddle.scale.y=.55}
-        }
-
-        if(room.entry){
-          const e=room.entry,ex=this.originX+e.x*cell+cell/2,ez=this.originZ+e.z*cell+cell/2,rot=e.side==="west"||e.side==="east"?Math.PI/2:0;
-          const frameH=Math.min(3.9,level.wallHeight-.35);
-          const entryGroup=new THREE.Group();
-          entryGroup.position.set(ex,0,ez);
-          entryGroup.rotation.y=rot;
-          box(entryGroup,new THREE.BoxGeometry(.12,frameH,.18),lib.doorFrame,-1.05,frameH/2,0);
-          box(entryGroup,new THREE.BoxGeometry(.12,frameH,.18),lib.doorFrame,1.05,frameH/2,0);
-          box(entryGroup,new THREE.BoxGeometry(2.22,.12,.18),lib.doorFrame,0,frameH,0);
-          if(index%3===0){
-            const sign=box(entryGroup,new THREE.BoxGeometry(.62,.18,.05),lib.exit,0,frameH+.18,0);
-            sign.material=lib.exit;
+          for(let i=0;i<3;i++){
+            const ox=(rng()-.5)*room.w*cell*.48;
+            const oz=(rng()-.5)*room.h*cell*.48;
+            const crate=box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz);
+            crate.rotation.y=rng()*Math.PI*2;
           }
-          if(index%2===0){
-            const door=box(entryGroup,new THREE.BoxGeometry(1.82,frameH-.18,.07),lib.door,0,(frameH-.18)/2,-.025);
-            door.rotation.y=(index%4===0?.04:-.03);
-          }
-          g.add(entryGroup);
+          box(g,new THREE.BoxGeometry(1.9,.10,.72),lib.metal,cx,.76,cz+1.0);
         }
       }
     }
@@ -823,31 +795,8 @@ class Chunk{
   update(dt){
     const state=this.game.lightState;
     const enteredFlicker=state==="FLICKER"&&this.lastLightState!=="FLICKER";
-    if(this.game.level.id==="1"&&this.zone==="halls"){
-      if(state!=="ON"&&this.lastLightState==="ON"&&Math.random()<.34){
-        const cell=this.game.level.cellSize;
-        const bx=this.originX+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
-        const bz=this.originZ+cell*(1+Math.random()*Math.max(1,this.gridSize()-2))+cell*.5;
-        const crate=box(this.group,new THREE.BoxGeometry(.9,.8,.9),this.world.library.crate,bx,.4,bz);
-        crate.userData.appearedAt=this.game.gameTime;
-        this.crates.push({group:crate,unseen:0});
-      }
-      for(let i=this.crates.length-1;i>=0;i--){
-        const item=this.crates[i];
-        if(!item.group.parent){this.crates.splice(i,1);continue}
-        const dx=this.game.player.position.x-item.group.position.x,dz=this.game.player.position.z-item.group.position.z,d=Math.hypot(dx,dz);
-        if(d<24){
-          const forward=new THREE.Vector3(-Math.sin(this.game.player.viewYaw),0,-Math.cos(this.game.player.viewYaw));
-          const to=new THREE.Vector3(-dx,0,-dz).normalize();
-          if(forward.dot(to)>.35)item.unseen=0;else item.unseen+=dt;
-          if(item.unseen>18){
-            item.group.removeFromParent();
-            item.group.geometry?.dispose();
-            this.crates.splice(i,1);
-          }
-        }
-      }
-      this.lastLightState=state;
+    if(this.game.level.id==="1"&&this.zone==="mega"){
+      this.lastLightState=this.game.lightState;
     }else{
       this.lastLightState=this.game.lightState;
     }
@@ -929,7 +878,7 @@ class WorldStreamer{
       this.library.ceiling
     );
     this.ceilingSurface.rotation.x=Math.PI/2;
-    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.08,0);
+    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.025,0);
     this.ceilingSurface.updateMatrix();
     this.ceilingSurface.matrixAutoUpdate=false;
     this.ceilingSurface.frustumCulled=false;
@@ -943,14 +892,13 @@ class WorldStreamer{
     // depend on remote texture downloads or external asset hosts.
     void (async()=>{
       try{
-        await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+        if(this.game.level.id==="1"){
+          await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
+        }else{
+          await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+        }
       }catch(error){
-        console.warn("[Backrooms] PBR enhancement failed; procedural fallback remains active.",error);
-      }
-      try{
-        await applySpacePotatoLevel1Assets(this.library,this.game.level,onProgress);
-      }catch(error){
-        console.warn("[Backrooms] Level 1 Found Footage asset enhancement failed; fallback remains active.",error);
+        console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
       this.updateSurfaceTiling();
     })();
@@ -959,10 +907,15 @@ class WorldStreamer{
   }
 
   updateSurfaceTiling(){
-    const surfaces=[
-      {material:this.library?.floor,tileWorld:3.2},
-      {material:this.library?.ceiling,tileWorld:1.6}
-    ];
+    const surfaces=this.game.level.id==="1"
+      ? [
+          {material:this.library?.floor,tileWorld:5.4},
+          {material:this.library?.ceiling,tileWorld:5.4}
+        ]
+      : [
+          {material:this.library?.floor,tileWorld:3.2},
+          {material:this.library?.ceiling,tileWorld:1.6}
+        ];
 
     for(const {material,tileWorld} of surfaces){
       if(!material)continue;
@@ -1592,7 +1545,7 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
-    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x676a64:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.028:.058);
+    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x686b67:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.018:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x050404);
     this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
