@@ -130,7 +130,7 @@ try{
   if(desktopUi.pcPrompt==="none"||desktopUi.mobilePrompt!=="none")throw new Error("Desktop audio prompt routing is wrong: "+JSON.stringify(desktopUi));
   if(desktopUi.pcControls===0||desktopUi.mobileControls!==0||desktopUi.touchOnly!=="none")throw new Error("Desktop control hint routing is wrong: "+JSON.stringify(desktopUi));
 
-  await command("Runtime.evaluate",{expression:"document.querySelector('.intro-audio-page')?.classList.add('intro-audio-active')",returnByValue:true});
+  await command("Runtime.evaluate",{expression:"(()=>{const page=document.querySelector('.intro-audio-page');if(page){page.classList.add('intro-audio-active');page.style.visibility='visible';page.style.opacity='1';}document.getElementById('audio-gate')?.focus();})()",returnByValue:true});
   const viewport=await command("Runtime.evaluate",{
     expression:"JSON.stringify({x:innerWidth/2,y:innerHeight/2})",
     returnByValue:true
