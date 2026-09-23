@@ -923,20 +923,6 @@ class Chunk{
       }
     };
 
-    const addMazeRoom=(gridX,gridZ,mask)=>{
-      const roomNumber=roomRng.int(1,8);
-      const rotation=level0RotationForMask(mask);
-      putStructure(
-        ["aroom","broom","croom","droom","eroom"][
-          ({0:"A",1:"B"})[0]||0
-        ]+"_"+roomNumber,
-        gridX*cell,
-        LEVEL0_SOURCE_FLOOR_Y,
-        gridZ*cell,
-        rotation
-      );
-    };
-
     // The family selection is the same mask routing used by MazeCell.drawWalls().
     const roomFamily=mask=>{
       if(mask===0)return "aroom";
@@ -1096,7 +1082,7 @@ class Chunk{
       const trim=box(
         g,
         new THREE.BoxGeometry(1.075,.125,.0375),
-        lib.wallBottom,
+        lib.trim,
         x,.0625+voxel.y,z,
         0,rotation,0
       );
@@ -1104,8 +1090,20 @@ class Chunk{
     };
     for(const voxel of voxels.values())if(voxel.kind==="trim")addTrim(voxel);
 
-    // Source collision is derived from actual solid wall/decor blocks, not the
-    // old one-cell wall mask. Merge adjacent blocked cells into boundary runs.
+    // Source collision is derived from the final solid voxels after structure
+    // overwrite order has been applied. Floor, ceiling, lights, markers and trim
+    // never become horizontal collision cells.
+    collisionCells.clear();
+    for(const voxel of voxels.values()){
+      if(
+        voxel.y>=0&&voxel.y<5 &&
+        voxel.kind!=="floor"&&voxel.kind!=="ceiling"&&
+        voxel.kind!=="light"&&voxel.kind!=="emergency"&&
+        voxel.kind!=="trim"&&voxel.kind!=="marker"
+      ){
+        collisionCells.add(voxel.x+"|"+voxel.z);
+      }
+    }
     const hasCollision=(x,z)=>collisionCells.has(x+"|"+z);
     const horizontal=new Map(),vertical=new Map();
     for(const key of collisionCells){
@@ -1124,7 +1122,7 @@ class Chunk{
     // placing, so do those exact logical checks against the macro block map.
     for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
       for(let tileX=0;tileX<this.world.size;tileX+=8){
-        if(level0SourceStateAt(voxels,tileX,18,tileZ))continue;
+        if(level0SourceStateAt(voxels,tileX,18-LEVEL0_SOURCE_FLOOR_Y,tileZ))continue;
         if(level0SourceStateAt(voxels,tileX,5,tileZ))continue;
         const roofName=roofRng.next()<.2?"roof2":"roof1";
         const rotation=roofRng.next()<.5?0:Math.PI/2;
