@@ -579,6 +579,39 @@ class Chunk{
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
 
+    for(const hz of this.hazards){
+      const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
+      p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
+    }
+
+    const batteryChance=level.batteryChance??.08;
+    const batteryRng=new RNG(this.seedKey()^0x0bba71);
+    for(let i=0;i<2;i++){
+      if(batteryRng.next()>batteryChance*(i===0?1:.48))continue;
+      let bx=batteryRng.int(1,Math.max(1,cells-2)),bz=batteryRng.int(1,Math.max(1,cells-2));
+      if(this.hazards.some(h=>h.x===bx&&h.z===bz)){bx=Math.max(1,Math.min(cells-2,bx+1));bz=Math.max(1,Math.min(cells-2,bz+1))}
+      const battery=new THREE.Group();
+      battery.position.set(
+        this.originX+bx*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32),
+        .22,
+        this.originZ+bz*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32)
+      );
+      const body=box(battery,new THREE.CylinderGeometry(.105,.105,.42,10),lib.battery,0,0,0,0,0,Math.PI/2);
+      box(battery,new THREE.BoxGeometry(.052,.23,.17),lib.batteryLabel,0,0,0);
+      body.rotation.order="ZYX";
+      battery.rotation.y=batteryRng.next()*Math.PI*2;
+      g.add(battery);
+      this.batteries.push({group:battery,amount:28+batteryRng.int(0,18)});
+    }
+
+    const wallPoint=(e,offset=.095,y=.6)=>{
+      const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
+      if(e.side==="north")return{position:new THREE.Vector3(px,y,pz-cell/2-offset),rotation:0};
+      if(e.side==="south")return{position:new THREE.Vector3(px,y,pz+cell/2+offset),rotation:0};
+      if(e.side==="west")return{position:new THREE.Vector3(px-cell/2-offset,y,pz),rotation:Math.PI/2};
+      return{position:new THREE.Vector3(px+cell/2+offset,y,pz),rotation:Math.PI/2};
+    };
+
     if(level.id==="0"&&this.rooms.length){
       for(const room of this.rooms){
         if(room.type==="pillars"){
@@ -612,39 +645,6 @@ class Chunk{
         }
       }
     }
-
-    for(const hz of this.hazards){
-      const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
-      p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
-    }
-
-    const batteryChance=level.batteryChance??.08;
-    const batteryRng=new RNG(this.seedKey()^0x0bba71);
-    for(let i=0;i<2;i++){
-      if(batteryRng.next()>batteryChance*(i===0?1:.48))continue;
-      let bx=batteryRng.int(1,Math.max(1,cells-2)),bz=batteryRng.int(1,Math.max(1,cells-2));
-      if(this.hazards.some(h=>h.x===bx&&h.z===bz)){bx=Math.max(1,Math.min(cells-2,bx+1));bz=Math.max(1,Math.min(cells-2,bz+1))}
-      const battery=new THREE.Group();
-      battery.position.set(
-        this.originX+bx*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32),
-        .22,
-        this.originZ+bz*cell+cell/2+(batteryRng.next()-.5)*Math.min(2.4,cell*.32)
-      );
-      const body=box(battery,new THREE.CylinderGeometry(.105,.105,.42,10),lib.battery,0,0,0,0,0,Math.PI/2);
-      box(battery,new THREE.BoxGeometry(.052,.23,.17),lib.batteryLabel,0,0,0);
-      body.rotation.order="ZYX";
-      battery.rotation.y=batteryRng.next()*Math.PI*2;
-      g.add(battery);
-      this.batteries.push({group:battery,amount:28+batteryRng.int(0,18)});
-    }
-
-    const wallPoint=(e,offset=.095,y=.6)=>{
-      const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
-      if(e.side==="north")return{position:new THREE.Vector3(px,y,pz-cell/2-offset),rotation:0};
-      if(e.side==="south")return{position:new THREE.Vector3(px,y,pz+cell/2+offset),rotation:0};
-      if(e.side==="west")return{position:new THREE.Vector3(px-cell/2-offset,y,pz),rotation:Math.PI/2};
-      return{position:new THREE.Vector3(px+cell/2+offset,y,pz),rotation:Math.PI/2};
-    };
 
     for(let i=0;i<Math.min(9,edges.length);i++){
       const e=edges[(rngBase.int(0,edges.length-1)+i*11)%edges.length];
@@ -1453,12 +1453,28 @@ class WorldStreamer{
     };
 
     if(this.game.level.id==="0"){
-      const offset=32;
+      const cell=this.game.level.cellSize;
+      const offset=this.size/2;
       const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+
       for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
         const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
-        if(!nearby?.collisionSegments?.length)continue;
-        for(let pass=0;pass<2;pass++)for(const seg of nearby.collisionSegments)testSegment(seg.x1,seg.z1,seg.x2,seg.z2);
+        if(!nearby)continue;
+
+        for(let pass=0;pass<2;pass++){
+          const bx=Math.floor((x-nearby.originX)/cell);
+          const bz=Math.floor((z-nearby.originZ)/cell);
+          for(let iz=bz-1;iz<=bz+1;iz++)for(let ix=bx-1;ix<=bx+1;ix++){
+            if(ix<0||iz<0||ix>=nearby.gridSize()||iz>=nearby.gridSize())continue;
+            const mask=nearby.walls[nearby.index(ix,iz)];
+            const minX=nearby.originX+ix*cell,maxX=minX+cell;
+            const minZ=nearby.originZ+iz*cell,maxZ=minZ+cell;
+            if(mask&1)testSegment(minX,minZ,maxX,minZ);
+            if(mask&2)testSegment(maxX,minZ,maxX,maxZ);
+            if(mask&4)testSegment(minX,maxZ,maxX,maxZ);
+            if(mask&8)testSegment(minX,minZ,minX,maxZ);
+          }
+        }
       }
       return {x,z};
     }
@@ -1490,7 +1506,7 @@ class WorldStreamer{
     return Math.hypot(c.exit.position.x-x,c.exit.position.z-z)<1.25;
   }
   lightProximity(x,z){
-    const offset=this.game.level.id==="0"?32:this.size/2;
+    const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
     let best=Infinity;
     for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
