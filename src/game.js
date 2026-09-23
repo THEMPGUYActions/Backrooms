@@ -620,6 +620,7 @@ class Chunk{
       }
     }
     
+    const addInstanced=(geometry,material,data)=>{
       if(!data.length)return;
       const mesh=new THREE.InstancedMesh(geometry,material,data.length);
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
