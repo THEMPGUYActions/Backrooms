@@ -1389,13 +1389,12 @@ export class BackroomsGame{
 
     const audioPage=document.querySelector(".intro-audio-page");
     const boot=document.getElementById("boot");
-    const isAudioPageVisible=()=>{
-      if(!audioPage)return false;
-      const style=getComputedStyle(audioPage);
-      return style.visibility!=="hidden"&&Number.parseFloat(style.opacity||"0")>.5;
-    };
     const handleAudioGesture=event=>{
-      if(!isAudioPageVisible())return;
+      if(!this.introActive||!audioPage)return;
+      // Only the active audio page can start the game. Do not inspect computed
+      // opacity/visibility here because WebKit can report the animation state
+      // differently during the same frame as a real touch.
+      if(!audioPage.contains(event.target))return;
       if(event.type==="touchend"||event.type==="pointerdown"||event.type==="pointerup")event.preventDefault();
       event.stopPropagation();
       begin(event);
