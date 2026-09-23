@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0scale2";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0scale4";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1706,7 +1706,7 @@ export class BackroomsGame{
         this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
       });
       this.world.ensureAround(0,0);
-      const spawn=this.world.findSafeSpawn(0,0,.36);
+      const spawn=this.level.id==="0"?this.world.level0SpawnPoint():this.world.findSafeSpawn(0,0,.36);
       this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
       this.worldReady=true;
       if(this.pendingStart)this.beginIntroReveal();
