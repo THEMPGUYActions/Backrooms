@@ -793,25 +793,21 @@ class Chunk{
   }
   startFlickerEvent(){
     const now=this.game.gameTime;
-    const duration=2.8+Math.random()*2.8;
-    const spread=Math.min(2.4,duration*.62);
     const fixtureCount=this.fixtures.length;
     if(!fixtureCount)return;
-    for(let i=0;i<fixtureCount;i++){
-      const fixture=this.fixtures[i];
-      const start=(i/Math.max(1,fixtureCount-1))*spread+Math.random()*.34;
-      const pulses=[];
-      let cursor=start;
-      const burstCount=2+Math.floor(Math.random()*3);
-      for(let burst=0;burst<burstCount;burst++){
-        cursor+=Math.random()*.12;
-        if(cursor>=duration-.08)break;
-        const offDuration=.065+Math.random()*.12;
-        pulses.push([cursor,cursor+offDuration]);
-        cursor+=offDuration+.16+Math.random()*.46;
-        if(cursor>=duration)break;
-      }
-      fixture.userData.flickerPulses=pulses;
+    const duration=Math.max(2.8,Math.min(5.8,.16*fixtureCount+.9+Math.random()*1.7));
+    const spacing=duration/fixtureCount;
+    const order=this.fixtures.slice();
+    for(let i=order.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [order[i],order[j]]=[order[j],order[i]];
+    }
+    for(let i=0;i<order.length;i++){
+      const fixture=order[i];
+      const offDuration=Math.min(.14,Math.max(.055,spacing*.52+Math.random()*.045));
+      const jitter=Math.min(.035,spacing*.12)*Math.random();
+      const start=i*spacing+jitter;
+      fixture.userData.flickerPulses=[[start,start+offDuration]];
       fixture.userData.flickerEventStart=now;
     }
   }
