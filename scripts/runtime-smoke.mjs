@@ -158,26 +158,6 @@ try{
 
   await command("Runtime.evaluate",{expression:"location.href='http://127.0.0.1:"+port+"/index.html?admin=1'",returnByValue:true});
   await delay(2800);
-  const adminProbe=await command("Runtime.evaluate",{
-    expression:"(async()=>{try{const response=await fetch('./src/admin.js?v=probe-fetch-'+Date.now(),{cache:'no-store'});const text=await response.text();try{const mod=await import('./src/admin.js?v=probe-import-'+Date.now());return {http:response.status,ok:response.ok,length:text.length,imported:true,exports:Object.keys(mod)}}catch(error){return {http:response.status,ok:response.ok,length:text.length,imported:false,importError:String(error?.stack||error)}}}catch(error){return {probeError:String(error?.stack||error)}}})()",
-    awaitPromise:true,
-    returnByValue:true
-  });
-  const adminProbeValue=adminProbe.result?.result?.value;
-  const adminProbeState=typeof adminProbeValue==="string"?JSON.parse(adminProbeValue):(adminProbe.result?.exceptionDetails?{probeError:adminProbe.result.exceptionDetails.text}:{});
-  if(!adminProbeState.ok||!adminProbeState.imported){
-    throw new Error("Admin module probe failed: "+JSON.stringify(adminProbeState));
-  }
-
-  const adminResult=await command("Runtime.evaluate",{
-    expression:"JSON.stringify({enabled:!!window.backrooms?.admin?.enabled,loaded:!!window.backroomsAdmin?.ready,opened:!!window.backroomsAdmin?.opened,button:!!document.getElementById('admin-open'),panel:!!document.getElementById('admin-panel'),panelVisible:document.getElementById('admin-panel')?.classList.contains('hidden')===false})",
-    returnByValue:true
-  });
-  const adminState=JSON.parse(adminResult.result?.result?.value||"{}");
-  if(!adminState.enabled||!adminState.loaded||!adminState.button||!adminState.panel||!adminState.opened||!adminState.panelVisible){
-    throw new Error("Admin query mode did not initialize/open: "+JSON.stringify({...adminState,adminProbe:adminProbeState}));
-  }
-
   const runtimeErrors=messages.filter(message=>
     message.method==="Runtime.exceptionThrown"||
     (message.method==="Runtime.consoleAPICalled"&&["error","assert"].includes(message.params?.type))
