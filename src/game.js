@@ -708,14 +708,14 @@ class Chunk{
       const columnXs=[12,28,44,60];
       const columnZs=[12,28,44,60];
       for(const x of columnXs)for(const z of columnZs){
-        if(rng()>.72)continue;
+        if(rng.next()>.72)continue;
         box(g,new THREE.BoxGeometry(.92,level.wallHeight,.92),lib.concrete,this.originX+x,level.wallHeight/2,this.originZ+z);
         box(g,new THREE.BoxGeometry(1.14,.10,1.14),lib.metal,this.originX+x,.52,this.originZ+z);
       }
 
       for(let x=12;x<size-8;x+=16)for(let z=12;z<size-8;z+=16){
-        if(rng()>.88)continue;
-        addLight(this.originX+x,this.originZ+z,rng()<.5?0:Math.PI/2,.92+rng()*.18,145+rng()*25);
+        if(rng.next()>.88)continue;
+        addLight(this.originX+x,this.originZ+z,rng.next()<.5?0:Math.PI/2,.92+rng.next()*.18,145+rng.next()*25);
       }
 
       // Concrete service beams and pipes overhead are sparse, not the dense
@@ -729,10 +729,10 @@ class Chunk{
           level.wallHeight-.18-i*.16,
           this.originZ+size*(.31+i*.38)
         );
-        beam.rotation.y=rng()<.5?0:Math.PI/2;
+        beam.rotation.y=rng.next()<.5?0:Math.PI/2;
       }
 
-      if(rng()<.46){
+      if(rng.next()<.46){
         const pipe=new THREE.Mesh(
           new THREE.CylinderGeometry(.075,.075,size*.72,10),
           lib.metal
@@ -743,7 +743,7 @@ class Chunk{
       }
 
       for(let i=0;i<1+rng.int(0,2);i++){
-        if(rng()<.22)continue;
+        if(rng.next()<.22)continue;
         const p=cellPos(rng.int(1,cells-2),rng.int(1,cells-2));
         const crate=box(g,new THREE.BoxGeometry(.9,.8,.9),lib.crate,p.x,.4,p.z);
         box(g,new THREE.BoxGeometry(.94,.055,.055),lib.metal,p.x,.80,p.z-.32);
@@ -751,8 +751,8 @@ class Chunk{
         this.crates.push({group:crate,unseen:0});
       }
 
-      if(rng()<.55){
-        const lane=this.originX+size*(.27+rng()*.46);
+      if(rng.next()<.55){
+        const lane=this.originX+size*(.27+rng.next()*.46);
         box(g,new THREE.BoxGeometry(.045,.012,size*.66),lib.parkingLine,lane,.008,this.originZ+size*.5);
       }
     }else{
@@ -762,10 +762,10 @@ class Chunk{
         const mask=this.walls[this.index(x,z)];
         const openings=4-((mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0));
         if(openings<=0)continue;
-        if((x+z)%2!==0&&rng()>.38)continue;
+        if((x+z)%2!==0&&rng.next()>.38)continue;
         const p=cellPos(x,z);
         const horizontal=openings>=2&&((mask&1)===0||(mask&4)===0);
-        addLight(p.x,p.z,horizontal?0:Math.PI/2,.72,92+rng()*18);
+        addLight(p.x,p.z,horizontal?0:Math.PI/2,.72,92+rng.next()*18);
       }
 
       for(const room of this.rooms){
@@ -777,10 +777,10 @@ class Chunk{
           }
         }else{
           for(let i=0;i<3;i++){
-            const ox=(rng()-.5)*room.w*cell*.48;
-            const oz=(rng()-.5)*room.h*cell*.48;
+            const ox=(rng.next()-.5)*room.w*cell*.48;
+            const oz=(rng.next()-.5)*room.h*cell*.48;
             const crate=box(g,new THREE.BoxGeometry(.86,.78,.86),lib.crate,cx+ox,.39,cz+oz);
-            crate.rotation.y=rng()*Math.PI*2;
+            crate.rotation.y=rng.next()*Math.PI*2;
           }
           box(g,new THREE.BoxGeometry(1.9,.10,.72),lib.metal,cx,.76,cz+1.0);
         }
@@ -1553,6 +1553,9 @@ export class BackroomsGame{
     }
     this.render();
     this.toast(this.level.objective,3);
+    if(this.admin?.enabled){
+      window.dispatchEvent(new CustomEvent("backrooms:game-ready"));
+    }
   }
 
   setLoadingProgress(progress,label,detail=""){
