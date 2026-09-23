@@ -5,8 +5,8 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2050";
-import { makeLibrary, applyOpenGameArtPBR, applyLevel0Assets, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-1655";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta1";
+import { makeLibrary, applyOpenGameArtPBR, applyLevel0Assets, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-lobbymat1";
 import { level0RoomRows, level0RotationForMask, level0TransformBlock, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2410";
 
 const VHSShader={
