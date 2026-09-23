@@ -14,11 +14,11 @@ export const LEVELS = {
       fog: 0x000000,
       accent: 0xffe992,
       light: 0xffcf42,
-      ambient: 0x100e08
+      ambient: 0x0a0804
     },
     gridSize: 5,
     cellSize: 16,
-    wallHeight: 4.0,
+    wallHeight: 5.0,
     darkness: 0.075,
     holeChance: 0.010,
     pipeChance: 0,
