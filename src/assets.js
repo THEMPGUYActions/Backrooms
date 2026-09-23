@@ -200,6 +200,7 @@ export async function applyLevel0Assets(library,level,onProgress=()=>{}){
   if(level.id!=="0")return false;
   const maps=[
     [library.wall,"map",LEVEL0_ASSET_SOURCES.wall,true,1,.0,"Level 0 wall texture"],
+    [library.wallBottom,"map",LEVEL0_ASSET_SOURCES.wallBottom,true,1,.0,"Level 0 wall base texture"],
     [library.floor,"map",LEVEL0_ASSET_SOURCES.floor.color,true,1.25,.16,"Level 0 carpet color"],
     [library.floor,"normalMap",LEVEL0_ASSET_SOURCES.floor.normal,false,1.25,.22,"Level 0 carpet normal"],
     [library.ceiling,"map",LEVEL0_ASSET_SOURCES.ceiling.color,true,1,.18,"Level 0 ceiling color"],
@@ -220,6 +221,9 @@ export async function applyLevel0Assets(library,level,onProgress=()=>{}){
   library.wall.roughness=.88;
   library.wall.normalMap=null;
   library.wall.needsUpdate=true;
+  library.wallBottom.roughness=.88;
+  library.wallBottom.normalMap=null;
+  library.wallBottom.needsUpdate=true;
   return true;
 }
 
@@ -275,6 +279,7 @@ export function makeLibrary(level){
   return {
     floor:createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:level.id==="0"?1:3.8,normalStrength:.35}),
+    wallBottom:createPBRMaterial({base:level.theme.wall,seed:129+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.08}),
     concrete:createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
     maintenanceWall:createPBRMaterial({base:0xe4e3dc,seed:117+Number(level.id),rough:.9,scale:2.4,normalStrength:.28}),
     stairs:new THREE.MeshStandardMaterial({color:0x8b8d89,roughness:.88,metalness:0}),
