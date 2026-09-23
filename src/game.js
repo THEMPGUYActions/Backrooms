@@ -950,7 +950,7 @@ class Chunk{
     makeWallMesh(manilaCells,lib.wall2);
 
     const horizontal=new Map(),vertical=new Map();
-    for(const key of wallCells){
+    for(const key of allWallCells){
       const cut=key.indexOf(",");
       const x=Number(key.slice(0,cut)),z=Number(key.slice(cut+1));
       if(!has(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
@@ -960,22 +960,6 @@ class Chunk{
     }
     this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
       .concat(level0MergeBoundaryIntervals(vertical,false));
-
-    if(positions.length){
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
-      geometry.setIndex(indices);
-      geometry.computeBoundingBox();
-      geometry.computeBoundingSphere();
-
-      const mesh=new THREE.Mesh(geometry,lib.wall);
-      mesh.name="level0_walls";
-      mesh.frustumCulled=true;
-      g.add(mesh);
-      this.level0WallMesh=mesh;
-    }
 
     // SpacePotato's bottom-most wall block uses a 2/16-high, 18/16-wide
     // base element. Recreate only its exposed sides so adjacent walls do not
