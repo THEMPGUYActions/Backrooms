@@ -23,9 +23,10 @@ export const LEVEL0_MEGA_TEMPLATES=Object.freeze({
 
 export function level0RoomFamily(mask){return LEVEL0_ROOM_FAMILY_BY_MASK[mask]||"A";}
 export function level0RoomRows(mask,index=0){
-  const family=level0RoomFamily(mask),list=LEVEL0_ROOM_ROWS[family]||LEVEL0_ROOM_ROWS.A;
-  const variant=((index|0)%list.length+list.length)%list.length;
-  return {family,index:variant,rows:list[variant]};
+  // Each family is currently one 16x8 source footprint. The source mod
+  // randomizes the room NUMBER, not a row inside this footprint.
+  const family=level0RoomFamily(mask),rows=LEVEL0_ROOM_ROWS[family]||LEVEL0_ROOM_ROWS.A;
+  return {family,index:0,rows};
 }
 export function level0RotationForMask(mask){
   // Browser wall bits: N=1,E=2,S=4,W=8.
