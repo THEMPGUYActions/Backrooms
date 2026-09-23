@@ -33,21 +33,25 @@ export function level0RoomRows(mask,index=0){
   return {family,index:0,rows};
 }
 export function level0RotationForMask(mask){
+  // Browser wall bits: N=1,E=2,S=4,W=8.
+  // Convert them to the structure table's N=8,W=4,S=2,E=1 before
+  // applying the corresponding quarter-turn around the integer anchor.
   switch(mask){
+    case 0:return 0;
     case 1:return Math.PI;
     case 2:return -Math.PI/2;
     case 4:return 0;
     case 8:return Math.PI/2;
-    case 9:return Math.PI/2;
     case 3:return Math.PI;
     case 6:return -Math.PI/2;
+    case 9:return Math.PI/2;
     case 12:return 0;
     case 10:return 0;
     case 5:return Math.PI/2;
     case 14:return 0;
     case 7:return -Math.PI/2;
     case 11:return Math.PI;
-    case 13:return Math.PI/2;
+    case 13:return -Math.PI/2;
     default:return 0;
   }
 }
