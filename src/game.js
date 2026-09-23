@@ -402,7 +402,19 @@ class Chunk{
       this.setEdge(spawnX,spawnZ,"north",true);
       this.setEdge(spawnX,spawnZ,"east",true);
       this.setEdge(spawnX,spawnZ,"south",true);
-      this.setEdge(spawnX,spawnZ,"west",true);    }else{
+      this.setEdge(spawnX,spawnZ,"west",true);
+      // Shared sector boundaries. The key is derived from the world-cell
+      // coordinate so both adjacent chunks make the exact same opening.
+      for(let x=0;x<cells;x++){
+        const gx=this.cx*cells+x;
+        if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h",.22))this.setEdge(x,0,"north",true);
+        if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",.22))this.setEdge(x,cells-1,"south",true);
+      }
+      for(let z=0;z<cells;z++){
+        const gz=this.cz*cells+z;
+        if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v",.22))this.setEdge(0,z,"west",true);
+        if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",.22))this.setEdge(cells-1,z,"east",true);
+      }    }else{
       const visited=new Uint8Array(cells*cells),stack=[[Math.floor(cells/2),Math.floor(cells/2)]];
       visited[this.index(Math.floor(cells/2),Math.floor(cells/2))]=1;
       const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
@@ -1835,7 +1847,7 @@ export class BackroomsGame{
     const seedBuffer=new Int32Array(1);
     const cryptoApi=globalThis.crypto;
     if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
-    this.seed=(seedBuffer[0]||Math.floor(Math.random()*2147483647))|0;
+    this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={
