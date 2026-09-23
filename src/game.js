@@ -535,11 +535,40 @@ class Chunk{
       }
     }else{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)],px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
+        const addEdge=(side)=>{
+          if(side==="north"){
+            const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,safeWallY,pz-cell/2);
+            pushMat(trimH,px,.065,pz-cell/2);
+            pushMat(topH,px,level.wallHeight-.04,pz-cell/2);
+            edges.push({x,z,side});
+          }else if(side==="south"){
+            const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
+            pushMat(hData,px,safeWallY,pz+cell/2);
+            pushMat(trimH,px,.065,pz+cell/2);
+            pushMat(topH,px,level.wallHeight-.04,pz+cell/2);
+            edges.push({x,z,side});
+          }else if(side==="west"){
+            const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px-cell/2,safeWallY,pz);
+            pushMat(trimV,px-cell/2,.065,pz);
+            pushMat(topV,px-cell/2,level.wallHeight-.04,pz);
+            edges.push({x,z,side});
+          }else{
+            const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
+            pushMat(vData,px+cell/2,safeWallY,pz);
+            pushMat(trimV,px+cell/2,.065,pz);
+            pushMat(topV,px+cell/2,level.wallHeight-.04,pz);
+            edges.push({x,z,side});
+          }
+        };
+
         if(mask&1)addEdge("north");
         if(mask&8)addEdge("west");
         if(z===cells-1&&(mask&4))addEdge("south");
         if(x===cells-1&&(mask&2))addEdge("east");
-  
+
         const fixtureChance=level.id==="0"?.47:level.id==="1"?0:.13;
         if(rngBase.next()<fixtureChance){
           const fixtureMat=level.id==="0"?lib.light:(level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light);
@@ -556,7 +585,7 @@ class Chunk{
           fixture.userData.light=true;
           fixture.userData.baseEmissive=material.emissiveIntensity;
           this.fixtures.push(fixture);
-  
+
           const lightColor=fixtureMat===lib.orangeLight?0xff9b52:level.theme.light;
           const intensity=level.id==="0"?220:level.id==="3"?220:level.id==="4"?110:170;
           this.lightSources.push({
@@ -569,10 +598,8 @@ class Chunk{
             fixture
           });
         }
-      
       }
     }
-
 
     const addInstanced=(geometry,material,data)=>{
       if(!data.length)return;
