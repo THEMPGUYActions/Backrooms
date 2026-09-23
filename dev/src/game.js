@@ -1380,32 +1380,53 @@ export class BackroomsGame{
 
     const begin=event=>{
       if(event?.isTrusted===false||!this.introActive)return;
-      // Never make the game transition wait on Web Audio. Safari/WebKit can leave
-      // AudioContext.resume() pending indefinitely on some iOS states.
+      // Audio is best-effort. It must never be on the critical path for starting
+      // the game because WebKit can leave AudioContext promises unresolved.
       this.audio.unlockFromGesture();
-      if(this.mounted)this.beginIntroReveal();
-      else this.pendingStart=true;
+      try{
+        if(this.mounted)this.beginIntroReveal();
+        else this.pendingStart=true;
+      }catch(error){
+        console.error("[Backrooms] Startup handoff failed:",error);
+        this.pendingStart=false;
+        this.introActive=false;
+        this.introPlaying=false;
+        this.running=true;
+        this.paused=false;
+        this.dead=false;
+        this.player.reset();
+        document.getElementById("hud")?.classList.remove("hidden");
+        document.getElementById("boot")?.classList.add("fade-out");
+      }
     };
 
     const audioPage=document.querySelector(".intro-audio-page");
     const boot=document.getElementById("boot");
+    const gate=$("audio-gate");
+    let audioGateReady=false;
+    const activateAudioGate=()=>{
+      audioGateReady=true;
+      audioPage?.classList.add("intro-audio-active");
+    };
+    if(audioPage){
+      audioPage.addEventListener("animationend",event=>{
+        if(event.animationName==="intro-audio-sequence")activateAudioGate();
+      },{once:false});
+      // CSS animation timing is fixed, but keep a JS fallback so the gate can
+      // never remain untappable if animation events are lost on WebKit.
+      setTimeout(activateAudioGate,16500);
+    }
     const handleAudioGesture=event=>{
-      if(!this.introActive||!audioPage)return;
-      // Only the active audio page can start the game. Do not inspect computed
-      // opacity/visibility here because WebKit can report the animation state
-      // differently during the same frame as a real touch.
-      if(!audioPage.contains(event.target))return;
-      if(event.type==="touchend"||event.type==="pointerdown"||event.type==="pointerup")event.preventDefault();
+      if(!this.introActive||!audioGateReady)return;
+      if(gate&&!gate.contains(event.target)&&!audioPage?.contains(event.target))return;
       event.stopPropagation();
       begin(event);
     };
-    boot?.addEventListener("pointerdown",handleAudioGesture,{passive:false,capture:true});
-    boot?.addEventListener("touchend",handleAudioGesture,{passive:false,capture:true});
-    boot?.addEventListener("click",handleAudioGesture,{capture:true});
-    const gate=$("audio-gate");
-    gate?.addEventListener("pointerdown",handleAudioGesture,{passive:false});
-    gate?.addEventListener("touchend",handleAudioGesture,{passive:false});
+    // Use click as the authoritative activation event. WebKit has had multiple
+    // touch/pointer compatibility bugs, while click is the browser's canonical
+    // user activation event for a tap.
     gate?.addEventListener("click",handleAudioGesture);
+    boot?.addEventListener("click",handleAudioGesture,{capture:true});
     gate?.addEventListener("keydown",event=>{
       if(event.key==="Enter"||event.key===" "){
         event.preventDefault();
