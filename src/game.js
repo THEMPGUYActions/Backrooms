@@ -229,7 +229,7 @@ class Chunk{
 
         // Level1MazeGenerator.spawnRandomRooms(): one 3x3 special area,
         // with storage being uncommon and the pillars structure otherwise.
-        if(rng.next()<.88){
+        {
           let room=null;
           for(let attempt=0;attempt<18&&!room;attempt++){
             const x=rng.int(1,cells-4),z=rng.int(1,cells-4);
