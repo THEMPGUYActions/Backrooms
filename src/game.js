@@ -2098,8 +2098,9 @@ export class BackroomsGame{
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
     this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.024:.058);
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:.052;
-    this.flash.color.setHex(this.level.id==="2"?0xd9d7ff:0xffffee);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.020:.052;
+    const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
+    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
     const objective=document.getElementById("objective");if(objective)objective.textContent=this.level.objective;
