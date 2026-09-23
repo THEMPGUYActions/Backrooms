@@ -1,3 +1,5 @@
+import { isTouchControlsDevice } from "./platform.js";
+
 export class InputManager {
   constructor(game){
     this.game = game;
