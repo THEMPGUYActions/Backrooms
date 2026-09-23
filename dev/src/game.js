@@ -820,7 +820,8 @@ class Chunk{
     const lightRng=new RNG(this.seedKey()^0x6a11c);
     const next=()=>lightRng.next();
     const wallCells=new Set();
-    const addWall=(x,z)=>wallCells.add(x+","+z);
+    const manilaCells=new Set();
+    const addWall=(x,z,manila=false)=>(manila?manilaCells:wallCells).add(x+","+z);
 
     const addRoom=(cellX,cellZ,mask)=>{
       const variant=roomRng.int(0,7);
@@ -839,8 +840,9 @@ class Chunk{
     const addMacro=(type,baseX,baseZ)=>{
       const template=LEVEL0_MEGA_TEMPLATES[type];
       if(!template)return;
+      const manila=type===4;
       for(const [z,start,end] of template.runs||[]){
-        for(let x=start;x<=end;x++)addWall(baseX+x,baseZ+z);
+        for(let x=start;x<=end;x++)addWall(baseX+x,baseZ+z,manila);
       }
     };
 
@@ -859,77 +861,96 @@ class Chunk{
       if(this.megaType>=3)addMacro(this.megaType,this.originX+16,this.originZ+16);
     }
 
-    // Render only exposed surfaces of the union of wall blocks. This removes
-    // internal coplanar faces, which is both cheaper and immune to z-fighting.
-    const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
-    const wallTileSize=1.0;
-    const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
-      const base=positions.length/3;
-      for(const v of verts){
-        positions.push(v[0],v[1],v[2]);
-        normals.push(nx,ny,nz);
+    // Render only exposed faces of the union of source wall blocks. Each
+    // browser wall cell is one Minecraft block wide, preserving the source
+    // texture scale instead of stretching a long generated wall.
+    const h=level.wallHeight;
+    const bottomHData=[],bottomVData=[],bottomHData2=[],bottomVData2=[];
+    const allWallCells=new Set([...wallCells,...manilaCells]);
+    const has=(x,z)=>allWallCells.has(x+","+z);
+
+    const makeWallMesh=(cellsSet,material)=>{
+      const positions=[],normals=[],uvs=[],indices=[];
+      const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
+        const base=positions.length/3;
+        for(const v of verts){
+          positions.push(v[0],v[1],v[2]);
+          normals.push(nx,ny,nz);
+        }
+        uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
+        indices.push(base,base+1,base+2,base,base+2,base+3);
+      };
+      const isManila=material===lib.wall2;
+
+      for(const key of cellsSet){
+        const [x,z]=key.split(",").map(Number);
+        const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
+        const bottomH=isManila?bottomHData2:bottomHData;
+        const bottomV=isManila?bottomVData2:bottomVData;
+
+        if(!has(x,z-1)){
+          appendFace(
+            [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
+            0,0,-1,0,0,1,h
+          );
+          bottomH.push(new THREE.Matrix4().makeTranslation((minX+maxX)/2,.0625,minZ));
+        }
+
+        if(!has(x,z+1)){
+          appendFace(
+            [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
+            0,0,1,0,0,1,h
+          );
+          bottomH.push(new THREE.Matrix4().makeTranslation((minX+maxX)/2,.0625,maxZ));
+        }
+
+        if(!has(x-1,z)){
+          appendFace(
+            [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
+            -1,0,0,0,0,1,h
+          );
+          bottomV.push(new THREE.Matrix4().makeTranslation(minX,.0625,(minZ+maxZ)/2));
+        }
+
+        if(!has(x+1,z)){
+          appendFace(
+            [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
+            1,0,0,0,0,1,h
+          );
+          bottomV.push(new THREE.Matrix4().makeTranslation(maxX,.0625,(minZ+maxZ)/2));
+        }
+
+        appendFace(
+          [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
+          0,-1,0,0,0,1,1
+        );
+        appendFace(
+          [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
+          0,1,0,0,0,1,1
+        );
       }
-      uvs.push(u0,v0,u1,v0,u1,v1,u0,v1);
-      indices.push(base,base+1,base+2,base,base+2,base+3);
+
+      if(!positions.length)return null;
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
+      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+      geometry.setIndex(indices);
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+
+      const mesh=new THREE.Mesh(geometry,material);
+      mesh.name=isManila?"level0_manila_walls":"level0_walls";
+      mesh.frustumCulled=true;
+      g.add(mesh);
+      return mesh;
     };
 
-    const has=(x,z)=>wallCells.has(x+","+z);
-    const bottomHData=[],bottomVData=[];
-    const pushBottomH=(x,z)=>bottomHData.push(new THREE.Matrix4().makeTranslation(x,.0625,z));
-    const pushBottomV=(x,z)=>bottomVData.push(new THREE.Matrix4().makeTranslation(x,.0625,z));
-    for(const key of wallCells){
-      const [x,z]=key.split(",").map(Number);
-      const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
-
-      if(!has(x,z-1)){
-        appendFace(
-          [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
-          0,0,-1,0,0,1,h/wallTileSize
-        );
-        pushBottomH((minX+maxX)/2,minZ);
-
-      }
-
-      if(!has(x,z+1)){
-        appendFace(
-          [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
-          0,0,1,0,0,1,h/wallTileSize
-        );
-        pushBottomH((minX+maxX)/2,maxZ);
-
-      }
-
-      if(!has(x-1,z)){
-        appendFace(
-          [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
-          -1,0,0,0,0,1,h/wallTileSize
-        );
-        pushBottomV(minX,(minZ+maxZ)/2);
-
-      }
-
-      if(!has(x+1,z)){
-        appendFace(
-          [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
-          1,0,0,0,0,1,h/wallTileSize
-        );
-        pushBottomV(maxX,(minZ+maxZ)/2);
-      }
-
-      // wall_block is a solid Minecraft cube. Keep its caps so isolated
-      // columns/posts do not render as hollow or cross-shaped.
-      appendFace(
-        [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
-        0,-1,0,0,0,1,1
-      );
-      appendFace(
-        [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
-        0,1,0,0,0,1,1
-      );
-    }
+    makeWallMesh(wallCells,lib.wall);
+    makeWallMesh(manilaCells,lib.wall2);
 
     const horizontal=new Map(),vertical=new Map();
-    for(const key of wallCells){
+    for(const key of allWallCells){
       const cut=key.indexOf(",");
       const x=Number(key.slice(0,cut)),z=Number(key.slice(cut+1));
       if(!has(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
@@ -939,22 +960,6 @@ class Chunk{
     }
     this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
       .concat(level0MergeBoundaryIntervals(vertical,false));
-
-    if(positions.length){
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
-      geometry.setIndex(indices);
-      geometry.computeBoundingBox();
-      geometry.computeBoundingSphere();
-
-      const mesh=new THREE.Mesh(geometry,lib.wall);
-      mesh.name="level0_walls";
-      mesh.frustumCulled=true;
-      g.add(mesh);
-      this.level0WallMesh=mesh;
-    }
 
     // SpacePotato's bottom-most wall block uses a 2/16-high, 18/16-wide
     // base element. Recreate only its exposed sides so adjacent walls do not
