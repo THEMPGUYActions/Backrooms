@@ -1551,7 +1551,15 @@ export class BackroomsGame{
   }
   changeLevel(id){
     if(!id){this.ending();return}
-    this.audio.exit();this.player.position.set(0,this.player.eyeY,0);this.setLevel(id);this.toast("You slipped into "+this.level.number+".",3);
+    this.audio.exit();
+    this.setLevel(id);
+    if(String(id)==="1"){
+      this.player.position.set(6,this.player.eyeY,3);
+    }else{
+      this.player.position.set(0,this.player.eyeY,0);
+    }
+    this.world.ensureAround(this.player.position.x,this.player.position.z);
+    this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
