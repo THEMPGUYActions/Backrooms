@@ -1509,21 +1509,14 @@ export class BackroomsGame{
       audioPage.setAttribute("aria-hidden","true");
     }
     if(boot){
-      boot.style.pointerEvents="none";
-      boot.setAttribute("aria-hidden","true");
+      // The audio-gate click is the final user gesture for startup. Remove the
+      // cinematic overlay synchronously so the renderer and gameplay input are
+      // never left underneath a transparent or fading DOM layer.
       boot.classList.add("fade-out");
-      // Put the intro behind the renderer immediately, then remove it after the
-      // fade. This prevents an invisible/transparent intro layer from ever
-      // competing with gameplay input or rendering.
-      boot.style.zIndex="-1";
-      const removeIntro=()=>{
-        boot.style.display="none";
-        boot.style.pointerEvents="none";
-      };
-      boot.addEventListener("transitionend",event=>{
-        if(event.propertyName==="opacity")removeIntro();
-      },{once:true});
-      setTimeout(removeIntro,1350);
+      boot.style.pointerEvents="none";
+      boot.style.visibility="hidden";
+      boot.style.display="none";
+      boot.setAttribute("aria-hidden","true");
     }
     this.render();
     this.toast(this.level.objective,3);
