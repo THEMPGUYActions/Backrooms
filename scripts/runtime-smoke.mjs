@@ -141,7 +141,7 @@ try{
   await delay(1500);
 
   const stateResult=await command("Runtime.evaluate",{
-    expression:"JSON.stringify({running:window.backrooms.running,paused:window.backrooms.paused,introActive:window.backrooms.introActive,runtimeFaulted:window.backrooms.runtimeFaulted,mobileDisplay:getComputedStyle(document.getElementById('mobile-controls')).display,hud:getComputedStyle(document.getElementById('hud')).display})",
+    expression:"JSON.stringify({running:window.backrooms.running,paused:window.backrooms.paused,introActive:window.backrooms.introActive,runtimeFaulted:window.backrooms.runtimeFaulted,mobileDisplay:getComputedStyle(document.getElementById('mobile-controls')).display,hud:getComputedStyle(document.getElementById('hud')).display,bootDisplay:getComputedStyle(document.getElementById('boot')).display,bootPointerEvents:getComputedStyle(document.getElementById('boot')).pointerEvents})",
     returnByValue:true
   });
   const state=JSON.parse(stateResult.result?.result?.value||"{}");
@@ -154,6 +154,7 @@ try{
   }
   if(state.mobileDisplay!=="none")throw new Error("Mobile controls appeared on desktop after gameplay start: "+JSON.stringify(state));
   if(state.hud==="none")throw new Error("HUD remained hidden after gameplay start");
+  if(state.bootDisplay!=="none"||state.bootPointerEvents!=="none")throw new Error("Intro overlay still blocked gameplay after activation: "+JSON.stringify(state));
 
   const runtimeErrors=messages.filter(message=>
     message.method==="Runtime.exceptionThrown"||
