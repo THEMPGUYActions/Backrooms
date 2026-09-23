@@ -43,6 +43,17 @@ jobs:
           test -s dist/styles.css
           test -f dist/.nojekyll
 
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v2.2.0
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Runtime browser smoke
+        run: node scripts/runtime-smoke.mjs
+        env:
+          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
+
       - name: Upload CI build
         if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
