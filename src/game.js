@@ -862,7 +862,6 @@ class Chunk{
     // Render only exposed surfaces of the union of wall blocks. This removes
     // internal coplanar faces, which is both cheaper and immune to z-fighting.
     const positions=[],normals=[],uvs=[],indices=[],h=level.wallHeight;
-    const wallTileSize=2.4;
     const appendFace=(verts,nx,ny,nz,u0,v0,u1,v1)=>{
       const base=positions.length/3;
       for(const v of verts){
@@ -874,6 +873,9 @@ class Chunk{
     };
 
     const has=(x,z)=>wallCells.has(x+","+z);
+    const bottomHData=[],bottomVData=[];
+    const pushBottomH=(x,z)=>bottomHData.push(new THREE.Matrix4().makeTranslation(x,.0625,z));
+    const pushBottomV=(x,z)=>bottomVData.push(new THREE.Matrix4().makeTranslation(x,.0625,z));
     for(const key of wallCells){
       const [x,z]=key.split(",").map(Number);
       const minX=x,maxX=x+1,minZ=z,maxZ=z+1;
@@ -881,43 +883,47 @@ class Chunk{
       if(!has(x,z-1)){
         appendFace(
           [[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]],
-          0,0,-1,(minX-this.originX)/wallTileSize,0,(maxX-this.originX)/wallTileSize,h/wallTileSize
+          0,0,-1,0,0,1,h
         );
+        pushBottomH((minX+maxX)/2,minZ);
 
       }
 
       if(!has(x,z+1)){
         appendFace(
           [[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]],
-          0,0,1,(minX-this.originX)/wallTileSize,0,(maxX-this.originX)/wallTileSize,h/wallTileSize
+          0,0,1,0,0,1,h
         );
+        pushBottomH((minX+maxX)/2,maxZ);
 
       }
 
       if(!has(x-1,z)){
         appendFace(
           [[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]],
-          -1,0,0,(minZ-this.originZ)/wallTileSize,0,(maxZ-this.originZ)/wallTileSize,h/wallTileSize
+          -1,0,0,0,0,1,h
         );
+        pushBottomV(minX,(minZ+maxZ)/2);
 
       }
 
       if(!has(x+1,z)){
         appendFace(
           [[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]],
-          1,0,0,(minZ-this.originZ)/wallTileSize,0,(maxZ-this.originZ)/wallTileSize,h/wallTileSize
+          1,0,0,0,0,1,h
         );
+        pushBottomV(maxX,(minZ+maxZ)/2);
       }
 
       // wall_block is a solid Minecraft cube. Keep its caps so isolated
       // columns/posts do not render as hollow or cross-shaped.
       appendFace(
         [[minX,0.001,minZ],[minX,0.001,maxZ],[maxX,0.001,maxZ],[maxX,0.001,minZ]],
-        0,-1,0,(minX-this.originX)/wallTileSize,0,(maxX-this.originX)/wallTileSize,1/wallTileSize
+        0,-1,0,0,0,1,1
       );
       appendFace(
         [[minX,h,minZ],[maxX,h,minZ],[maxX,h,maxZ],[minX,h,maxZ]],
-        0,1,0,(minX-this.originX)/wallTileSize,0,(maxX-this.originX)/wallTileSize,1/wallTileSize
+        0,1,0,0,0,1,1
       );
     }
 
@@ -948,6 +954,37 @@ class Chunk{
       g.add(mesh);
       this.level0WallMesh=mesh;
     }
+
+    // SpacePotato's bottom-most wall block uses a 2/16-high, 18/16-wide
+    // base element. Recreate only its exposed sides so adjacent walls do not
+    // produce coplanar duplicate geometry.
+    if(bottomHData.length){
+      const mesh=new THREE.InstancedMesh(
+        new THREE.BoxGeometry(1.125,.125,.125),
+        lib.wallBottom,
+        bottomHData.length
+      );
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      bottomHData.forEach((m,i)=>mesh.setMatrixAt(i,m));
+      mesh.instanceMatrix.needsUpdate=true;
+      mesh.computeBoundingBox();
+      mesh.computeBoundingSphere();
+      g.add(mesh);
+    }
+    if(bottomVData.length){
+      const mesh=new THREE.InstancedMesh(
+        new THREE.BoxGeometry(.125,.125,1.125),
+        lib.wallBottom,
+        bottomVData.length
+      );
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      bottomVData.forEach((m,i)=>mesh.setMatrixAt(i,m));
+      mesh.instanceMatrix.needsUpdate=true;
+      mesh.computeBoundingBox();
+      mesh.computeBoundingSphere();
+      g.add(mesh);
+    }
+
     // The source roof is an 8x8 block structure. roof1 has no light;
     // roof2 replaces four ceiling blocks with one-block fluorescent lights.
     const fixtureCandidates=[];
@@ -976,25 +1013,25 @@ class Chunk{
       if(fixtureCount>=maxFixtures)break;
 
       const mat=lib.light.clone();
-      mat.emissiveIntensity=1.55+next()*.4;
+      mat.emissiveIntensity=1.20+next()*.22;
       const fixture=box(
         g,
-        new THREE.BoxGeometry(.92,.08,.92),
+        new THREE.BoxGeometry(1.0,.06,1.0),
         mat,
-        candidate.px,level.wallHeight-.015,candidate.pz,
+        candidate.px,level.wallHeight-.025,candidate.pz,
         0,0,0
       );
       fixture.userData.light=true;
       fixture.userData.baseEmissive=mat.emissiveIntensity;
       this.fixtures.push(fixture);
 
-      const intensity=82+next()*18;
+      const intensity=10.0+next()*2.0;
       this.lightSources.push({
-        position:new THREE.Vector3(candidate.px,level.wallHeight-.25,candidate.pz),
-        color:0xffff78,
+        position:new THREE.Vector3(candidate.px,level.wallHeight-.5,candidate.pz),
+        color:0xfff064,
         baseIntensity:intensity,
         intensity,
-        distance:18,
+        distance:13,
         decay:2,
         fixture
       });
@@ -1346,6 +1383,8 @@ class WorldStreamer{
       try{
         if(this.game.level.id==="1"){
           await applyLevel1Assets(this.library,this.game.level,onProgress);
+        }else if(this.game.level.id==="0"){
+          await applyLevel0Assets(this.library,this.game.level,onProgress);
         }else{
           await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
         }
@@ -1643,13 +1682,23 @@ class Player{
     this.game.camera.rotation.set(this.viewPitch,this.viewYaw,roll,"YXZ");
 
     const batteryPower=Math.max(0,this.flashBattery/100);
-    const beamPower=Math.pow(batteryPower,.82);
-    this.game.flash.position.copy(this.game.camera.position);
-    this.game.flash.intensity=this.flashlight?(20+beamPower*700):0;
-    this.game.flash.distance=this.flashlight?(10+beamPower*105):10;
-    this.game.flash.angle=.36;
-    this.game.flash.penumbra=.54;
-    this.game.flashTarget.position.copy(this.game.camera.position).add(new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion));
+    const beamPower=Math.pow(batteryPower,.72);
+    const flashForward=new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion).normalize();
+    // Keep the light source slightly behind the camera. When the camera is
+    // pressed against a wall, placing the source inside the surface creates
+    // a saturated center hotspot instead of a natural flashlight wash.
+    const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.16);
+    this.game.flash.position.copy(flashOrigin);
+    this.game.flashFill.position.copy(flashOrigin);
+    this.game.flash.intensity=this.flashlight?(2.15+beamPower*4.6):0;
+    this.game.flash.distance=25;
+    this.game.flash.angle=.25;
+    this.game.flash.penumbra=.88;
+    this.game.flash.decay=2;
+    this.game.flashFill.intensity=this.flashlight?(.20+beamPower*.62):0;
+    this.game.flashFill.distance=25;
+    this.game.flashFill.decay=2;
+    this.game.flashTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
     this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance);
   }
 }
@@ -1804,16 +1853,25 @@ export class BackroomsGame{
 
     this.input=new InputManager(this);this.audio=new AudioDirector();this.player=new Player(this);this.world=new WorldStreamer(this);
     this.localLights=[];
-    const localLightCount=this.level.id==="0"?(isTouchControlsDevice()?6:10):(isTouchControlsDevice()?14:24);
+    const localLightCount=this.level.id==="0"?(isTouchControlsDevice()?8:14):(isTouchControlsDevice()?14:24);
     for(let i=0;i<localLightCount;i++){
-      const light=new THREE.PointLight(0xffd34d,0,0,2);
+      const light=new THREE.PointLight(0xfff064,0,13,2);
       light.name="dynamic_fluorescent_"+i;
       light.visible=true;
       this.localLights.push(light);
       this.scene.add(light);
     }this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
-    this.ambient=new THREE.HemisphereLight(0x665f52,0x080807,.052);this.scene.add(this.ambient);
-    this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,0,10,.36,.54,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
+    // The source Level 0 dimension has no skylight or ambient daylight. Keep
+    // the base fill very low so fluorescent fixtures and the flashlight carry
+    // the scene.
+    this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.020);this.scene.add(this.ambient);
+    this.flashTarget=new THREE.Object3D();
+    this.flash=new THREE.SpotLight(0xfff1d5,0,25,.25,.88,2);
+    this.flashFill=new THREE.PointLight(0xfff1d5,0,25,2);
+    this.flash.castShadow=false;
+    this.flashFill.castShadow=false;
+    this.flash.target=this.flashTarget;
+    this.scene.add(this.flash,this.flashFill,this.flashTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
@@ -2250,7 +2308,6 @@ export class BackroomsGame{
     if(status)status.textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";
     const battery=document.getElementById("flash-battery");
     if(battery)battery.textContent="BAT "+Math.round(this.player.flashBattery)+"%";
-    this.flash.position.copy(this.camera.position);
   }
   updateArgLayer(dt){
     const t=Math.floor(this.gameTime),h=String(Math.floor(t/3600)%24).padStart(2,"0"),m=String(Math.floor(t/60)%60).padStart(2,"0"),s=String(t%60).padStart(2,"0");
