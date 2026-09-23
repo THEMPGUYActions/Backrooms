@@ -207,6 +207,7 @@ export async function applyLevel0Assets(library,level,onProgress=()=>{}){
     [library.wall2,"map",LEVEL0_ASSET_SOURCES.wall2,true,1,.0,"Level 0 Manila wall texture"],
     [library.wallBottom,"map",LEVEL0_ASSET_SOURCES.wallBottom,true,1,.0,"Level 0 wall base texture"],
     [library.wallBottom2,"map",LEVEL0_ASSET_SOURCES.wallBottom2,true,1,.0,"Level 0 Manila wall base texture"],
+    [library.trim,"map",LOCAL_SPB_ASSET_BASE+"wall_trim_texture.png",true,1,.0,"Level 0 wall trim"]
     [library.floor,"map",LEVEL0_ASSET_SOURCES.floor.color,true,1.25,.16,"Level 0 carpet color"],
     [library.floor,"normalMap",LEVEL0_ASSET_SOURCES.floor.normal,false,1.25,.22,"Level 0 carpet normal"],
     [library.ceiling,"map",LEVEL0_ASSET_SOURCES.ceiling.color,true,1,.18,"Level 0 ceiling color"],
