@@ -207,7 +207,7 @@ export async function applyLevel0Assets(library,level,onProgress=()=>{}){
     [library.wall2,"map",LEVEL0_ASSET_SOURCES.wall2,true,1,.0,"Level 0 Manila wall texture"],
     [library.wallBottom,"map",LEVEL0_ASSET_SOURCES.wallBottom,true,1,.0,"Level 0 wall base texture"],
     [library.wallBottom2,"map",LEVEL0_ASSET_SOURCES.wallBottom2,true,1,.0,"Level 0 Manila wall base texture"],
-    [library.trim,"map",LOCAL_SPB_ASSET_BASE+"wall_trim_texture.png",true,1,.0,"Level 0 wall trim"]
+    [library.trim,"map",LOCAL_SPB_ASSET_BASE+"wall_trim_texture.png",true,1,.0,"Level 0 wall trim"],
     [library.floor,"map",LEVEL0_ASSET_SOURCES.floor.color,true,1.25,.16,"Level 0 carpet color"],
     [library.floor,"normalMap",LEVEL0_ASSET_SOURCES.floor.normal,false,1.25,.22,"Level 0 carpet normal"],
     [library.ceiling,"map",LEVEL0_ASSET_SOURCES.ceiling.color,true,1,.18,"Level 0 ceiling color"],
@@ -326,6 +326,7 @@ export function makeLibrary(level){
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
     light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
+    redLight:new THREE.MeshStandardMaterial({color:0x9a2825,roughness:.42,metalness:0,emissive:0x6e1714,emissiveIntensity:1.5}),
     orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2}),
     battery:new THREE.MeshStandardMaterial({color:0x1c1d1b,roughness:.55,metalness:.35}),
     batteryLabel:new THREE.MeshStandardMaterial({color:0xc9b85f,roughness:.45,metalness:.15,emissive:0x6f5b1c,emissiveIntensity:.45}),
