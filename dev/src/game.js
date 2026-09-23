@@ -3,10 +3,10 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20260923-2032";
-import { AudioDirector } from "./audio.js?v=20260923-2032";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2032";
-import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2032";
+import { InputManager } from "./input.js?v=20260923-2050";
+import { AudioDirector } from "./audio.js?v=20260923-2050";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2050";
+import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2050";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -458,7 +458,7 @@ class Chunk{
       if(x===cells-1&&(mask&2))addEdge("east");
 
       const fixtureSlot=level.id==="0"?x%2===0&&z%2===0:true;
-      const fixtureChance=level.id==="0"?.78:level.id==="1"?0:.13;
+      const fixtureChance=level.id==="0"?0:level.id==="1"?0:.13;
       if(fixtureSlot&&rngBase.next()<fixtureChance){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,fixtureMaterial=fixtureMat.clone();
         const rotation=rngBase.next()<.5?0:Math.PI/2,jx=(rngBase.next()-.5)*1.8,jz=(rngBase.next()-.5)*1.8;
@@ -502,24 +502,7 @@ class Chunk{
     }
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
-
-    if(level.id==="0"){
-      const columnGeom=new THREE.BoxGeometry(.72,level.wallHeight,.72),columnData=[],columnCount=3+rngBase.int(0,4);
-      for(let i=0;i<columnCount;i++){
-        const cx=.75+rngBase.next()*(cells-1.5),cz=.75+rngBase.next()*(cells-1.5);
-        columnData.push(new THREE.Matrix4().makeTranslation(this.originX+cx*cell,level.wallHeight/2,this.originZ+cz*cell));
-      }
-      if(columnData.length){
-        const columns=new THREE.InstancedMesh(columnGeom,lib.wall,columnData.length);
-        columns.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-        columnData.forEach((m,i)=>columns.setMatrixAt(i,m));
-        columns.instanceMatrix.needsUpdate=true;
-        columns.computeBoundingBox();
-        columns.computeBoundingSphere();
-        columns.frustumCulled=true;
-        g.add(columns);
-      }
-    }
+    else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
 
     for(const hz of this.hazards){
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
@@ -705,6 +688,197 @@ class Chunk{
       }
     }
   }
+  buildLevel0Set(level,lib,rng){
+    const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
+    const next=()=>rng.next();
+
+    // SpacePotato's Level 0 is based on 5x5 maze sectors of 16-block cells,
+    // with some sectors replaced/overlaid by large room structures. The
+    // original mod's room structures are NBT assets, so this browser version
+    // recreates their major visual geometry instead of using the Level 1
+    // garage generator.
+    const addLight=(x,z,rotation=0,scale=1,intensity=185)=>{
+      const fixtureMat=lib.light.clone();
+      fixtureMat.emissiveIntensity=2.25+next()*.65;
+      const fixture=box(
+        g,
+        new THREE.BoxGeometry(3.65*scale,.055,.68*scale),
+        fixtureMat,
+        x,
+        level.wallHeight-.09,
+        z,
+        0,
+        rotation,
+        0
+      );
+      fixture.userData.light=true;
+      fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;
+      this.fixtures.push(fixture);
+      box(
+        g,
+        new THREE.BoxGeometry(3.95*scale,.085,.86*scale),
+        lib.metal,
+        x,
+        level.wallHeight-.025,
+        z,
+        0,
+        rotation,
+        0
+      );
+      this.lightSources.push({
+        position:new THREE.Vector3(x,level.wallHeight-.27,z),
+        color:0xffd96a,
+        baseIntensity:intensity,
+        intensity,
+        distance:30,
+        decay:2
+      });
+    };
+
+    const addPillar=(x,z,w=1.45)=>{
+      const pillar=box(
+        g,
+        new THREE.BoxGeometry(w,level.wallHeight,w),
+        lib.wall,
+        x,
+        level.wallHeight/2,
+        z
+      );
+      pillar.userData.level0Pillar=true;
+      box(g,new THREE.BoxGeometry(w+.12,.10,w+.12),lib.trim,x,.05,z);
+      return pillar;
+    };
+
+    const addPartition=(x,z,w,d,rotation=0)=>{
+      box(
+        g,
+        new THREE.BoxGeometry(w,level.wallHeight,d),
+        lib.wall,
+        x,
+        level.wallHeight/2,
+        z,
+        0,
+        rotation,
+        0
+      );
+    };
+
+    if(this.zone==="mega"){
+      // SpacePotato's large Level 0 rooms are broad yellow spaces with
+      // repeating architectural supports and a dense fluorescent ceiling.
+      const roomMinX=this.originX+8,roomMinZ=this.originZ+8;
+
+      if((this.spacePotatoMegaType||1)===1){
+        // 4x4 pillar lattice. Keep the centre clear because the player starts
+        // at the origin and the reference room has broad sightlines.
+        const positions=[-24,-8,8,24];
+        for(const ox of positions)for(const oz of positions){
+          addPillar(roomMinX+32+ox,roomMinZ+32+oz,1.55);
+        }
+
+        for(let x=roomMinX+8;x<roomMinX+64;x+=16){
+          for(let z=roomMinZ+8;z<roomMinZ+64;z+=16){
+            if(next()<.14)continue;
+            addLight(x,z,next()<.5?0:Math.PI/2,1,.88*185);
+          }
+        }
+      }else{
+        // The other large structure is intentionally less regular: long
+        // yellow partitions create the room-within-a-room feeling seen in
+        // Level 0 instead of turning the space into a Level 1 parking garage.
+        addPartition(roomMinX+16,roomMinZ+32,1.25,48);
+        addPartition(roomMinX+48,roomMinZ+32,1.25,48);
+        addPartition(roomMinX+32,roomMinZ+16,30,1.25);
+        addPartition(roomMinX+32,roomMinZ+48,30,1.25);
+
+        const cuts=[
+          [roomMinX+16,roomMinZ+16,0],
+          [roomMinX+48,roomMinZ+16,0],
+          [roomMinX+16,roomMinZ+48,0],
+          [roomMinX+48,roomMinZ+48,0]
+        ];
+        for(const [x,z] of cuts)addPillar(x,z,1.3);
+
+        for(let x=roomMinX+8;x<roomMinX+64;x+=16){
+          for(let z=roomMinZ+8;z<roomMinZ+64;z+=16){
+            if(next()<.18)continue;
+            addLight(x,z,next()<.5?0:Math.PI/2,1,next()<.12?95:175);
+          }
+        }
+      }
+
+      // A few small architectural offsets keep the large room from reading
+      // like a perfectly repeated game arena.
+      for(let i=0;i<3;i++){
+        const px=roomMinX+6+next()*52,pz=roomMinZ+6+next()*52;
+        if(next()<.5)addPillar(px,pz,.95);
+        else addPartition(px,pz,4.2,.75,next()<.5?0:Math.PI/2);
+      }
+    }else{
+      // Standard SpacePotato Level 0 maze sector: each 16x16 cell is a
+      // segmented room/hall unit, with inconsistent fluorescent placement.
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        const mask=this.walls[this.index(x,z)];
+        const openings=4-
+          ((mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0));
+        if(openings===0)continue;
+
+        const px=this.originX+x*cell+cell/2;
+        const pz=this.originZ+z*cell+cell/2;
+
+        // One or occasionally two lights per occupied cell. The slight
+        // offset is deliberate and matches the inconsistent ceiling layout.
+        const chance=.54+openings*.08;
+        if(next()<chance){
+          addLight(
+            px+(next()-.5)*2.2,
+            pz+(next()-.5)*2.2,
+            next()<.5?0:Math.PI/2,
+            .84+next()*.22,
+            145+next()*80
+          );
+          if(openings>=3&&next()<.16){
+            addLight(
+              px+(next()-.5)*3.4,
+              pz+(next()-.5)*3.4,
+              next()<.5?0:Math.PI/2,
+              .68+next()*.18,
+              115+next()*55
+            );
+          }
+        }
+      }
+
+      // SpacePotato places a 32x32 special-room structure over the maze in
+      // the megaroom3-6 path. Recreate that as an open central room with the
+      // same yellow architecture rather than a concrete garage.
+      if(this.rooms.some(room=>room.type==="mega")){
+        const cx=this.originX+size/2,cz=this.originZ+size/2;
+        const roomType=(this.spacePotatoMegaType||3)-3;
+
+        if(roomType===0||roomType===2){
+          for(const [ox,oz] of [[-8,-8],[8,-8],[-8,8],[8,8]])addPillar(cx+ox,cz+oz,1.2);
+        }else if(roomType===1){
+          for(const [ox,oz] of [[-9,-9],[9,-9],[-9,9],[9,9]])addPillar(cx+ox,cz+oz,1.0);
+          for(const [ox,oz,rot] of [[0,-12,0],[0,12,0],[-12,0,Math.PI/2],[12,0,Math.PI/2]]){
+            addPartition(cx+ox,cz+oz,5,.7,rot);
+          }
+        }else{
+          for(const [ox,oz] of [[-8,-8],[8,-8],[-8,8],[8,8]])addPillar(cx+ox,cz+oz,.95);
+          for(let i=0;i<7;i++){
+            const hx=cx-10+next()*20,hz=cz-10+next()*20;
+            const hole=new THREE.Mesh(new THREE.CircleGeometry(.85+next()*.55,18),lib.dark);
+            hole.rotation.x=-Math.PI/2;
+            hole.position.set(hx,.018,hz);
+            g.add(hole);
+          }
+        }
+
+        for(let x=cx-12;x<=cx+12;x+=8)addLight(x,cz,next()<.5?0:Math.PI/2,.72,135+next()*55);
+      }
+    }
+  }
+
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
     const next=()=>rng.next();
