@@ -337,11 +337,28 @@ class Chunk{
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
     const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0));
-    if((level.id==="1"?level1ExitSector:chunkDistance>=level.exitAfterChunks)&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
+    if(level.id==="1"){
+      // SpacePotato's Level1ChunkGenerator places the level2 stairwell only
+      // in the non-megaroom path, outside the spawn radius, with a 50% roll.
+      if(level1ExitSector&&rng2.next()<.5){
+        const candidates=[];
+        for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
+          if(this.rooms.some(room=>x>=room.x&&x<room.x+room.w&&z>=room.z&&z<room.z+room.h))continue;
+          candidates.push({x,z});
+        }
+        if(candidates.length){
+          const chosen=rng2.pick(candidates);
+          this.exit={...chosen,kind:"stairwell2"};
+        }
+      }
+    }else if(chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
-        if(mask&1)candidates.push({x,z,side:"north"});if(mask&2)candidates.push({x,z,side:"east"});if(mask&4)candidates.push({x,z,side:"south"});if(mask&8)candidates.push({x,z,side:"west"});
+        if(mask&1)candidates.push({x,z,side:"north"});
+        if(mask&2)candidates.push({x,z,side:"east"});
+        if(mask&4)candidates.push({x,z,side:"south"});
+        if(mask&8)candidates.push({x,z,side:"west"});
       }
       if(candidates.length){
         const chosen=rng2.pick(candidates),kind=level.id==="0"?(rng2.next()<.62?"door":"flicker-wall"):"door";
@@ -533,7 +550,29 @@ class Chunk{
 
     if(this.exit){
       const e=this.exit;
-      if(e.kind==="door"){
+      if(e.kind==="stairwell2"){
+        const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
+        const landing=box(g,new THREE.BoxGeometry(3.9,.12,3.9),lib.concrete,px,.06,pz);
+        landing.userData.exit=true;
+        for(let i=0;i<8;i++){
+          const step=box(
+            g,
+            new THREE.BoxGeometry(3.15,.16,.48),
+            lib.stairs,
+            px,
+            .98-i*.12,
+            pz-.20-i*.48
+          );
+          step.userData.exit=true;
+        }
+        const opening=box(g,new THREE.BoxGeometry(3.0,.025,1.55),lib.dark,px,.02,pz-2.0);
+        opening.userData.exit=true;
+        for(const side of [-1,1]){
+          box(g,new THREE.BoxGeometry(.08,.92,3.9),lib.metal,px+side*2.02,.46,pz-1.4);
+        }
+        addLight(px,pz,0,.82,105);
+        this.exit.position=new THREE.Vector3(px,.72,pz-1.65);
+      }else if(e.kind==="door"){
         buildDoor(e,true);
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         this.exit.position=e.side==="north"?new THREE.Vector3(px,1.28,pz-cell/2-.78):
