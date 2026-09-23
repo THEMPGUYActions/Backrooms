@@ -29,7 +29,9 @@ export const LEVEL0_ASSET_SOURCES = Object.freeze({
     color: LOCAL_SPB_ASSET_BASE + "level0/pbr/ceiling_tile/ceiling_tile_color.png",
     normal: LOCAL_SPB_ASSET_BASE + "level0/pbr/ceiling_tile/ceiling_tile_normal.png"
   },
-  fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png"
+  fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png",
+  pole: LOCAL_SPB_ASSET_BASE + "pole.png",
+  plastic: LOCAL_SPB_ASSET_BASE + "plastic.png"
 });
 
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
@@ -212,7 +214,9 @@ export async function applyLevel0Assets(library,level,onProgress=()=>{}){
     [library.floor,"normalMap",LEVEL0_ASSET_SOURCES.floor.normal,false,1.25,.22,"Level 0 carpet normal"],
     [library.ceiling,"map",LEVEL0_ASSET_SOURCES.ceiling.color,true,1,.18,"Level 0 ceiling color"],
     [library.ceiling,"normalMap",LEVEL0_ASSET_SOURCES.ceiling.normal,false,1,.22,"Level 0 ceiling normal"],
-    [library.light,"map",LEVEL0_ASSET_SOURCES.fluorescent,true,1,.08,"Level 0 fluorescent fixture"]
+    [library.light,"map",LEVEL0_ASSET_SOURCES.fluorescent,true,1,.08,"Level 0 fluorescent fixture"],
+    [library.pole,"map",LEVEL0_ASSET_SOURCES.pole,true,1,.02,"Level 0 pole texture"],
+    [library.pillar,"map",LEVEL0_ASSET_SOURCES.plastic,true,1,.02,"Level 0 pillar plastic"]
   ];
   let done=0;
   onProgress(0,"LOADING LEVEL 0 ASSETS","SpacePotato Level 0 materials");
@@ -326,6 +330,8 @@ export function makeLibrary(level){
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
     light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
+    pole:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.72,metalness:.18}),
+    pillar:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.86,metalness:0}),
     redLight:new THREE.MeshStandardMaterial({color:0x9a2825,roughness:.42,metalness:0,emissive:0x6e1714,emissiveIntensity:1.5}),
     orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2}),
     battery:new THREE.MeshStandardMaterial({color:0x1c1d1b,roughness:.55,metalness:.35}),
