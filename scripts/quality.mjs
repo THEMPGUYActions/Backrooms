@@ -122,7 +122,7 @@ async function checkThreeApiCompatibility(files){
     ["multiplyVector3(","multiplyVector3() is obsolete; use Vector3.applyMatrix3()/applyMatrix4() as appropriate"],
     ["applyProjection(","Vector3.applyProjection() is obsolete; use Vector3.applyMatrix4()"]
   ];
-  for(const file of files.filter(file=>(extname(file)===".js"||extname(file)===".mjs")&&!file.endsWith("/scripts/quality.mjs")){
+  for(const file of files.filter(file=>((extname(file)===".js"||extname(file)===".mjs")&&!file.endsWith("/scripts/quality.mjs")))){
     const source=await readFile(file,"utf8");
     for(const [token,message] of deprecated)if(source.includes(token))fail("Three.js API compatibility: "+file+": "+message);
   }
