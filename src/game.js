@@ -1013,7 +1013,10 @@ class Chunk{
       if(fixtureCount>=maxFixtures)break;
 
       const mat=lib.light.clone();
-      mat.emissiveIntensity=1.20+next()*.22;
+      // The source fluorescent block is a full 1x1 ceiling block rendered
+      // full-bright while ON. Keep its web equivalent at a stable source-like
+      // emissive level instead of overdriving it.
+      mat.emissiveIntensity=1.0;
       const fixture=box(
         g,
         new THREE.BoxGeometry(1.0,.06,1.0),
@@ -1025,14 +1028,16 @@ class Chunk{
       fixture.userData.baseEmissive=mat.emissiveIntensity;
       this.fixtures.push(fixture);
 
-      const intensity=10.0+next()*2.0;
+      // Source value: radius 13, brightness 1.0, RGB (255,240,100), with
+      // the light positioned one block below the ceiling tile center.
+      const intensity=1.0;
       this.lightSources.push({
         position:new THREE.Vector3(candidate.px,level.wallHeight-.5,candidate.pz),
         color:0xfff064,
         baseIntensity:intensity,
         intensity,
         distance:13,
-        decay:2,
+        decay:1,
         fixture
       });
       fixtureCount++;
@@ -1599,6 +1604,38 @@ class WorldStreamer{
     out.sort((a,b)=>a.score-b.score);
     return out;
   }
+  flashlightWallDistance(x,z,dx,dz,maxDistance=2.5){
+    if(this.game.level.id!=="0")return Infinity;
+    const offset=32;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    let best=Infinity;
+    const rayX=dx,rayZ=dz;
+    const checkSegment=(s)=>{
+      const x1=s.x1,x2=s.x2,z1=s.z1,z2=s.z2;
+      const eps=1e-6;
+      if(Math.abs(x2-x1)<eps){
+        if(Math.abs(rayX)<eps)return;
+        const t=(x1-x)/rayX;
+        if(t<0||t>maxDistance||t>=best)return;
+        const hitZ=z+t*rayZ;
+        const lo=Math.min(z1,z2)-.03,hi=Math.max(z1,z2)+.03;
+        if(hitZ>=lo&&hitZ<=hi)best=t;
+      }else if(Math.abs(rayZ)>=eps){
+        const t=(z1-z)/rayZ;
+        if(t<0||t>maxDistance||t>=best)return;
+        const hitX=x+t*rayX;
+        const lo=Math.min(x1,x2)-.03,hi=Math.max(x1,x2)+.03;
+        if(hitX>=lo&&hitX<=hi)best=t;
+      }
+    };
+    for(let dzc=-1;dzc<=1;dzc++)for(let dxc=-1;dxc<=1;dxc++){
+      const chunk=this.chunks.get(this.key(cx+dxc,cz+dzc));
+      if(!chunk?.collisionSegments?.length)continue;
+      for(const segment of chunk.collisionSegments)checkSegment(segment);
+    }
+    return best;
+  }
+
   entitySpawns(){
     const out=[];
     for(const c of this.chunks.values()){
@@ -1695,15 +1732,26 @@ class Player{
     const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.16);
     this.game.flash.position.copy(flashOrigin);
     this.game.flashFill.position.copy(flashOrigin);
-    this.game.flash.intensity=this.flashlight?(1.55+beamPower*3.05):0;
+    // The source mod's deferred AreaLights do not have Three.js's inverse-
+    // square point-light hotspot. Suppress only the very-near-wall case so a
+    // wall cannot turn the center of the screen into a white disc.
+    const wallDistance=this.game.level.id==="0"
+      ? this.game.world.flashlightWallDistance(this.game.camera.position.x,this.game.camera.position.z,flashForward.x,flashForward.z,2.5)
+      : Infinity;
+    const wallT=wallDistance<Infinity?Math.max(0,Math.min(1,(wallDistance-.34)/.96)):1;
+    const nearWallScale=.16+.84*wallT*wallT;
+    this.game.flash.intensity=this.flashlight?(1.15+beamPower*1.85)*nearWallScale:0;
     this.game.flash.distance=25;
     this.game.flash.angle=.25;
     this.game.flash.penumbra=.88;
-    this.game.flash.decay=2;
-    this.game.flashFill.intensity=this.flashlight?(.18+beamPower*.48):0;
+    this.game.flash.decay=1;
+    this.game.flashFill.intensity=this.flashlight?(.10+beamPower*.22)*nearWallScale:0;
     this.game.flashFill.distance=25;
-    this.game.flashFill.decay=2;
+    this.game.flashFill.angle=.75;
+    this.game.flashFill.penumbra=1;
+    this.game.flashFill.decay=1;
     this.game.flashTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
+    this.game.flashFillTarget.position.copy(this.game.camera.position).addScaledVector(flashForward,1.5);
     this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance);
   }
 }
@@ -1871,12 +1919,17 @@ export class BackroomsGame{
     // the scene.
     this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.020);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();
-    this.flash=new THREE.SpotLight(0xfff1d5,0,25,.25,.88,2);
-    this.flashFill=new THREE.PointLight(0xfff1d5,0,25,2);
+    this.flashFillTarget=new THREE.Object3D();
+    // SpacePotato uses two deferred AreaLights for the flashlight: one broad
+    // wash and one 0.25-radian directional beam. Two spotlights are the closest
+    // portable WebGL equivalent without introducing a screen-space light decal.
+    this.flash=new THREE.SpotLight(0xfff1d5,0,25,.25,.88,1);
+    this.flashFill=new THREE.SpotLight(0xfff1d5,0,25,.75,1,1);
     this.flash.castShadow=false;
     this.flashFill.castShadow=false;
     this.flash.target=this.flashTarget;
-    this.scene.add(this.flash,this.flashFill,this.flashTarget);
+    this.flashFill.target=this.flashFillTarget;
+    this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
