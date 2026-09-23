@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createServer as createNetServer } from "node:net";
 
 const root=resolve("dist");
-const chrome=process.env.CHROME_BIN||process.env.CHROMIUM_BIN||"/usr/bin/chromium";
+const chrome=process.env.CHROME_BIN||process.env.CHROMIUM_BIN||"chrome";
 const mime={
   ".html":"text/html; charset=utf-8",
   ".js":"text/javascript; charset=utf-8",
