@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20260923-1252";
+import { BackroomsGame } from "./game.js?v=20260923-1304";
 
 const registerCache=async()=>{
   if(!("serviceWorker" in navigator))return;
@@ -23,7 +23,7 @@ game.mount().then(async()=>{
   /* DEV_ADMIN_START */
   if(new URLSearchParams(location.search).get("admin")!=="1")return;
   try{
-    const {BackroomsAdmin}=await import("./admin.js?v=20260923-1205");
+    const {BackroomsAdmin}=await import("./admin.js?v=20260923-1304");
     window.backroomsAdmin=new BackroomsAdmin(game);
     window.backroomsAdmin.activate();
   }catch(error){
