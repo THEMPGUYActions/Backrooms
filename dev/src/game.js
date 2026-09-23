@@ -336,10 +336,10 @@ class Chunk{
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
-    const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0));
+    const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
     if(level.id==="1"){
-      // SpacePotato's Level1ChunkGenerator places the level2 stairwell only
-      // in the non-megaroom path, outside the spawn radius, with a 50% roll.
+      // SpacePotato's Level1ChunkGenerator places the level2 stairwell on
+      // maze-grid sectors outside the starting area, using a 50% roll.
       if(level1ExitSector&&rng2.next()<.5){
         const candidates=[];
         for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
@@ -1138,29 +1138,17 @@ class WorldStreamer{
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
     const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
-    const bounds=this._lightBounds||(this._lightBounds=new THREE.Sphere(new THREE.Vector3(),2.05));
-    const view=this._lightViewPosition||(this._lightViewPosition=new THREE.Vector3());
-    const verticalFov=THREE.MathUtils.degToRad(camera?.getEffectiveFOV?.()??camera?.fov??62);
-    const horizontalFov=2*Math.atan(Math.tan(verticalFov*.5)*(camera?.aspect||1));
-    const halfV=verticalFov*.5;
-    const halfH=horizontalFov*.5;
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
-      const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
+      const c=this.chunks.get(this.key(cx+dx,cz+dz));
+      if(!c)continue;
       for(const light of c.lightSources){
+        const range=Math.max(34,light.distance||0);
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d>Math.max(96,this.size*2.6))continue;
-        view.copy(light.position).applyMatrix4(camera.matrixWorldInverse);
-        if(view.z>=-0.05||-view.z>camera.far+20)continue;
-        if(Math.abs(Math.atan2(view.x,-view.z))>halfH||Math.abs(Math.atan2(view.y,-view.z))>halfV)continue;
-        if(frustum){
-          bounds.center.copy(light.position);
-          if(!frustum.intersectsSphere(bounds))continue;
-        }
-        const horizontal=Math.abs(Math.atan2(view.x,-view.z))/Math.max(.001,halfH);
-        const vertical=Math.abs(Math.atan2(view.y,-view.z))/Math.max(.001,halfV);
-        const edge=Math.min(1,Math.max(horizontal,vertical));
-        const score=d*(1+edge*.9);
-        out.push({light,d,score});
+        // A point light can illuminate geometry that is outside the camera
+        // frustum. Do not cull it because the light source itself is behind
+        // the camera or just outside the view.
+        if(d>Math.max(96,range+54))continue;
+        out.push({light,d,score:d});
       }
     }
     out.sort((a,b)=>a.score-b.score);
