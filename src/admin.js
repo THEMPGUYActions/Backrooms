@@ -240,7 +240,7 @@ export class BackroomsAdmin{
       this.game.world.ensureAround(0,0);
       this.game.entityManager.clear();
       this.game.player.reset();
-      if(String(id)==="1")this.game.player.position.set(6,this.game.player.eyeY,3);
+      if(String(id)==="1")this.game.player.position.set(20,this.game.player.eyeY,20);
       else this.game.player.position.set(0,this.game.player.eyeY,0);
 
       this.game.running=true;
