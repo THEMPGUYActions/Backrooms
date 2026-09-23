@@ -7,6 +7,7 @@ import { InputManager } from "./input.js";
 import { AudioDirector } from "./audio.js";
 import { LEVELS, levelById, cycleHash } from "./levels.js";
 import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js";
+import { isTouchControlsDevice } from "./platform.js";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1064,7 +1065,7 @@ class WorldStreamer{
       const c=this.chunks.get(this.key(cx+dx,cz+dz));if(!c)continue;
       for(const light of c.lightSources){
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        camera?.matrixWorldInverse?.applyToVector3(view.copy(light.position));
+        view.copy(light.position).applyMatrix4(camera.matrixWorldInverse);
         if(view.z>=-0.05||-view.z>camera.far+20)continue;
         if(Math.abs(Math.atan2(view.x,-view.z))>halfH)continue;
         if(Math.abs(Math.atan2(view.y,-view.z))>halfV)continue;
@@ -1304,7 +1305,7 @@ export class BackroomsGame{
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(0x000000);
     this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
-    const touchDevice=matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches;
+    const touchDevice=isTouchControlsDevice();
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"highp"});
     this.renderer.setPixelRatio(1);this.renderer.setSize(Math.max(1,innerWidth),Math.max(1,innerHeight),false);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -1331,7 +1332,7 @@ export class BackroomsGame{
     }this.entityManager=new EntityManager(this);this.quality=new AdaptiveQuality(this);
     this.ambient=new THREE.HemisphereLight(0x665f52,0x080807,.052);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();this.flash=new THREE.SpotLight(0xfffff1,0,10,.36,.54,2);this.flash.castShadow=false;this.flash.target=this.flashTarget;this.scene.add(this.flash,this.flashTarget);
-    this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;
+    this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
     introControls?.classList.add("hidden");
@@ -1515,7 +1516,7 @@ export class BackroomsGame{
     if(info)info.textContent=detail;
   }
 
-  isTouchLayout(){return navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches||matchMedia("(hover:none)").matches||innerWidth<=900}
+  isTouchLayout(){return isTouchControlsDevice()}
   start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
@@ -1766,8 +1767,18 @@ export class BackroomsGame{
   loop(now){
     const raw=(now-this.last)/1000;this.last=now;
     const dt=Math.min(MAX_DT,raw);
-    if(this.running&&!this.paused)this.update(dt);
-    this.render();
+    try{
+      if(this.running&&!this.paused)this.update(dt);
+      this.render();
+    }catch(error){
+      if(!this.runtimeFaulted){
+        this.runtimeFaulted=true;
+        console.error("[Backrooms] Runtime update failed:",error);
+        this.running=false;
+        this.paused=true;
+        this.toast("RUNTIME ERROR - OPEN CONSOLE",6);
+      }
+    }
     requestAnimationFrame(this.loop.bind(this));
   }
   resize(){

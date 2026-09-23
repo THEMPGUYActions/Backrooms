@@ -1924,3 +1924,23 @@ button,.audio-gate{
 @media (prefers-reduced-motion:reduce){
   #mobile-controls{transition:none}
 }
+
+
+/* Final device routing: viewport size is not a device type. */
+#mobile-controls:not(.hidden){display:none!important}
+.touch-device #mobile-controls:not(.hidden){display:block!important}
+#mobile-controls.hidden{display:none!important}
+
+.audio-prompt-pc{display:inline!important}
+.audio-prompt-mobile{display:none!important}
+.touch-device .audio-prompt-pc{display:none!important}
+.touch-device .audio-prompt-mobile{display:inline!important}
+
+.control-row .control-pc{display:inline-flex!important}
+.control-row .control-mobile{display:none!important}
+.touch-device .control-row .control-pc{display:none!important}
+.touch-device .control-row .control-mobile{display:inline-flex!important}
+.control-touch-only{display:none!important}
+.touch-device .control-touch-only{display:grid!important}
+
+.touch-device #mobile-controls .look-zone{display:block}
