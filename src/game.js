@@ -886,22 +886,13 @@ class Chunk{
     const roomRng=new RNG(this.seedKey()^0x5d11f);
     const roofRng=new RNG(this.seedKey()^0x6a11c);
     const voxels=new Map();
-    const collisionCells=new Set();
 
     const putVoxel=(x,y,z,state)=>{
       const kind=level0SourceKind(state);
       if(kind==="air")return;
-      const key=x+"|"+y+"|"+z;
-      // Minecraft structure placement is ordered. Later placements overwrite
-      // blocks at the same coordinates, so the browser map follows that rule.
-      voxels.set(key,{x,y,z,state,kind});
-      if(
-        y>=0&&y<5 &&
-        kind!=="floor"&&kind!=="ceiling"&&kind!=="light"&&
-        kind!=="emergency"&&kind!=="trim"&&kind!=="marker"
-      ){
-        collisionCells.add(x+"|"+z);
-      }
+      // Match Minecraft structure placement semantics: later structures replace
+      // earlier blocks at the same integer coordinate.
+      voxels.set(x+"|"+y+"|"+z,{x,y,z,state,kind});
     };
 
     const putStructure=(name,baseX,baseSourceY,baseZ,rotation=0)=>{
@@ -909,7 +900,6 @@ class Chunk{
       if(!structure)return;
       const size=Number(structure.size?.[0])||0;
       if(!size)return;
-
       for(const packed of structure.blocks){
         const block=level0SourcePackedBlock(packed);
         const state=structure.palette[block.state];
@@ -923,7 +913,6 @@ class Chunk{
       }
     };
 
-    // The family selection is the same mask routing used by MazeCell.drawWalls().
     const roomFamily=mask=>{
       if(mask===0)return "aroom";
       if(mask===8||mask===4||mask===2||mask===1)return "broom";
@@ -934,9 +923,8 @@ class Chunk{
     };
 
     const addRoom=(gridX,gridZ,mask)=>{
-      const roomNumber=roomRng.int(1,8);
       putStructure(
-        roomFamily(mask)+"_"+roomNumber,
+        roomFamily(mask)+"_"+roomRng.int(1,8),
         gridX*cell,
         LEVEL0_SOURCE_FLOOR_Y,
         gridZ*cell,
@@ -948,17 +936,17 @@ class Chunk{
       putStructure("megaroom"+type,baseX,18,baseZ,0);
     };
 
-    // The source generator explicitly fills its starting 16x16 Minecraft
-    // chunk at Y=25 before the generic 8x8 roof pass. That makes the roof pass
-    // skip these four 8x8 units because their Y=25 probe is no longer air.
+    // The source generator explicitly fills the starting Minecraft chunk's
+    // 16x16 ceiling at Y=25. The generic 8x8 roof pass then skips those tiles.
     if(this.cx===0&&this.cz===0){
       for(let z=0;z<16;z++)for(let x=0;x<16;x++){
         putVoxel(x,5,z,{name:(x===0&&z===0)?"ghost_ceiling_tile":"ceiling_tile",properties:null});
       }
     }
 
-    // Source Level0ChunkGenerator's start chunk is four 48x48 megaroom1
-    // placements spanning the complete 80x80 sector.
+    // Source Level0ChunkGenerator places four 48x48 structures for types 1/2,
+    // while types 3-6 occupy the center 48x48 and then hand control to the
+    // 5x5 Level0MazeGenerator.
     if(this.megaType===1||this.megaType===2){
       for(const ox of [0,32])for(const oz of [0,32])
         addMacro(this.megaType,ox,oz);
@@ -971,17 +959,33 @@ class Chunk{
       if(this.megaType>=3)addMacro(this.megaType,16,16);
     }
 
-    // Build source-equivalent geometry from the actual structure voxel list.
-    // Every source block remains a full 1x1x1 cube, then shared internal faces
-    // are removed. This gives the correct block thickness without z-fighting.
-    const grouped=new Map();
+    // Reproduce the source 8x8 roof pass before rendering anything. With the
+    // final voxel map known, every shared ceiling seam can be face-culled once.
+    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
+      for(let tileX=0;tileX<this.world.size;tileX+=8){
+        const sourceMarker=level0SourceStateAt(
+          voxels,
+          tileX,
+          18-LEVEL0_SOURCE_FLOOR_Y,
+          tileZ
+        );
+        if(sourceMarker?.kind==="marker"&&level0SourceShortName(sourceMarker.state)==="cyan_wool")continue;
+        if(level0SourceStateAt(voxels,tileX,5,tileZ))continue;
+
+        const roofName=roofRng.next()<.2?"roof2":"roof1";
+        const rotation=roofRng.next()<.5?0:Math.PI/2;
+        const baseX=rotation===0?tileX:tileX+7;
+        putStructure(roofName,baseX,25,tileZ,rotation);
+      }
+    }
+
     const faceDefs=[
-      {dx:0,dy:0,dz:-1,n:[0,0,-1],v:(x,y,z)=>[[x,y,z],[x,y+1,z],[x+1,y+1,z],[x+1,y,z]]},
-      {dx:0,dy:0,dz:1,n:[0,0,1],v:(x,y,z)=>[[x+1,y,z+1],[x+1,y+1,z+1],[x,y+1,z+1],[x,y,z+1]]},
-      {dx:-1,dy:0,dz:0,n:[-1,0,0],v:(x,y,z)=>[[x,y,z+1],[x,y+1,z+1],[x,y+1,z],[x,y,z]]},
-      {dx:1,dy:0,dz:0,n:[1,0,0],v:(x,y,z)=>[[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]]},
-      {dx:0,dy:-1,dz:0,n:[0,-1,0],v:(x,y,z)=>[[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]]},
-      {dx:0,dy:1,dz:0,n:[0,1,0],v:(x,y,z)=>[[x,y+1,z+1],[x+1,y+1,z+1],[x+1,y+1,z],[x,y+1,z]]}
+      {dx:0,dy:0,dz:-1,n:[0,0,-1],v:(x,y,z)=>[[x,y,z],[x,y+1,z],[x+1,y+1,z],[x+1,y,z]],uv:0},
+      {dx:0,dy:0,dz:1,n:[0,0,1],v:(x,y,z)=>[[x+1,y,z+1],[x+1,y+1,z+1],[x,y+1,z+1],[x,y,z+1]],uv:0},
+      {dx:-1,dy:0,dz:0,n:[-1,0,0],v:(x,y,z)=>[[x,y,z+1],[x,y+1,z+1],[x,y+1,z],[x,y,z]],uv:3},
+      {dx:1,dy:0,dz:0,n:[1,0,0],v:(x,y,z)=>[[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]],uv:1},
+      {dx:0,dy:-1,dz:0,n:[0,-1,0],v:(x,y,z)=>[[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]],uv:0},
+      {dx:0,dy:1,dz:0,n:[0,1,0],v:(x,y,z)=>[[x,y+1,z+1],[x+1,y+1,z+1],[x+1,y+1,z],[x,y+1,z]],uv:0}
     ];
 
     const materialForKind=kind=>{
@@ -993,38 +997,42 @@ class Chunk{
       return lib.wall;
     };
 
-    const appendFace=(positions,normals,uvs,indices,verts,normal,uvRot=0)=>{
-      const base=positions.length/3;
-      for(const v of verts){positions.push(
-        this.originX+v[0],v[1],this.originZ+v[2]
-      );normals.push(normal[0],normal[1],normal[2]);}
-      const uvBase=[[0,0],[1,0],[1,1],[0,1]];
-      const uv=uvRot===1?[[1,0],[1,1],[0,1],[0,0]]:
-                uvRot===2?[[1,1],[0,1],[0,0],[1,0]]:
-                uvRot===3?[[0,1],[0,0],[1,0],[1,1]]:uvBase;
-      for(const [u,v] of uv){uvs.push(u,v)}
-      indices.push(base,base+1,base+2,base,base+2,base+3);
+    const appendFace=(bucket,verts,normal,uvRotation=0)=>{
+      const base=bucket.positions.length/3;
+      for(const v of verts){
+        bucket.positions.push(this.originX+v[0],v[1],this.originZ+v[2]);
+        bucket.normals.push(normal[0],normal[1],normal[2]);
+      }
+      const uv=uvRotation===1
+        ? [[1,0],[1,1],[0,1],[0,0]]
+        : uvRotation===2
+          ? [[1,1],[0,1],[0,0],[1,0]]
+          : uvRotation===3
+            ? [[0,1],[0,0],[1,0],[1,1]]
+            : [[0,0],[1,0],[1,1],[0,1]];
+      for(const pair of uv){bucket.uvs.push(pair[0],pair[1])}
+      bucket.indices.push(base,base+1,base+2,base,base+2,base+3);
     };
 
-    const meshes={};
+    const buckets=new Map();
     for(const voxel of voxels.values()){
       if(voxel.kind==="marker"||voxel.kind==="light"||voxel.kind==="trim")continue;
       const material=materialForKind(voxel.kind);
-      const bucket=meshes[voxel.kind]||(meshes[voxel.kind]={
-        material,positions:[],normals:[],uvs:[],indices:[]
-      });
+      let bucket=buckets.get(voxel.kind);
+      if(!bucket){
+        bucket={material,positions:[],normals:[],uvs:[],indices:[]};
+        buckets.set(voxel.kind,bucket);
+      }
+
       for(const face of faceDefs){
         if(voxels.has(
           (voxel.x+face.dx)+"|"+(voxel.y+face.dy)+"|"+(voxel.z+face.dz)
         ))continue;
-        let uvRot=0;
-        // Match the fixed orientation of a default Minecraft cube face.
-        if(face.dx!==0)uvRot=face.dx>0?1:3;
-        appendFace(bucket.positions,bucket.normals,bucket.uvs,bucket.indices,face.v(voxel.x,voxel.y,voxel.z),face.n,uvRot);
+        appendFace(bucket,face.v(voxel.x,voxel.y,voxel.z),face.n,face.uv);
       }
     }
 
-    for(const [kind,bucket] of Object.entries(meshes)){
+    for(const [kind,bucket] of buckets){
       if(!bucket.positions.length)continue;
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute("position",new THREE.Float32BufferAttribute(bucket.positions,3));
@@ -1039,10 +1047,12 @@ class Chunk{
       g.add(mesh);
     }
 
-    // The source fluorescent block is a full cube drawn by a block-entity
-    // renderer. Keep each light separate so the existing flicker event can
-    // toggle individual fixtures without changing the source structure.
-    const addLightSource=(voxel,emergency=false)=>{
+    // The source fluorescent renderer draws a complete 1x1x1 cube and creates
+    // a deferred point light one block below it. Keep those block entities
+    // separate so the existing flicker event can operate per fixture.
+    for(const voxel of voxels.values()){
+      if(voxel.kind!=="light"&&voxel.kind!=="emergency")continue;
+      const emergency=voxel.kind==="emergency";
       const material=(emergency?lib.orangeLight:lib.light).clone();
       material.emissiveIntensity=1.0;
       const fixture=box(
@@ -1056,56 +1066,57 @@ class Chunk{
       fixture.userData.light=true;
       fixture.userData.baseEmissive=1.0;
       this.fixtures.push(fixture);
-      const distance=emergency?10:13;
-      const color=emergency?0xffc06a:0xfff064;
-      const baseIntensity=emergency?.55:1.0;
       this.lightSources.push({
         position:new THREE.Vector3(
           this.originX+voxel.x+.5,
           voxel.y-.5,
           this.originZ+voxel.z+.5
         ),
-        color,
-        baseIntensity,
-        intensity:baseIntensity,
-        distance,
+        color:emergency?0xffc06a:0xfff064,
+        baseIntensity:emergency?.55:1.0,
+        intensity:emergency?.55:1.0,
+        distance:emergency?10:13,
         decay:1,
         fixture
       });
-    };
-
-    for(const voxel of voxels.values()){
-      if(voxel.kind==="light")addLightSource(voxel,false);
-      else if(voxel.kind==="emergency")addLightSource(voxel,true);
     }
 
-    // Source bottom_trim is an actual BlockBench model, not a generic wall
-    // strip. Recreate its visible 2/16-high trim with the source 18/16 span.
-    const addTrim=(voxel)=>{
+    // Recreate the source bottom trim's 2/16-high, 18/16-wide straight
+    // element. Its source texture is wall_trim_texture, loaded into lib.trim.
+    for(const voxel of voxels.values()){
+      if(voxel.kind!=="trim")continue;
       const props=voxel.state?.properties||{};
       const facing=String(props.facing||"north");
       let rotation=0,x=this.originX+voxel.x+.5,z=this.originZ+voxel.z+.98125;
-      if(facing==="south"){rotation=Math.PI;x=this.originX+voxel.x+.5;z=this.originZ+voxel.z+.01875}
-      else if(facing==="east"){rotation=Math.PI/2;x=this.originX+voxel.x+.98125;z=this.originZ+voxel.z+.5}
-      else if(facing==="west"){rotation=-Math.PI/2;x=this.originX+voxel.x+.01875;z=this.originZ+voxel.z+.5}
-      const trim=box(
+      if(facing==="south"){
+        rotation=Math.PI;
+        z=this.originZ+voxel.z+.01875;
+      }else if(facing==="east"){
+        rotation=Math.PI/2;
+        x=this.originX+voxel.x+.98125;
+        z=this.originZ+voxel.z+.5;
+      }else if(facing==="west"){
+        rotation=-Math.PI/2;
+        x=this.originX+voxel.x+.01875;
+        z=this.originZ+voxel.z+.5;
+      }
+      box(
         g,
         new THREE.BoxGeometry(1.075,.125,.0375),
         lib.trim,
-        x,.0625+voxel.y,z,
+        x,
+        voxel.y+.0625,
+        z,
         0,rotation,0
       );
-      trim.frustumCulled=true;
-    };
-    for(const voxel of voxels.values())if(voxel.kind==="trim")addTrim(voxel);
+    }
 
-    // Source collision is derived from the final solid voxels after structure
-    // overwrite order has been applied. Floor, ceiling, lights, markers and trim
-    // never become horizontal collision cells.
-    collisionCells.clear();
+    // Collide against the actual final wall/decor voxels in the source layout.
+    // Floor, ceiling, light entities, markers and trim remain non-solid.
+    const collisionCells=new Set();
     for(const voxel of voxels.values()){
       if(
-        voxel.y>=0&&voxel.y<5 &&
+        voxel.y>=0&&voxel.y<5&&
         voxel.kind!=="floor"&&voxel.kind!=="ceiling"&&
         voxel.kind!=="light"&&voxel.kind!=="emergency"&&
         voxel.kind!=="trim"&&voxel.kind!=="marker"
@@ -1113,6 +1124,7 @@ class Chunk{
         collisionCells.add(voxel.x+"|"+voxel.z);
       }
     }
+
     const hasCollision=(x,z)=>collisionCells.has(x+"|"+z);
     const horizontal=new Map(),vertical=new Map();
     for(const key of collisionCells){
@@ -1124,74 +1136,6 @@ class Chunk{
     }
     this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
       .concat(level0MergeBoundaryIntervals(vertical,false));
-
-    // Reproduce the source 8x8 roof as actual structure placements. The source
-    // chooses roof2 one time in five and rotates each unit NONE/CW90. The
-    // source generator probes the 18Y marker and 25Y destination before
-    // placing, so do those exact logical checks against the macro block map.
-    for(let tileZ=0;tileZ<this.world.size;tileZ+=8){
-      for(let tileX=0;tileX<this.world.size;tileX+=8){
-        const sourceMarker=level0SourceStateAt(voxels,tileX,18-LEVEL0_SOURCE_FLOOR_Y,tileZ);
-        if(sourceMarker?.kind==="marker"&&level0SourceShortName(sourceMarker.state)==="cyan_wool")continue;
-        if(level0SourceStateAt(voxels,tileX,5,tileZ))continue;
-        const roofName=roofRng.next()<.2?"roof2":"roof1";
-        const rotation=roofRng.next()<.5?0:Math.PI/2;
-        const baseX=rotation===0?tileX:tileX+7;
-        putStructure(roofName,baseX,25,tileZ,rotation);
-      }
-    }
-
-    // Roof placement happens after the initial macro/maze structure in the
-    // source generator, so any new ceiling/light blocks are added to the voxel
-    // map above. Render their newly added exposed faces and lights.
-    const roofBuckets={};
-    for(const voxel of voxels.values()){
-      if(voxel.y<5)continue;
-      if(voxel.kind==="marker"||voxel.kind==="trim"||voxel.kind==="light"||voxel.kind==="emergency")continue;
-      // Only add roof blocks once; lower source structure blocks have already
-      // been rendered in the previous pass.
-      const roofKey=voxel.x+"|"+voxel.y+"|"+voxel.z;
-      if(roofKey.split("|")[1]==="5"){
-        const bucket=roofBuckets[voxel.kind]||(roofBuckets[voxel.kind]={
-          material:materialForKind(voxel.kind),positions:[],normals:[],uvs:[],indices:[]
-        });
-        for(const face of faceDefs){
-          if(voxels.has((voxel.x+face.dx)+"|"+(voxel.y+face.dy)+"|"+(voxel.z+face.dz)))continue;
-          appendFace(bucket.positions,bucket.normals,bucket.uvs,bucket.indices,face.v(voxel.x,voxel.y,voxel.z),face.n,face.dx?face.dx>0?1:3:0);
-        }
-      }
-    }
-    for(const [kind,bucket] of Object.entries(roofBuckets)){
-      if(!bucket.positions.length)continue;
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute("position",new THREE.Float32BufferAttribute(bucket.positions,3));
-      geometry.setAttribute("normal",new THREE.Float32BufferAttribute(bucket.normals,3));
-      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(bucket.uvs,2));
-      geometry.setIndex(bucket.indices);
-      geometry.computeBoundingBox();
-      geometry.computeBoundingSphere();
-      const mesh=new THREE.Mesh(geometry,bucket.material);
-      mesh.name="level0_source_roof_"+kind;
-      mesh.frustumCulled=true;
-      g.add(mesh);
-    }
-
-    // Any roof fluorescent lights appended after the first light pass need
-    // their block-entity equivalents too.
-    const renderedLights=new Set(this.fixtures.map(mesh =>
-      mesh.position.x.toFixed(4)+"|"+mesh.position.y.toFixed(4)+"|"+mesh.position.z.toFixed(4)
-    ));
-    for(const voxel of voxels.values()){
-      if(voxel.y<5||voxel.kind!=="light")continue;
-      const key=(
-        (this.originX+voxel.x+.5).toFixed(4)+"|"+
-        (voxel.y+.5).toFixed(4)+"|"+
-        (this.originZ+voxel.z+.5).toFixed(4)
-      );
-      if(renderedLights.has(key))continue;
-      addLightSource(voxel,false);
-      renderedLights.add(key);
-    }
   }
 
   buildLevel1Set(level,lib,rng){
