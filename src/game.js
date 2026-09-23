@@ -178,6 +178,28 @@ function level0SourcePackedBlock(packed){
   };
 }
 
+const level0MacroAnchorMarkerCache=new Map();
+
+function level0SourceMacroHasAnchorMarker(type){
+  if(level0MacroAnchorMarkerCache.has(type))return level0MacroAnchorMarkerCache.get(type);
+  const placements=(type===1||type===2)
+    ? [[0,0],[32,0],[0,32],[32,32]]
+    : [[16,16]];
+  let found=false;
+  for(const base of placements){
+    for(const marker of level0SourceMarkers("megaroom"+type)){
+      if(marker.name!=="red_wool")continue;
+      if(base[0]+marker.x===32&&base[1]+marker.z===32){
+        found=true;
+        break;
+      }
+    }
+    if(found)break;
+  }
+  level0MacroAnchorMarkerCache.set(type,found);
+  return found;
+}
+
 function level0SourceMarkers(name){
   const structure=level0SourceStructure(name);
   if(!structure)return [];
@@ -372,27 +394,32 @@ class Chunk{
       }
     }else if(level.id==="0"){
       const isStart=this.cx===0&&this.cz===0;
-      const anchorRoll=cycleHash(this.game.seed^0x4d30,this.cx,this.cz);
+      const initialMega=isStart||cycleHash(this.game.seed^0x4d30,this.cx,this.cz)<.5;
       let roomType=0;
 
-      // The reference only evaluates mega-room placement at 80-block anchors.
-      // Keep that same sector size here, with an order-independent seeded
-      // selection so streaming chunks generate identically every time.
-      if(isStart){
-        roomType=1;
-      }else if(anchorRoll<.5){
-        let blocked=false;
-        for(let dz=-1;dz<=1&&!blocked;dz++)for(let dx=-1;dx<=1;dx++){
+      // Source Level0ChunkGenerator evaluates this behavior only on its
+      // 80-block sector anchors. First it rolls 1/2 for mega-room generation;
+      // when that roll requests a mega-room, it suppresses it if a neighboring
+      // sector has a red-wool mega-room marker at the same anchor coordinate.
+      const nearSourceMega=()=>{
+        if(isStart)return false;
+        for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
           if(!dx&&!dz)continue;
           const nx=this.cx+dx,nz=this.cz+dz;
-          if(nx===0&&nz===0){blocked=true;break}
-          const neighborRoll=cycleHash(this.game.seed^0x4d30,nx,nz);
-          if(neighborRoll<.5&&neighborRoll<anchorRoll){blocked=true;break}
+          const neighborInitial=cycleHash(this.game.seed^0x4d30,nx,nz)<.5||(nx===0&&nz===0);
+          if(!neighborInitial)continue;
+          const neighborType=nx===0&&nz===0
+            ? 1
+            : 1+Math.floor(cycleHash(this.game.seed^0x31a7,nx,nz)*6);
+          if(level0SourceMacroHasAnchorMarker(neighborType))return true;
         }
-        if(!blocked){
-          const typeRoll=cycleHash(this.game.seed^0x31a7,this.cx,this.cz);
-          roomType=1+Math.floor(typeRoll*6);
-        }
+        return false;
+      };
+
+      if(isStart){
+        roomType=1;
+      }else if(initialMega&&!nearSourceMega()){
+        roomType=1+Math.floor(cycleHash(this.game.seed^0x31a7,this.cx,this.cz)*6);
       }
 
       this.megaType=roomType||null;
