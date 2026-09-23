@@ -1832,7 +1832,10 @@ class AdaptiveQuality{
 
 export class BackroomsGame{
   constructor(){
-    const seedBuffer=new Int32Array(1);\n    const cryptoApi=globalThis.crypto;\n    if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);\n    this.seed=(seedBuffer[0]||Math.floor(Math.random()*2147483647))|0;
+    const seedBuffer=new Int32Array(1);
+    const cryptoApi=globalThis.crypto;
+    if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
+    this.seed=(seedBuffer[0]||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.settings={
