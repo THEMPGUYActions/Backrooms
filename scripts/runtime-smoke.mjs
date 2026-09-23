@@ -130,10 +130,8 @@ try{
   if(desktopUi.pcPrompt==="none"||desktopUi.mobilePrompt!=="none")throw new Error("Desktop audio prompt routing is wrong: "+JSON.stringify(desktopUi));
   if(desktopUi.pcControls===0||desktopUi.mobileControls!==0||desktopUi.touchOnly!=="none")throw new Error("Desktop control hint routing is wrong: "+JSON.stringify(desktopUi));
 
-  await command("Runtime.evaluate",{
-    expression:"document.querySelector('.intro-audio-page')?.dispatchEvent(new AnimationEvent('animationend',{animationName:'intro-audio-sequence'}))",
-    returnByValue:true
-  });
+  // Let the real intro animation reach its audio gate so this is a genuine user-input path.
+  await delay(17000);
   const viewport=await command("Runtime.evaluate",{
     expression:"JSON.stringify({x:innerWidth/2,y:innerHeight/2})",
     returnByValue:true
@@ -148,7 +146,13 @@ try{
     returnByValue:true
   });
   const state=JSON.parse(stateResult.result?.result?.value||"{}");
-  if(!state.running||state.paused||state.introActive||state.runtimeFaulted)throw new Error("Gameplay did not remain healthy after real UI activation: "+JSON.stringify(state));
+  if(!state.running||state.paused||state.introActive||state.runtimeFaulted){
+    const runtimeErrors=messages.filter(message=>message.method==="Runtime.exceptionThrown"||(message.method==="Runtime.consoleAPICalled"&&["error","assert"].includes(message.params?.type)));
+    const detail=runtimeErrors.map(message=>message.method==="Runtime.exceptionThrown"
+      ?(message.params?.exceptionDetails?.text||message.params?.exceptionDetails?.exception?.description||"Runtime exception")
+      :(message.params?.args?.map(arg=>arg.value??arg.description??"").join(" ")||"Console error")).join("\n");
+    throw new Error("Gameplay did not remain healthy after real UI activation: "+JSON.stringify(state)+(detail?"\n"+detail:""));
+  }
   if(state.mobileDisplay!=="none")throw new Error("Mobile controls appeared on desktop after gameplay start: "+JSON.stringify(state));
   if(state.hud==="none")throw new Error("HUD remained hidden after gameplay start");
 
