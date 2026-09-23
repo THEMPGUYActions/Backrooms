@@ -7,7 +7,7 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-2050";
 import { makeLibrary, applyOpenGameArtPBR, applySpacePotatoLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-2050";
-import { level0RoomVariant, level0RotationForMask, rotateLevel0Local, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2105";
+import { level0RoomRows, level0RotationForMask, rotateLevel0Local, LEVEL0_MEGA_TEMPLATES } from "./level0_templates.js?v=20260923-2105";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -316,15 +316,9 @@ class Chunk{
         if(roomType>=3){
           // megaroom3-6 are a 32x32 structure embedded in the maze. A 2x2
           // group of 16x16 cells gives the same footprint in the browser.
-          this.rooms.push({x:1,z:1,w:2,h:2,type:"mega"});
-          this.setEdge(1,1,"east",true);
-          this.setEdge(1,2,"east",true);
-          this.setEdge(1,1,"south",true);
-          this.setEdge(2,1,"south",true);
-          this.setEdge(1,1,"north",true);
-          this.setEdge(1,2,"west",true);
-          this.setEdge(2,2,"east",true);
-          this.setEdge(2,2,"south",true);
+          // The real generator overlays megaroom3-6 onto the maze after
+          // generation. Do not carve a fake 2x2 topology underneath it.
+          this.rooms.push({x:1,z:1,w:3,h:3,type:"mega"});
         }
       }
 
@@ -437,85 +431,15 @@ class Chunk{
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
 
-    const addCollisionSegment=(x1,z1,x2,z2)=>{
-      if(Math.hypot(x2-x1,z2-z1)<.04)return;
-      this.collisionSegments.push({x1,z1,x2,z2});
-    };
-
-    const addLevel0Wall=(x1,z1,x2,z2,closedEdge=false)=>{
-      const horizontal=Math.abs(z2-z1)<Math.abs(x2-x1);
-      const length=Math.max(.05,horizontal?Math.abs(x2-x1):Math.abs(z2-z1));
-      const cx=(x1+x2)/2,cz=(z1+z2)/2;
-      if(horizontal){
-        box(g,new THREE.BoxGeometry(length,level.wallHeight,wallThickness),wallMaterial,cx,level.wallHeight/2,cz);
-        box(g,new THREE.BoxGeometry(length,.11,.12),lib.trim,cx,.065,cz);
-        box(g,new THREE.BoxGeometry(length,.075,.09),lib.trimTop,cx,level.wallHeight-.04,cz);
-      }else{
-        box(g,new THREE.BoxGeometry(wallThickness,level.wallHeight,length),wallMaterial,cx,level.wallHeight/2,cz);
-        box(g,new THREE.BoxGeometry(.12,.11,length),lib.trim,cx,.065,cz);
-        box(g,new THREE.BoxGeometry(.09,.075,length),lib.trimTop,cx,level.wallHeight-.04,cz);
-      }
-      addCollisionSegment(x1,z1,x2,z2);
-      void closedEdge;
-    };
-
-    const level0VariantFor=(x,z)=>{
-      const mask=this.walls[this.index(x,z)];
-      const variantIndex=Math.floor(cycleHash(this.seedKey(),x,z,0x4c30)*8);
-      return {mask,...level0RoomVariant(mask,variantIndex),rotation:level0RotationForMask(mask)};
-    };
-
-    const addLevel0Boundary=(x,z,side,closed)=>{
-      const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-      const template=level0VariantFor(x,z);
-      const gap=closed?0:Math.min(cell-1.2,Math.max(3.6,template.doorWidth||4.5));
-      if(side==="north"||side==="south"){
-        const wz=side==="north"?pz-cell/2:pz+cell/2;
-        const x0=px-cell/2,x1=px+cell/2;
-        if(closed){
-          addLevel0Wall(x0,wz,x1,wz,true);
-          edges.push({x,z,side});
-        }else{
-          const a=(cell-gap)/2;
-          addLevel0Wall(x0,wz,px-gap/2,wz,false);
-          addLevel0Wall(px+gap/2,wz,x1,wz,false);
-          // Subtle ceiling header at each real passage. This is part of the
-          // browser-native template, not a copied Minecraft structure.
-          box(g,new THREE.BoxGeometry(gap+.22,.14,.28),lib.trimTop,px,level.wallHeight-.10,wz);
-        }
-      }else{
-        const wx=side==="west"?px-cell/2:px+cell/2;
-        const z0=pz-cell/2,z1=pz+cell/2;
-        if(closed){
-          addLevel0Wall(wx,z0,wx,z1,true);
-          edges.push({x,z,side});
-        }else{
-          const a=(cell-gap)/2;
-          addLevel0Wall(wx,z0,wx,pz-gap/2,false);
-          addLevel0Wall(wx,pz+gap/2,wx,z1,false);
-          box(g,new THREE.BoxGeometry(.28,.14,gap+.22),lib.trimTop,wx,level.wallHeight-.10,pz);
-        }
-      }
-    };
-
     if(level.id==="0"){
-      // Mega sectors are not a 16x16 grid of open holes. Their 32x32
-      // browser-native structures supply the internal architecture.
+      // Level 0 room templates contain the openings themselves. Keep edge
+      // metadata for wall props, but do not add a second perimeter layer.
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
         const mask=this.walls[this.index(x,z)];
-        if(this.zone==="mega"){
-          if(z===0&&(mask&1))addLevel0Boundary(x,z,"north",true);
-          if(x===0&&(mask&8))addLevel0Boundary(x,z,"west",true);
-          if(z===cells-1&&(mask&4))addLevel0Boundary(x,z,"south",true);
-          if(x===cells-1&&(mask&2))addLevel0Boundary(x,z,"east",true);
-        }else{
-          if(mask&1||z===0)addLevel0Boundary(x,z,"north",(mask&1)!==0);
-          if(mask&8||x===0)addLevel0Boundary(x,z,"west",(mask&8)!==0);
-          if(mask&4&&z===cells-1)addLevel0Boundary(x,z,"south",true);
-          if(mask&2&&x===cells-1)addLevel0Boundary(x,z,"east",true);
-          // Interior south/east edges are owned by their north/west neighbor,
-          // so the mask is still represented exactly once.
-        }
+        if(mask&1)edges.push({x,z,side:"north"});
+        if(mask&8)edges.push({x,z,side:"west"});
+        if(z===cells-1&&(mask&4))edges.push({x,z,side:"south"});
+        if(x===cells-1&&(mask&2))edges.push({x,z,side:"east"});
       }
     }else{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
@@ -762,117 +686,102 @@ class Chunk{
     }
   }
   buildLevel0Set(level,lib,rng){
-    const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
-    const next=()=>rng.next();
+    const g=this.group,cell=level.cellSize,cells=this.gridSize(),next=()=>rng.next();
 
-    const addCollisionBox=(cx,cz,w,d,rotation=0)=>{
-      const swap=Math.abs(Math.sin(rotation))>.5;
-      const ww=swap?d:w,dd=swap?w:d;
-      const x0=cx-ww/2,x1=cx+ww/2,z0=cz-dd/2,z1=cz+dd/2;
-      this.collisionSegments.push({x1:x0,z1:z0,x2:x1,z2:z0});
-      this.collisionSegments.push({x1:x1,z1:z0,x2:x1,z2:z1});
-      this.collisionSegments.push({x1:x1,z1:z1,x2:x0,z2:z1});
-      this.collisionSegments.push({x1:x0,z1:z1,x2:x0,z2:z0});
+    const addRectCollision=(cx,cz,w,d,rot=0)=>{
+      const c=Math.cos(rot),s=Math.sin(rot),hw=w/2,hd=d/2,pts=[[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([x,z])=>({x:cx+x*c-z*s,z:cz+x*s+z*c}));
+      for(let i=0;i<4;i++){const a=pts[i],b=pts[(i+1)%4];this.collisionSegments.push({x1:a.x,z1:a.z,x2:b.x,z2:b.z})}
     };
 
-    const addPartLocal=(baseX,baseZ,data,rotation,sizeLocal=16)=>{
-      const local=rotateLevel0Local(data[0],data[1],rotation,sizeLocal);
-      const x=baseX+(local.x-sizeLocal/2),z=baseZ+(local.z-sizeLocal/2);
-      box(g,new THREE.BoxGeometry(data[2],level.wallHeight,data[3]),lib.wall,x,level.wallHeight/2,z,0,rotation,0);
-      addCollisionBox(x,z,data[2],data[3],rotation);
+    const addRun=(baseX,baseZ,z,start,end,rot)=>{
+      const width=end-start+1,local=rotateLevel0Local((start+end+1)/2,z+.5,rot,16);
+      const cx=baseX+(local.x-8),cz=baseZ+(local.z-8);
+      box(g,new THREE.BoxGeometry(width,level.wallHeight,1),lib.wall,cx,level.wallHeight/2,cz,0,rot,0);
+      box(g,new THREE.BoxGeometry(width+.06,.07,1.06),lib.trimTop,cx,level.wallHeight-.035,cz,0,rot,0);
+      addRectCollision(cx,cz,width,1,rot);
     };
 
-    const addPillarLocal=(baseX,baseZ,data,rotation,sizeLocal=16)=>{
-      const local=rotateLevel0Local(data[0],data[1],rotation,sizeLocal);
-      const x=baseX+(local.x-sizeLocal/2),z=baseZ+(local.z-sizeLocal/2),w=data[2];
-      box(g,new THREE.BoxGeometry(w,level.wallHeight,w),lib.wall,x,level.wallHeight/2,z);
-      addCollisionBox(x,z,w,w);
-      box(g,new THREE.BoxGeometry(w+.12,.10,w+.12),lib.trim,x,.05,z);
-    };
-
-    const addLight=(x,z,rotation=0,scale=1,intensity=170)=>{
-      const fixtureMat=lib.light.clone();
-      fixtureMat.emissiveIntensity=2.0+next()*.75;
-      const fixture=box(g,new THREE.BoxGeometry(3.35*scale,.052,.62*scale),fixtureMat,x,level.wallHeight-.12,z,0,rotation,0);
-      fixture.userData.light=true;fixture.userData.baseEmissive=fixtureMat.emissiveIntensity;this.fixtures.push(fixture);
-      box(g,new THREE.BoxGeometry(3.65*scale,.08,.78*scale),lib.metal,x,level.wallHeight-.05,z,0,rotation,0);
-      this.lightSources.push({
-        position:new THREE.Vector3(x,level.wallHeight-.30,z),
-        color:0xffd66a,baseIntensity:intensity,intensity,distance:28,decay:2,fixture
-      });
-    };
-
-    const addMega=(type,centerX,centerZ)=>{
-      const template=LEVEL0_MEGA_TEMPLATES[type]||LEVEL0_MEGA_TEMPLATES[1];
-      const originX=centerX-template.size/2,originZ=centerZ-template.size/2;
-      for(const pillar of template.pillars){
-        const x=originX+pillar[0],z=originZ+pillar[1],w=pillar[2];
-        box(g,new THREE.BoxGeometry(w,level.wallHeight,w),lib.wall,x,level.wallHeight/2,z);
-        addCollisionBox(x,z,w,w);
-        box(g,new THREE.BoxGeometry(w+.12,.10,w+.12),lib.trim,x,.05,z);
-      }
-      for(const part of template.parts){
-        const x=originX+part[0],z=originZ+part[1],w=part[2],d=part[3],rot=part[4]||0;
-        box(g,new THREE.BoxGeometry(w,level.wallHeight,d),lib.wall,x,level.wallHeight/2,z,0,rot,0);
-        addCollisionBox(x,z,w,d,rot);
-      }
-
-      const spacing=8;
-      for(let x=originX+8;x<originX+template.size-3;x+=spacing){
-        for(let z=originZ+8;z<originZ+template.size-3;z+=spacing){
-          if(next()<.58)addLight(x,z,next()<.5?0:Math.PI/2,.78,112+next()*58);
+    const addRoom=(cx,cz,mask,variant)=>{
+      const t=level0RoomRows(mask,variant),rot=level0RotationForMask(mask),rows=t.rows;
+      for(let z=0;z<16;z++){
+        const bits=rows[z]>>>0;
+        let x=0;
+        while(x<16){
+          while(x<16&&!(bits&(1<<x)))x++;
+          if(x>=16)break;
+          const start=x;
+          while(x+1<16&&(bits&(1<<(x+1))))x++;
+          addRun(cx-8,cz-8,z,start,x,rot);
+          x++;
         }
+      }
+
+      const fx={A:[8,8,0,3.8,.82],B:[8,7,rot,3.6,.80],C:[9,7,rot,3.2,.76],D:[8,8,rot+Math.PI/2,3.9,.92],E:[8,9,rot,3.1,.70]}[t.family]||[8,8,rot,3.4,.8];
+      if(next()<fx[4]){
+        const p=rotateLevel0Local(fx[0],fx[1],rot,16),lx=cx-8+p.x,lz=cz-8+p.z,mat=lib.light.clone();
+        mat.emissiveIntensity=1.6+next()*.6;
+        const fixture=box(g,new THREE.BoxGeometry(fx[3],.052,.58),mat,lx,level.wallHeight-.12,lz,0,fx[2],0);
+        fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
+        this.lightSources.push({position:new THREE.Vector3(lx,level.wallHeight-.31,lz),color:0xffd66a,baseIntensity:105+next()*55,intensity:105+next()*55,distance:24,decay:2,fixture});
+      }
+    };
+
+    const addMega=(type,cx,cz)=>{
+      const t=LEVEL0_MEGA_TEMPLATES[type]||LEVEL0_MEGA_TEMPLATES[1],size=t.size,ox=cx-size/2,oz=cz-size/2;
+      const wall=(x,z,w,d,rot=0)=>{
+        box(g,new THREE.BoxGeometry(w,level.wallHeight,d),lib.wall,x,level.wallHeight/2,z,0,rot,0);
+        addRectCollision(x,z,w,d,rot);
+        box(g,new THREE.BoxGeometry(w+.06,.07,d+.06),lib.trimTop,x,level.wallHeight-.035,z,0,rot,0);
+      };
+      if(t.kind==="grid_posts"){
+        for(const px of t.posts)for(const pz of t.posts)wall(ox+px+1,oz+pz+1,2,2);
+        for(const x of t.posts)for(const z of t.posts)if(next()<.58){
+          const fx=box(g,new THREE.BoxGeometry(3.2,.052,.56),lib.light.clone(),ox+x+1,level.wallHeight-.12,oz+z+1);
+          fx.userData.light=true;fx.userData.baseEmissive=1.8;this.fixtures.push(fx);
+          this.lightSources.push({position:new THREE.Vector3(ox+x+1,level.wallHeight-.31,oz+z+1),color:0xffd66a,baseIntensity:102,intensity:102,distance:28,decay:2,fixture:fx});
+        }
+        return;
+      }
+      if(t.kind==="open"||t.kind==="open_small"){
+        const step=t.kind==="open_small"?8:8;
+        for(let x=step/2;x<size;x+=step)for(let z=step/2;z<size;z+=step)if(next()<.62){
+          const fx=box(g,new THREE.BoxGeometry(3.35,.052,.58),lib.light.clone(),ox+x,level.wallHeight-.12,oz+z);
+          fx.userData.light=true;fx.userData.baseEmissive=1.8;this.fixtures.push(fx);
+          this.lightSources.push({position:new THREE.Vector3(ox+x,level.wallHeight-.31,oz+z),color:0xffd66a,baseIntensity:92,intensity:92,distance:28,decay:2,fixture:fx});
+        }
+        return;
+      }
+      if(t.kind==="maze_garage"){
+        wall(cx,oz+4,size,8);wall(cx,oz+size-4,size,8);wall(ox+4,cz,8,size);wall(ox+size-4,cz,8,size);
+        for(const x of [ox+10,ox+17,ox+24,ox+31,ox+38])wall(x,cz,2,30);
+        for(const z of [oz+10,oz+17,oz+24,oz+31,oz+38])wall(cx,z,30,2);
+        return;
+      }
+      if(t.kind==="dense_rooms"){
+        wall(cx,oz+4,size,8);wall(cx,oz+size-4,size,8);wall(ox+4,cz,8,size);wall(ox+size-4,cz,8,size);
+        for(const x of [ox+15,ox+32])wall(x,cz,2,30);
+        for(const z of [oz+15,oz+32])wall(cx,z,30,2);
+        return;
+      }
+      if(t.kind==="small_rooms"){
+        wall(cx,oz+3,size,6);wall(cx,oz+size-3,size,6);wall(ox+3,cz,6,size);wall(ox+size-3,cz,6,size);
+        wall(cx,cz,2,12);wall(cx,cz,12,2);
       }
     };
 
     if(this.zone==="mega"){
-      // megaroom1/megaroom2 are placed four times around the start/sector
-      // center in the original generator. Recreate that 64x64 footprint with
-      // four native 32x32 browser templates, without shipping NBT.
       const type=this.spacePotatoMegaType===2?2:1;
-      for(const ox of [-16,16])for(const oz of [-16,16])addMega(type,ox,oz);
-      // Keep the 8-block outer apron dark and mostly empty, as in the
-      // structure footprint instead of filling the entire 80x80 sector.
-      if(next()<.35){
-        const x=(next()-.5)*60,z=(next()-.5)*60;
-        addPillarLocal(x,z,[8,8,.72],0,16);
-      }
+      if(type===1||type===2){
+        for(const x of [-8,24])for(const z of [-8,24])addMega(type,x,z);
+      }else addMega(type,0,0);
     }else{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(this.rooms.some(room=>room.type==="mega"&&x>=room.x&&x<room.x+room.w&&z>=room.z&&z<room.z+room.h))continue;
         const mask=this.walls[this.index(x,z)];
-        const variantIndex=Math.floor(cycleHash(this.seedKey(),x,z,0x4c30)*8);
-        const template=level0RoomVariant(mask,variantIndex);
-        const rotation=level0RotationForMask(mask);
-        const cx=this.originX+x*cell+cell/2,cz=this.originZ+z*cell+cell/2;
-
-        for(const part of template.returns)addPartLocal(cx,cz,part,rotation);
-        for(const pillar of template.pillars)addPillarLocal(cx,cz,pillar,rotation);
-
-        const openings=4-((mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0));
-        const family=template.family;
-
-        // Dense but irregular fluorescent coverage. Hallways get longer,
-        // narrower runs while dead-ends get a single tired fixture.
-        let chance=family==="D"?.86:family==="E"?.64:family==="C"?.70:family==="B"?.76:.82;
-        if(openings>=3)chance-=.10;
-        if(next()<chance){
-          const lx=8+(next()-.5)*(family==="D"?2.2:4.2);
-          const lz=8+(next()-.5)*(family==="D"?3.0:4.2);
-          const local=rotateLevel0Local(lx,lz,rotation,16);
-          addLight(cx+(local.x-8),cz+(local.z-8),rotation+(next()<.24?Math.PI/2:0),.70+next()*.20,112+next()*68);
-        }
-        if(family==="A"&&next()<.22){
-          const local=rotateLevel0Local(8,4.8,rotation,16);
-          addLight(cx+(local.x-8),cz+(local.z-8),rotation,.58,88+next()*42);
-        }
+        const variant=Math.floor(cycleHash(this.seedKey(),x,z,0x4c30)*8);
+        const covered=this.rooms.some(r=>r.type==="mega"&&x>=r.x&&x<r.x+r.w&&z>=r.z&&z<r.z+r.h);
+        if(!covered)addRoom(this.originX+x*cell+cell/2,this.originZ+z*cell+cell/2,mask,variant);
       }
-
-      // megaroom3-6 overlay one 32x32 browser structure over the maze center.
-      if(this.rooms.some(room=>room.type==="mega")){
-        const type=Math.max(3,Math.min(6,this.spacePotatoMegaType||3));
-        addMega(type,0,0);
-      }
+      if(this.spacePotatoMegaType>=3)addMega(this.spacePotatoMegaType,0,0);
     }
   }
 
