@@ -732,6 +732,21 @@ class Chunk{
     });
 
     const addLight=(x,z,rotation=0,scale=1,intensity=105)=>{
+      const cableLength=.22;
+      const cableOffset=1.35*scale;
+      for(const side of [-1,1]){
+        const cable=new THREE.Mesh(
+          new THREE.CylinderGeometry(.022,.022,cableLength,8),
+          lib.cable
+        );
+        cable.position.set(
+          x+Math.cos(rotation)*cableOffset*side,
+          level.wallHeight-cableLength/2-.035,
+          z+Math.sin(rotation)*cableOffset*side
+        );
+        g.add(cable);
+      }
+
       const fixture=box(
         g,
         new THREE.BoxGeometry(3.65*scale,.07,.32*scale),
@@ -1015,7 +1030,7 @@ class WorldStreamer{
       this.library.floor
     );
     this.floorSurface.rotation.x=-Math.PI/2;
-    this.floorSurface.position.set(0,0,0);
+    this.floorSurface.position.set(0,-.035,0);
     this.floorSurface.updateMatrix();
     this.floorSurface.matrixAutoUpdate=false;
     this.floorSurface.frustumCulled=false;
@@ -1026,7 +1041,7 @@ class WorldStreamer{
       this.library.ceiling
     );
     this.ceilingSurface.rotation.x=Math.PI/2;
-    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.025,0);
+    this.ceilingSurface.position.set(0,this.game.level.wallHeight+.065,0);
     this.ceilingSurface.updateMatrix();
     this.ceilingSurface.matrixAutoUpdate=false;
     this.ceilingSurface.frustumCulled=false;
