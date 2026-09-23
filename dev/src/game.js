@@ -322,9 +322,9 @@ class Chunk{
           this.setEdge(1,1,"south",true);
           this.setEdge(2,1,"south",true);
           this.setEdge(1,1,"north",true);
-          this.setEdge(2,1,"north",true);
-          this.setEdge(2,1,"east",true);
+          this.setEdge(1,2,"west",true);
           this.setEdge(2,2,"east",true);
+          this.setEdge(2,2,"south",true);
         }
       }
 
@@ -456,7 +456,7 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.09,.075,length),lib.trimTop,cx,level.wallHeight-.04,cz);
       }
       addCollisionSegment(x1,z1,x2,z2);
-      if(closedEdge)edges.push({worldX:cx,worldZ:cz,x:x1,z:z1,side:horizontal?"horizontal":"vertical"});
+      void closedEdge;
     };
 
     const level0VariantFor=(x,z)=>{
@@ -474,6 +474,7 @@ class Chunk{
         const x0=px-cell/2,x1=px+cell/2;
         if(closed){
           addLevel0Wall(x0,wz,x1,wz,true);
+          edges.push({x,z,side});
         }else{
           const a=(cell-gap)/2;
           addLevel0Wall(x0,wz,px-gap/2,wz,false);
@@ -487,6 +488,7 @@ class Chunk{
         const z0=pz-cell/2,z1=pz+cell/2;
         if(closed){
           addLevel0Wall(wx,z0,wx,z1,true);
+          edges.push({x,z,side});
         }else{
           const a=(cell-gap)/2;
           addLevel0Wall(wx,z0,wx,pz-gap/2,false);
@@ -837,6 +839,7 @@ class Chunk{
       }
     }else{
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        if(this.rooms.some(room=>room.type==="mega"&&x>=room.x&&x<room.x+room.w&&z>=room.z&&z<room.z+room.h))continue;
         const mask=this.walls[this.index(x,z)];
         const variantIndex=Math.floor(cycleHash(this.seedKey(),x,z,0x4c30)*8);
         const template=level0RoomVariant(mask,variantIndex);
