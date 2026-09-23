@@ -2,16 +2,28 @@ import * as THREE from "three";
 THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
-const LOCAL_SPB_ASSET_BASE = new URL("../assets/spb-ff/", import.meta.url).href;
+const LOCAL_FF_ASSET_BASE = new URL("../assets/found-footage/", import.meta.url).href
+
+export const FOUND_FOOTAGE_ASSET_SOURCES = Object.freeze({
+  wall: LOCAL_FF_ASSET_BASE+"level0/wall_block.png",
+  wall2: LOCAL_FF_ASSET_BASE+"level0/wall_block_2_texture.png",
+  wallBottom: LOCAL_FF_ASSET_BASE+"level0/wallpaper_bottom_block_texture.png",
+  fluorescent: LOCAL_FF_ASSET_BASE+"fluorescent_light.png",
+  pole: LOCAL_FF_ASSET_BASE+"level0/pole.png",
+  plastic: LOCAL_FF_ASSET_BASE+"level0/plastic.png",
+  powerPole: LOCAL_FF_ASSET_BASE+"level0/power_pole_texture.png",
+  powerPoleTop: LOCAL_FF_ASSET_BASE+"level0/power_pole_top_texture.png",
+  wallTrim: LOCAL_FF_ASSET_BASE+"wall_trim_texture.png"
+});
 
 export const LEVEL1_ASSET_SOURCES = Object.freeze({
-  concreteColor: LOCAL_SPB_ASSET_BASE + "pbr/concrete/concrete_color.png",
-  concreteNormal: LOCAL_SPB_ASSET_BASE + "pbr/concrete/concrete_normal.png",
-  brickColor: LOCAL_SPB_ASSET_BASE + "pbr/bricks/bricks_color.png",
-  crateColor: LOCAL_SPB_ASSET_BASE + "pbr/crate/crate_color.png",
-  fluorescent: LOCAL_SPB_ASSET_BASE + "fluorescent_light.png",
-  wallTrim: LOCAL_SPB_ASSET_BASE + "wall_trim_texture.png",
-  stairs: LOCAL_SPB_ASSET_BASE + "newstairs_texture.png"
+  concreteColor: LOCAL_FF_ASSET_BASE + "pbr/concrete/concrete_color.png",
+  concreteNormal: LOCAL_FF_ASSET_BASE + "pbr/concrete/concrete_normal.png",
+  brickColor: LOCAL_FF_ASSET_BASE + "pbr/bricks/bricks_color.png",
+  crateColor: LOCAL_FF_ASSET_BASE + "pbr/crate/crate_color.png",
+  fluorescent: LOCAL_FF_ASSET_BASE + "fluorescent_light.png",
+  wallTrim: LOCAL_FF_ASSET_BASE + "wall_trim_texture.png",
+  stairs: LOCAL_FF_ASSET_BASE + "newstairs_texture.png"
 });
 
 export const BACKROOMS_PBR_SOURCES = Object.freeze({
@@ -103,6 +115,25 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
   }
 }
 
+export async function applyFoundFootageLevel0Assets(library,level,onProgress=()=>{}){
+  if(level.id!=="0")return false;
+  const loader=new THREE.TextureLoader();loader.setCrossOrigin("anonymous");
+  const load=async(url,color=true)=>await new Promise((resolve,reject)=>loader.load(url,t=>{configureTexture(t,{color,repeat:1});resolve(t)},undefined,e=>reject(e)));
+  const entries=[
+    [library.wall,FOUND_FOOTAGE_ASSET_SOURCES.wall,true,"Level 0 wall texture"],
+    [library.trim,FOUND_FOOTAGE_ASSET_SOURCES.wallTrim,true,"Level 0 trim texture"],
+    [library.level1Light,FOUND_FOOTAGE_ASSET_SOURCES.fluorescent,true,"Level 0 fluorescent texture"],
+    [library.pole,FOUND_FOOTAGE_ASSET_SOURCES.pole,true,"Level 0 pole texture"],
+    [library.pillar,FOUND_FOOTAGE_ASSET_SOURCES.plastic,true,"Level 0 pillar texture"]
+  ];
+  let done=0;
+  for(const [material,url,color,label] of entries){
+    try{const texture=await load(url,color);material.map=texture;material.needsUpdate=true}catch(error){console.warn("[Backrooms] Found Footage asset unavailable:",url,error)}
+    done++;onProgress(done/entries.length,"LOADING LOCAL ASSETS",label)
+  }
+  return true;
+}
+
 export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
   if(level.id==="1")return false;
   const source=level.id==="0"
@@ -126,7 +157,7 @@ export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
     ["manilaWall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // Manila wallpaper"]
   ]:[];
   const colorMaps=[
-    ["wall","map",source.wall.color,true,wallRepeat,.28,"Color // wallpaper"],
+    ...(level.id==="0"?[]:[["wall","map",source.wall.color,true,wallRepeat,.28,"Color // wallpaper"]]),
     ["floor","map",source.floor.color,true,floorRepeat,.16,"Color // carpet"],
     ["ceiling","map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25,"Color // ceiling"]
   ];
@@ -269,6 +300,8 @@ export function makeLibrary(level){
     exitFrame:new THREE.MeshStandardMaterial({color:0xf3f0e4,roughness:.56,metalness:0}),
     wallAnomaly:new THREE.MeshStandardMaterial({color:0xd2bf61,roughness:.72,metalness:0,emissive:0xffdc69,emissiveIntensity:.7}),
     redWall:createPBRMaterial({base:0x651713,seed:211,rough:.94,scale:1,normalStrength:.28}),
+    pole:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.82,metalness:0}),
+    pillar:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.88,metalness:0}),
     redFloor:createPBRMaterial({base:0x3d1714,seed:212,rough:.99,scale:5,normalStrength:.12}),
     manilaWall:createPBRMaterial({base:0x8a7357,seed:213,rough:.9,scale:1.2,normalStrength:.22}),
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
