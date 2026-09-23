@@ -14,7 +14,7 @@ const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const MAX_SPB_BYTES = 30 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
 const SPB_SOURCE_COMMIT = "0c46c8301fc512c318ac93e23b669355b7d4b180";
-const SPB_LEVEL0_SOURCE_COMMIT = "e8cc1d2b7fce038932b662deab52d9e7344af010";
+const SPB_LEVEL0_SOURCE_COMMIT = "0c46c8301fc512c318ac93e23b669355b7d4b180";
 const SPB_SOURCE_REPO = "https://github.com/SpacePotatoee/MinecraftFoundFootage";
 const SPB_FILES = [
   {name:"pbr/concrete/concrete_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/concrete/concrete_color.png"},
@@ -24,13 +24,13 @@ const SPB_FILES = [
   {name:"fluorescent_light.png",path:"src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png"},
   {name:"wall_trim_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png"},
   {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"},
-  {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"},
-  {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"},
-  {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"},
-  {name:"level0/pbr/carpet/carpet_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_color.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"},
-  {name:"level0/pbr/carpet/carpet_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_normal.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"},
-  {name:"level0/pbr/ceiling_tile/ceiling_tile_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_color.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"},
-  {name:"level0/pbr/ceiling_tile/ceiling_tile_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_normal.png",sourceCommit:"e8cc1d2b7fce038932b662deab52d9e7344af010"}
+  {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
+  {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
+  {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
+  {name:"level0/pbr/carpet/carpet_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_color.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
+  {name:"level0/pbr/carpet/carpet_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/carpet/carpet_normal.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
+  {name:"level0/pbr/ceiling_tile/ceiling_tile_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_color.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"},
+  {name:"level0/pbr/ceiling_tile/ceiling_tile_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/ceiling_tile/ceiling_tile_normal.png",sourceCommit:"0c46c8301fc512c318ac93e23b669355b7d4b180"}
 ];
 
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
