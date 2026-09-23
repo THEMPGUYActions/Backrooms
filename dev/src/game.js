@@ -126,6 +126,30 @@ function smoothNoise2D(x,z,seed){
   return a+(b-a)*sz;
 }
 
+function level0AddBoundaryInterval(map,key,start,end){
+  let list=map.get(key);
+  if(!list){list=[];map.set(key,list)}
+  list.push([start,end]);
+}
+
+function level0MergeBoundaryIntervals(map,horizontal){
+  const out=[];
+  for(const [line,parts] of map){
+    parts.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    let start=parts[0][0],end=parts[0][1];
+    for(let i=1;i<parts.length;i++){
+      const [a,b]=parts[i];
+      if(a<=end){end=Math.max(end,b);continue}
+      if(horizontal)out.push({x1:start,z1:line,x2:end,z2:line});
+      else out.push({x1:line,z1:start,x2:line,z2:end});
+      start=a;end=b;
+    }
+    if(horizontal)out.push({x1:start,z1:line,x2:end,z2:line});
+    else out.push({x1:line,z1:start,x2:line,z2:end});
+  }
+  return out;
+}
+
 class Chunk{
   constructor(world,cx,cz){
     this.world=world;this.game=world.game;this.cx=cx;this.cz=cz;
@@ -773,7 +797,7 @@ class Chunk{
           [[minX,0,minZ],[maxX,0,minZ],[maxX,h,minZ],[minX,h,minZ]],
           0,0,-1,1,h
         );
-        this.collisionSegments.push({x1:minX,z1:minZ,x2:maxX,z2:minZ});
+
       }
 
       if(!has(x,z+1)){
@@ -781,7 +805,7 @@ class Chunk{
           [[maxX,0,maxZ],[minX,0,maxZ],[minX,h,maxZ],[maxX,h,maxZ]],
           0,0,1,1,h
         );
-        this.collisionSegments.push({x1:minX,z1:maxZ,x2:maxX,z2:maxZ});
+
       }
 
       if(!has(x-1,z)){
@@ -789,7 +813,7 @@ class Chunk{
           [[minX,0,maxZ],[minX,0,minZ],[minX,h,minZ],[minX,h,maxZ]],
           -1,0,0,1,h
         );
-        this.collisionSegments.push({x1:minX,z1:minZ,x2:minX,z2:maxZ});
+
       }
 
       if(!has(x+1,z)){
@@ -797,9 +821,21 @@ class Chunk{
           [[maxX,0,minZ],[maxX,0,maxZ],[maxX,h,maxZ],[maxX,h,minZ]],
           1,0,0,1,h
         );
-        this.collisionSegments.push({x1:maxX,z1:minZ,x2:maxX,z2:maxZ});
+
       }
     }
+
+    const horizontal=new Map(),vertical=new Map();
+    for(const key of wallCells){
+      const cut=key.indexOf(",");
+      const x=Number(key.slice(0,cut)),z=Number(key.slice(cut+1));
+      if(!has(x,z-1))level0AddBoundaryInterval(horizontal,z,x,x+1);
+      if(!has(x,z+1))level0AddBoundaryInterval(horizontal,z+1,x,x+1);
+      if(!has(x-1,z))level0AddBoundaryInterval(vertical,x,z,z+1);
+      if(!has(x+1,z))level0AddBoundaryInterval(vertical,x+1,z,z+1);
+    }
+    this.collisionSegments=level0MergeBoundaryIntervals(horizontal,true)
+      .concat(level0MergeBoundaryIntervals(vertical,false));
 
     if(positions.length){
       const geometry=new THREE.BufferGeometry();
@@ -827,6 +863,7 @@ class Chunk{
         if(this.macroBlockedCells?.some(r=>r.x===x&&r.z===z))continue;
 
         const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
+        if(wallCells.has(Math.floor(px)+","+Math.floor(pz)))continue;
         const mat=lib.light.clone();
         mat.emissiveIntensity=1.65+rng.next()*.45;
         const rotation=rng.next()<.5?0:Math.PI/2;
@@ -1250,6 +1287,20 @@ class WorldStreamer{
     }
   }
   currentCell(){const c=this.chunkAt(this.game.player.position.x,this.game.player.position.z);return c?c.cellAt(this.game.player.position.x,this.game.player.position.z):null}
+  findSafeSpawn(x,z,radius=.36){
+    const direct=this.collision(new THREE.Vector3(x,0,z),radius);
+    if(Math.hypot(direct.x-x,direct.z-z)<.02)return {x,z};
+    const candidates=[
+      [2,0],[-2,0],[0,2],[0,-2],[4,0],[-4,0],[0,4],[0,-4],
+      [2,2],[-2,2],[2,-2],[-2,-2],[6,0],[-6,0],[0,6],[0,-6],
+      [4,2],[-4,2],[4,-2],[-4,-2],[2,4],[-2,4],[2,-4],[-2,-4]
+    ];
+    for(const [dx,dz] of candidates){
+      const cx=x+dx,cz=z+dz,hit=this.collision(new THREE.Vector3(cx,0,cz),radius);
+      if(Math.hypot(hit.x-cx,hit.z-cz)<.02)return {x:cx,z:cz};
+    }
+    return {x:direct.x,z:direct.z};
+  }
   update(dt){
     const p=this.game.player.position;
     this.ensureAround(p.x,p.z);
@@ -1355,8 +1406,10 @@ class WorldStreamer{
   }
   nearbyLightSources(x,z,frustum,camera){
     const out=[];
-    const cx=Math.floor((x+this.size/2)/this.size),cz=Math.floor((z+this.size/2)/this.size);
-    for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
+    const offset=this.game.level.id==="0"?32:this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    const span=this.game.level.id==="0"?1:2;
+    for(let dz=-span;dz<=span;dz++)for(let dx=-span;dx<=span;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
       for(const light of c.lightSources){
@@ -1553,10 +1606,11 @@ class AdaptiveQuality{
     return Math.max(1,Math.min(1.15,this.game.renderer.capabilities.maxTextureSize/Math.max(width,height)));
   }
   limits(){
-    if(this.mode==="low")return{pixel:1,radius:2};
-    if(this.mode==="medium")return{pixel:1,radius:2};
-    if(this.mode==="high")return{pixel:1.15,radius:2};
-    return{pixel:Math.min(devicePixelRatio,1.0),radius:2};
+    const radius=this.game.level.id==="0"?1:2;
+    if(this.mode==="low")return{pixel:1,radius};
+    if(this.mode==="medium")return{pixel:1,radius};
+    if(this.mode==="high")return{pixel:1.15,radius};
+    return{pixel:Math.min(devicePixelRatio,1.0),radius};
   }
   apply(){
     const l=this.limits();
@@ -1663,6 +1717,8 @@ export class BackroomsGame{
         this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
       });
       this.world.ensureAround(0,0);
+      const spawn=this.world.findSafeSpawn(0,0,.36);
+      this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
       this.worldReady=true;
       if(this.pendingStart)this.beginIntroReveal();
       worldLoad.catch(error=>{
@@ -1832,7 +1888,7 @@ export class BackroomsGame{
   start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
-    this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();
+    this.seed=(Math.random()*2147483647)|0;localStorage.setItem("br.seed",String(this.seed));this.levelId="0";this.setLevel("0");this.player.reset();const spawn=this.world.findSafeSpawn(0,0,.36);this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
     this.running=true;this.paused=false;this.dead=false;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
     const mobileControls=document.getElementById("mobile-controls");
     if(this.isTouchLayout()){

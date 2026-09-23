@@ -51,7 +51,7 @@ export function level0RotationForMask(mask){
     case 14:return 0;
     case 7:return -Math.PI/2;
     case 11:return Math.PI;
-    case 13:return -Math.PI/2;
+    case 13:return Math.PI/2;
     default:return 0;
   }
 }
