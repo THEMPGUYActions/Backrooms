@@ -112,12 +112,10 @@ export function level0RoomVariant(mask,index){
 }
 
 export function level0RotationForMask(mask){
-  if(mask===1||mask===9||mask===13)return 0;
-  if(mask===2||mask===6||mask===14)return Math.PI/2;
-  if(mask===4||mask===12||mask===7)return Math.PI;
-  if(mask===8||mask===3||mask===11)return -Math.PI/2;
-  if(mask===5)return 0;
-  if(mask===10)return Math.PI/2;
+  if(mask===1||mask===9||mask===13||mask===5)return 0;
+  if(mask===2||mask===3||mask===10||mask===11)return Math.PI/2;
+  if(mask===4||mask===6||mask===7)return Math.PI;
+  if(mask===8||mask===12||mask===14)return -Math.PI/2;
   return 0;
 }
 
