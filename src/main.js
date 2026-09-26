@@ -1,5 +1,5 @@
-import { BackroomsGame } from "./game.js?v=20260926-manilalayout1";
-import { installBackroomsFixes } from "./fixes.js?v=20260926-rooftexture";
+import { BackroomsGame } from "./game.js?v=20260926-manilalayout2";
+import { installBackroomsFixes } from "./fixes.js?v=20260926-roofmanila1";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20260925-entityai2";
 /* DEV_ADMIN_END */
