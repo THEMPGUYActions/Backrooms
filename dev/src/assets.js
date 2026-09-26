@@ -204,8 +204,6 @@ export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
     ["ceiling","map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25,"Color // ceiling"]
   ];
   const level0Colors=level.id==="0"?[
-    ["redWall","map",source.wall.color,true,wallRepeat,.28,"Color // red wallpaper"],
-    ["redFloor","map",source.floor.color,true,floorRepeat,.16,"Color // red carpet"],
     ["manilaWall","map",source.wall.color,true,wallRepeat,.28,"Color // Manila wallpaper"]
   ]:[];
   const maps=[...dataMaps,...level0Data,...colorMaps,...level0Colors];
@@ -315,6 +313,8 @@ export function makeLibrary(level){
   const redWall=createPBRMaterial({base:0x8b1717,seed:211,rough:.94,scale:1,normalStrength:.28});
   const redFloor=createPBRMaterial({base:0x4a1212,seed:212,rough:.99,scale:5,normalStrength:.12});
   redWall.color.setHex(0xb51b1b);
+  redWall.emissive=new THREE.Color(0x100000);
+  redWall.emissiveIntensity=.018;
   redFloor.color.setHex(0x6b1717);
   return {
     floor,
