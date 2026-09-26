@@ -1,0 +1,2 @@
+# Entity models are binary assets. Git LFS keeps large GLBs manageable while they remain part of this repository.
+assets/entities/*.glb filter=lfs diff=lfs merge=lfs -text
