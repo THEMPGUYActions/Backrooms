@@ -6,49 +6,65 @@
       "url": "https://opengameart.org/sites/default/files/ambient_horror.ogg",
       "source": "https://opengameart.org/content/ambient-horror",
       "author": "techiew",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 776232,
+      "sha256": "70943868cd7df14310bf0613da1c0c8858e0fb82ce554cb45bfd5a268d6f44d4"
     },
     "electric_buzz.ogg": {
       "url": "https://opengameart.org/sites/default/files/buzz_0.ogg",
       "source": "https://opengameart.org/content/electric-buzz",
       "author": "themightyglider",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 23644,
+      "sha256": "4427905b12e7dbd35613a45ab3cf6b74b10816888db3446b3acbadbe36829dd8"
     },
     "footstep_01.ogg": {
       "url": "https://opengameart.org/sites/default/files/01-footstep.ogg",
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 9715,
+      "sha256": "33c9bef5e8aeb1069455699a34a0c5e1ef1787fd3f61594b0859d7e6bb9f9dec"
     },
     "footstep_02.ogg": {
       "url": "https://opengameart.org/sites/default/files/02-footstep.ogg",
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 10531,
+      "sha256": "f05396c807eb8eaecffb2a1ead611ec971c5a7914d1d081c91d7796e852692a2"
     },
     "footstep_03.ogg": {
       "url": "https://opengameart.org/sites/default/files/03-footstep.ogg",
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 14136,
+      "sha256": "9817cc93897ed1de5da87675b26be4196bfda3daa6f1de9dc4398a68d250cdb9"
     },
     "footstep_04.ogg": {
       "url": "https://opengameart.org/sites/default/files/04-footstep.ogg",
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 13771,
+      "sha256": "b373ff981e44d6f7ba2291225a4803078771029615ed81606136fdb9599906d5"
     },
     "footstep_05.ogg": {
       "url": "https://opengameart.org/sites/default/files/05-footstep.ogg",
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 13595,
+      "sha256": "f1b4893dd3cebe23438567a0dcaf047848a52b594e7eb03e5c212d99e83d2298"
     },
     "footstep_06.ogg": {
       "url": "https://opengameart.org/sites/default/files/06-footstep.ogg",
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
-      "license": "CC0"
+      "license": "CC0",
+      "bytes": 11329,
+      "sha256": "39147cc1b98abb4b5378ad07b15d50d18f2aa0f0fd2f5514f078c1e574d14773"
     }
   }
-}
+}\n
