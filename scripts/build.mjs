@@ -8,6 +8,7 @@ const dist = join(root, "dist");
 const pbrDir = join(dist, "assets", "pbr");
 const audioDir = join(dist, "assets", "audio");
 const ffDir = join(dist, "assets", "found-footage");
+const entityDir = join(dist, "assets", "entities");
 const LOCK_PATH = join(root, "data", "pbr-assets-lock.json");
 const AUDIO_LOCK_PATH = join(root, "data", "audio-assets-lock.json");
 const MAX_ASSET_BYTES = 6 * 1024 * 1024;
@@ -122,11 +123,22 @@ await mkdir(dist, { recursive: true });
 await mkdir(pbrDir,{recursive:true});
 await mkdir(audioDir,{recursive:true});
 await mkdir(ffDir,{recursive:true});
+await mkdir(entityDir,{recursive:true});
 
 for (const path of ["index.html", "styles.css", "favicon.svg", "sw.js", "src", "data"]) {
   await cp(join(root, path), join(dist, path), { recursive: true });
 }
 
+const entitySource=join(root,"assets","entities");
+try{
+  const entityEntries=await (await import("node:fs/promises")).readdir(entitySource,{withFileTypes:true});
+  for(const entry of entityEntries){
+    if(entry.isFile()&&entry.name.toLowerCase().endsWith(".glb"))
+      await cp(join(entitySource,entry.name),join(entityDir,entry.name));
+  }
+}catch(error){
+  if(error?.code!=="ENOENT")throw error;
+}
 const redZoneSource=join(root,"assets","RedZone.ogg");
 const redZoneTarget=join(dist,"assets","RedZone.ogg");
 const redZoneStat=await stat(redZoneSource);
