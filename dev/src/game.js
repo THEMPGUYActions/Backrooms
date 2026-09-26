@@ -2056,18 +2056,13 @@ export class BackroomsGame{
       }
     });
 
+    // Native click is the authoritative activation path for menu controls.
+    // iOS Safari/WebKit has changed pointer/click synthesis across releases, so
+    // do not gate click handling on PointerEvent.pointerType or require pointerup.
     const bindUiButton=(element,handler)=>{
       if(!element)return;
-      let lastPointer=0;
-      element.addEventListener("pointerup",event=>{
-        if(event.pointerType==="mouse")return;
-        event.preventDefault();
-        event.stopPropagation();
-        lastPointer=performance.now();
-        handler(event);
-      },{passive:false});
+      element.type==="button"&&(element.type="button");
       element.addEventListener("click",event=>{
-        if(performance.now()-lastPointer<700)return;
         event.preventDefault();
         event.stopPropagation();
         handler(event);
