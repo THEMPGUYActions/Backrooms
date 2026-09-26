@@ -1,6 +1,6 @@
-import { BackroomsGame } from "./game.js?v=20260925-entities1";
+import { BackroomsGame } from "./game.js?v=20260925-entityai2";
 /* DEV_ADMIN_START */
-import { BackroomsAdmin } from "./admin.js?v=20260925-entities1";
+import { BackroomsAdmin } from "./admin.js?v=20260925-entityai2";
 /* DEV_ADMIN_END */
 
 const registerCache=async()=>{
