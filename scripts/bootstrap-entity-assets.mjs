@@ -150,7 +150,7 @@ for(const entry of SPB_FILES){
 
 // Manifests live beside the committed assets so the build has no network dependency.
 async function writeManifestIfChanged(path,value){
-  const next=JSON.stringify(value,null,2)+"\\n";
+  const next=JSON.stringify(value,null,2)+"\n";
   let previous="";
   try{previous=await readFile(path,"utf8");}catch{}
   if(previous!==next){
