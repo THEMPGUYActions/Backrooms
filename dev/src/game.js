@@ -2061,11 +2061,36 @@ export class BackroomsGame{
     $("retry")?.addEventListener("click",()=>this.restart());
     $("again-ending")?.addEventListener("click",()=>this.restart());
     $("fullscreen")?.addEventListener("click",()=>this.toggleFullscreen());
+    $("fullscreen-settings")?.addEventListener("click",()=>this.toggleFullscreen());
+
+    const pauseTabNames={settings:["SETTINGS","SETTINGS"],controls:["CONTROLS","HOW TO PLAY"]};
+    this.pauseTabState=tab=>{
+      const target=tab==="settings"||tab==="controls"?tab:"game";
+      document.querySelectorAll("[data-pause-tab]").forEach(button=>button.classList.toggle("active",(button.dataset.pauseTab||"game")===target));
+      document.querySelectorAll("[data-pause-panel]").forEach(panel=>panel.classList.toggle("active",(panel.dataset.pausePanel||"game")===target));
+      const meta=pauseTabNames[target]||["GAME","THE RECORDING IS PAUSED"];
+      const kicker=$("pause-panel-kicker"),title=$("pause-panel-title");
+      if(kicker)kicker.textContent=meta[0];
+      if(title)title.textContent=meta[1];
+    };
+    document.querySelectorAll("[data-pause-tab]").forEach(button=>button.addEventListener("click",()=>this.pauseTabState(button.dataset.pauseTab)));
+    document.querySelectorAll("[data-settings-tab]").forEach(button=>button.addEventListener("click",()=>{
+      const tab=button.dataset.settingsTab;
+      document.querySelectorAll("[data-settings-tab]").forEach(x=>x.classList.toggle("active",x===button));
+      document.querySelectorAll("[data-settings-panel]").forEach(x=>x.classList.toggle("active",x.dataset.settingsPanel===tab));
+    }));
 
     const quality=$("quality");
     if(quality){quality.value=this.quality.mode;quality.onchange=e=>this.quality.set(e.target.value)}
     const volume=$("volume");
-    if(volume){volume.value=String(this.audio.volume);volume.oninput=e=>this.audio.setVolume(e.target.value)}
+    if(volume){
+      volume.value=String(this.audio.volume);
+      volume.oninput=e=>{
+        this.audio.setVolume(e.target.value);
+        const value=volume.closest(".pause-setting")?.querySelector("b");
+        if(value)value.textContent=Math.round(Number(e.target.value)*100)+"%";
+      };
+    }
     const shake=$("shake");
     if(shake){shake.checked=this.settings.shake;shake.onchange=e=>{this.settings.shake=e.target.checked;localStorage.setItem("br.shake",e.target.checked?"1":"0")}}
     const flashlight=$("flashlight");
@@ -2076,6 +2101,8 @@ export class BackroomsGame{
       sensitivity.oninput=e=>{
         this.settings.sensitivity=Math.max(.5,Math.min(2,Number(e.target.value)));
         localStorage.setItem("br.sensitivity",String(this.settings.sensitivity));
+        const value=sensitivity.closest(".pause-setting")?.querySelector("b");
+        if(value)value.textContent=this.settings.sensitivity.toFixed(2);
       };
     }
   }
@@ -2202,6 +2229,13 @@ export class BackroomsGame{
     pause?.classList.toggle("hidden",!this.paused);
     const pauseLevel=document.getElementById("pause-level");
     if(pauseLevel)pauseLevel.textContent=this.level.number;
+    const pauseStatusLevel=document.getElementById("pause-status-level");
+    if(pauseStatusLevel)pauseStatusLevel.textContent=this.level.number;
+    const pauseFooterLevel=document.getElementById("pause-footer-level");
+    if(pauseFooterLevel)pauseFooterLevel.textContent=String(this.level.number).replace(/^LEVEL\s*/i,"");
+    const pauseObjective=document.getElementById("pause-status-objective");
+    if(pauseObjective)pauseObjective.textContent=this.level.objective;
+    this.pauseTabState?.("game");
     const mobile=document.getElementById("mobile-controls");
     mobile?.classList.toggle("paused",this.paused);
     if(this.paused){
