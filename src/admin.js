@@ -35,15 +35,17 @@ export class BackroomsAdmin{
       if(!this.game.running||this.game.introActive)return;
       this.opened?this.close():this.open();
     };
+    this.opener.addEventListener("pointerup",event=>{
+      if(event.pointerType==="mouse")return;
+      event.preventDefault();
+      event.stopPropagation();
+      lastTouchActivation=performance.now();
+      toggle(event);
+    },{passive:false});
     this.opener.addEventListener("click",event=>{
       if(performance.now()-lastTouchActivation<700)return;
       toggle(event);
     });
-    this.opener.addEventListener("pointerup",event=>{
-      if(event.pointerType==="mouse")return;
-      lastTouchActivation=performance.now();
-      toggle(event);
-    },{passive:false});
     this.ready=true;
     this.opener.hidden=false;
   }
