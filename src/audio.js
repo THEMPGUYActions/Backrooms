@@ -1,4 +1,5 @@
 const AUDIO_BASE=new URL("../assets/audio/",import.meta.url).href;
+const RED_ZONE_AUDIO=new URL("../assets/RedZone.ogg",import.meta.url).href;
 
 export const BACKROOMS_AUDIO_SOURCES=Object.freeze({
   ambient_horror:AUDIO_BASE+"ambient_horror.ogg",
@@ -21,6 +22,7 @@ export class AudioDirector{
     this.ready=false;this.loading=null;this.buffers=new Map();
     this.stepDistance=0;this.ambientTimer=70;this.buzzTimer=11;this.humGain=null;this.lastRareEvent=-Infinity;
     this.volume=Number(localStorage.getItem("br.volume")??.65);
+    this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;this.redZoneLoading=null;
   }
   createImpulse(seconds=1.6,decay=2.8){
     const length=Math.floor(this.ctx.sampleRate*seconds),buffer=this.ctx.createBuffer(2,length,this.ctx.sampleRate);
@@ -77,6 +79,7 @@ export class AudioDirector{
       const entries=[
         ["ambient_horror",BACKROOMS_AUDIO_SOURCES.ambient_horror],
         ["electric_buzz",BACKROOMS_AUDIO_SOURCES.electric_buzz],
+        ["red_zone",RED_ZONE_AUDIO],
         ...BACKROOMS_AUDIO_SOURCES.footsteps.map((url,i)=>["footstep_"+String(i+1).padStart(2,"0"),url])
       ];
       Promise.allSettled(entries.map(async([key,url])=>{
@@ -150,6 +153,58 @@ export class AudioDirector{
     const gainNode=this.ctx.createGain();gainNode.gain.value=gain;
     const panner=this.ctx.createStereoPanner();panner.pan.value=clamp(pan,-1,1);
     source.connect(gainNode).connect(panner);this.connectFx(panner,send,delay);source.start();return true;
+  }
+  async ensureRedZoneBuffer(){
+    if(this.buffers.has("red_zone"))return this.buffers.get("red_zone");
+    if(this.redZoneLoading){await this.redZoneLoading;return this.buffers.get("red_zone")||null}
+    this.redZoneLoading=(async()=>{
+      const response=await fetch(RED_ZONE_AUDIO,{cache:"force-cache"});
+      if(!response.ok)throw new Error("HTTP "+response.status+" while loading RedZone.ogg");
+      const buffer=await this.ctx.decodeAudioData(await response.arrayBuffer());
+      this.buffers.set("red_zone",buffer);
+      return buffer;
+    })();
+    try{return await this.redZoneLoading}
+    catch(error){console.warn("[Backrooms] RedZone.ogg unavailable:",error);return null}
+    finally{this.redZoneLoading=null}
+  }
+  async playRedZone(){
+    await this.init();
+    if(this.ctx?.state==="suspended"){
+      try{await this.ctx.resume()}catch(error){console.warn("[Backrooms] Red Zone audio resume failed:",error)}
+    }
+    const buffer=await this.ensureRedZoneBuffer();
+    if(!buffer||!this.ready)return null;
+
+    this.stopRedZone();
+    const source=this.ctx.createBufferSource();
+    source.buffer=buffer;
+    const gain=this.ctx.createGain();
+    gain.gain.setValueAtTime(.9,this.ctx.currentTime);
+    source.connect(gain).connect(this.master);
+    const startedAt=this.ctx.currentTime;
+    this.redZoneSource=source;
+    this.redZoneGain=gain;
+    this.redZoneStartedAt=startedAt;
+    this.redZoneDuration=buffer.duration;
+    source.onended=()=>{
+      if(this.redZoneSource===source){
+        this.redZoneSource=null;this.redZoneGain=null;
+      }
+    };
+    source.start(startedAt);
+    return {duration:buffer.duration,startedAt};
+  }
+  stopRedZone(){
+    const source=this.redZoneSource;
+    if(source){
+      try{source.stop()}catch{}
+    }
+    this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;
+  }
+  redZoneElapsed(){
+    if(!this.redZoneSource||!this.ctx)return 0;
+    return Math.max(0,this.ctx.currentTime-this.redZoneStartedAt);
   }
   clickToEnter(){this.tone(1180,.055,"square",.08);this.tone(260,.08,"square",.04)}
   tone(freq,duration,type="sine",gain=.05){
