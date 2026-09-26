@@ -324,8 +324,10 @@ class Chunk{
     }else if(level.id==="0"){
       this.zone="maze";
       this.megaType=null;
-      this.level0Region=level0RegionAt(this.cx,this.cz,this.game.seed);
-      if(this.world.forceLevel0Zone&&Math.abs(this.cx-this.world.forceLevel0Zone.cx)<=1&&Math.abs(this.cz-this.world.forceLevel0Zone.cz)<=1){
+      this.level0Region=this.world.forceLevel0AllRed
+        ? {type:"red",id:"red:global"}
+        : level0RegionAt(this.cx,this.cz,this.game.seed);
+      if(!this.world.forceLevel0AllRed&&this.world.forceLevel0Zone&&Math.abs(this.cx-this.world.forceLevel0Zone.cx)<=1&&Math.abs(this.cz-this.world.forceLevel0Zone.cz)<=1){
         this.level0Region={type:this.world.forceLevel0Zone.type,id:"forced:"+this.world.forceLevel0Zone.type};
       }
       this.level0SpawnCell={x:Math.floor(cells/2),z:Math.floor(cells/2)};
@@ -360,13 +362,24 @@ class Chunk{
         }
       }
 
-      for(let x=0;x<cells;x++){
-        if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"north",this.level0Region))this.setEdge(x,0,"north",true);
-        if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"south",this.level0Region))this.setEdge(x,cells-1,"south",true);
-      }
-      for(let z=0;z<cells;z++){
-        if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"west",this.level0Region))this.setEdge(0,z,"west",true);
-        if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"east",this.level0Region))this.setEdge(cells-1,z,"east",true);
+      if(this.world.forceLevel0AllRed){
+        for(let x=0;x<cells;x++){
+          this.setEdge(x,0,"north",true);
+          this.setEdge(x,cells-1,"south",true);
+        }
+        for(let z=0;z<cells;z++){
+          this.setEdge(0,z,"west",true);
+          this.setEdge(cells-1,z,"east",true);
+        }
+      }else{
+        for(let x=0;x<cells;x++){
+          if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"north",this.level0Region))this.setEdge(x,0,"north",true);
+          if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"south",this.level0Region))this.setEdge(x,cells-1,"south",true);
+        }
+        for(let z=0;z<cells;z++){
+          if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"west",this.level0Region))this.setEdge(0,z,"west",true);
+          if(level0BoundaryOpen(this.game.seed,this.cx,this.cz,"east",this.level0Region))this.setEdge(cells-1,z,"east",true);
+        }
       }
       if(this.cx===0&&this.cz===0){const s=Math.floor(cells/2);for(const side of ["north","east","south","west"])this.setEdge(s,s,side,true)}
       if(this.manilaRoom)this.setEdge(this.manilaRoom.cellX,this.manilaRoom.cellZ,this.manilaRoom.entrySide,true);
@@ -1067,6 +1080,7 @@ class WorldStreamer{
     this.game=game;this.chunks=new Map();this.library=null;this.radius=2;this.size=0;
     this.surfaceSize=0;this.floorSurface=null;this.ceilingSurface=null;
     this.forceLevel0Zone=null;
+    this.forceLevel0AllRed=false;
   }
   key(cx,cz){return cx+","+cz}
   async configure(onProgress=()=>{}){
@@ -1212,6 +1226,51 @@ class WorldStreamer{
     for(const [k,c] of this.chunks){
       if(Math.hypot(c.cx-cx,c.cz-cz)>this.radius+1){this.game.scene.remove(c.group);this.chunks.delete(k)}
     }
+  }
+  setLevel0AllRed(enabled=true){
+    this.forceLevel0AllRed=!!enabled;
+    if(this.game.level.id!=="0")return;
+    if(this.forceLevel0AllRed){
+      // The red-room rewrite is intentionally a game mechanic: once the
+      // 60-second escape window expires, the loaded world and every newly
+      // streamed Level 0 chunk use the Red Rooms appearance.
+      const redFloor=this.library?.redFloor;
+      const redWall=this.library?.redWall;
+      if(redWall){
+        redWall.map=null;
+        redWall.color.setHex(0xb51b1b);
+        redWall.needsUpdate=true;
+      }
+      if(redFloor){
+        redFloor.map=null;
+        redFloor.color.setHex(0x651515);
+        redFloor.emissive=new THREE.Color(0x160000);
+        redFloor.emissiveIntensity=.035;
+        redFloor.needsUpdate=true;
+      }
+      if(this.library?.floor){
+        this.library.floor.map=null;
+        this.library.floor.color.setHex(0x651515);
+        this.library.floor.emissive=new THREE.Color(0x160000);
+        this.library.floor.emissiveIntensity=.035;
+        this.library.floor.needsUpdate=true;
+      }
+      if(this.library?.ceiling){
+        this.library.ceiling.map=null;
+        this.library.ceiling.color.setHex(0x350909);
+        this.library.ceiling.emissive=new THREE.Color(0x210000);
+        this.library.ceiling.emissiveIntensity=.075;
+        this.library.ceiling.needsUpdate=true;
+      }
+    }
+
+    const p=this.game.player.position;
+    for(const c of this.chunks.values()){
+      this.game.scene.remove(c.group);
+      c.dispose();
+    }
+    this.chunks.clear();
+    this.ensureAround(p.x,p.z);
   }
   currentCell(){const c=this.chunkAt(this.game.player.position.x,this.game.player.position.z);return c?c.cellAt(this.game.player.position.x,this.game.player.position.z):null}
   level0SpawnPoint(){
@@ -1915,6 +1974,8 @@ export class BackroomsGame{
     this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
+    this.redZoneFontTimer=0;
+    this.redZoneFonts=["system-ui","ui-sans-serif","ui-monospace","ui-rounded","Arial, sans-serif","Helvetica, sans-serif","Verdana, sans-serif","Tahoma, sans-serif","Georgia, serif","Times New Roman, serif","Courier New, monospace","monospace","serif","sans-serif","cursive","fantasy"];
     this.settings={
       shake:localStorage.getItem("br.shake")!=="0",
       sensitivity:Math.max(.5,Math.min(2,Number(localStorage.getItem("br.sensitivity")||1)))
@@ -2233,7 +2294,7 @@ export class BackroomsGame{
     this.toast(this.level.objective,2.4);
   }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.024:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.032:.052;
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
@@ -2304,8 +2365,9 @@ export class BackroomsGame{
   updateRedZone(dt){
     const bar=document.getElementById("zone-actionbar");
     if(this.level.id!=="0"){
-      this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
+      this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;
       bar?.classList.add("hidden");
+      if(bar)bar.style.fontFamily="";
       return;
     }
 
@@ -2315,7 +2377,7 @@ export class BackroomsGame{
     const id=region?.id||null;
 
     if(!inRed&&!this.redZoneTrapped){
-      this.redZoneTimer=0;this.redZoneId=null;this.redZoneBounds=null;
+      this.redZoneTimer=0;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;
       bar?.classList.add("hidden");
       return;
     }
@@ -2326,22 +2388,35 @@ export class BackroomsGame{
       const parts=String(id).split(":");
       const mx=Number(parts[1]),mz=Number(parts[2]);
       const size=this.world.size||80;
-      const minCx=mx*LEVEL0_REGION_CHUNKS+3,maxCx=minCx+LEVEL0_RED_SIZE-1;
-      const minCz=mz*LEVEL0_REGION_CHUNKS+3,maxCz=minCz+LEVEL0_RED_SIZE-1;
-      this.redZoneBounds={
-        minX:minCx*size-size/2+.55,
-        maxX:(maxCx+1)*size-size/2-.55,
-        minZ:minCz*size-size/2+.55,
-        maxZ:(maxCz+1)*size-size/2-.55
-      };
+      if(id==="red:global"){
+        this.redZoneBounds={
+          minX:-Infinity,maxX:Infinity,minZ:-Infinity,maxZ:Infinity
+        };
+      }else{
+        const minCx=mx*LEVEL0_REGION_CHUNKS+3,maxCx=minCx+LEVEL0_RED_SIZE-1;
+        const minCz=mz*LEVEL0_REGION_CHUNKS+3,maxCz=minCz+LEVEL0_RED_SIZE-1;
+        this.redZoneBounds={
+          minX:minCx*size-size/2+.55,
+          maxX:(maxCx+1)*size-size/2-.55,
+          minZ:minCz*size-size/2+.55,
+          maxZ:(maxCz+1)*size-size/2-.55
+        };
+      }
+      this.redZoneFontTimer=0;
       this.triggerFear(.18);
     }
 
     if(this.redZoneTrapped){
       if(bar){
-        bar.textContent="RED ZONE\nYOU ARE TRAPPED\nFOREVER";
+        bar.textContent="RED ZONE\nTRAPPED FOREVER";
         bar.classList.remove("hidden","warning");
         bar.classList.add("trapped");
+        this.redZoneFontTimer-=dt;
+        if(this.redZoneFontTimer<=0){
+          this.redZoneFontTimer=.5;
+          const fonts=this.redZoneFonts||["system-ui","sans-serif"];
+          bar.style.fontFamily=fonts[Math.floor(Math.random()*fonts.length)];
+        }
       }
       return;
     }
@@ -2351,8 +2426,10 @@ export class BackroomsGame{
       this.redZoneTrapped=true;
       this.triggerFear(.8);
       this.audio.ambientSting(.12);
+      this.world.setLevel0AllRed(true);
+      this.redZoneBounds={minX:-Infinity,maxX:Infinity,minZ:-Infinity,maxZ:Infinity};
       if(bar){
-        bar.textContent="RED ZONE\nYOU ARE TRAPPED\nFOREVER";
+        bar.textContent="RED ZONE\nTRAPPED FOREVER";
         bar.classList.remove("hidden","warning");
         bar.classList.add("trapped");
       }
@@ -2364,9 +2441,14 @@ export class BackroomsGame{
       bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nLEAVE IN "+seconds+"s";
       bar.classList.remove("hidden","trapped");
       bar.classList.add("warning");
+      this.redZoneFontTimer-=dt;
+      if(this.redZoneFontTimer<=0){
+        this.redZoneFontTimer=.5;
+        const fonts=this.redZoneFonts||["system-ui","sans-serif"];
+        bar.style.fontFamily=fonts[Math.floor(Math.random()*fonts.length)];
+      }
     }
   }
-
   updateLightEvent(dt){
     if(!this.running||this.paused||this.dead)return;
     this.lightEventTimer-=dt;
@@ -2526,12 +2608,13 @@ export class BackroomsGame{
       const zoneChunk=this.world.chunkAt(this.player.position.x,this.player.position.z);
       const zone=zoneChunk?.level0Region?.type||"maze";
       const blackout=zone==="blackout";
-      const red=zone==="red";
-      // Red rooms are a physical Level 0 sub-section: red materials + dim red
-      // atmosphere, while blackout remains a separate unlit section.
-      this.ambient.intensity=blackout?.010:red?.020:.020;
-      this.scene.fog.density=blackout?.036:red?.031:.027;
-      this.scene.fog.color.setHex(blackout?0x000000:red?0x240000:0x000000);
+      const red=zone==="red"||this.redZoneTrapped;
+      // Red Rooms are a physical Level 0 sub-section. After the escape timer
+      // expires, the game intentionally converts all of Level 0 into the red state.
+      this.ambient.color.setHex(red?0x4a0808:this.level.theme.ambient);
+      this.ambient.intensity=blackout&&!this.redZoneTrapped?.010:red?.020:.020;
+      this.scene.fog.density=blackout&&!this.redZoneTrapped?.036:red?.031:.027;
+      this.scene.fog.color.setHex(blackout&&!this.redZoneTrapped?0x000000:red?0x240000:0x000000);
       document.documentElement.style.setProperty("--level0-zone",zone);
     }
     this.updateArgLayer(dt);
