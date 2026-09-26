@@ -224,12 +224,14 @@ export class AudioDirector{
     const buffer=await this.primeRedZone();
     if(!buffer||!this.ready)return null;
 
+    const clockStartedAt=this.redZoneClockStartedAt;
     this.stopRedZone();
     // Preserve the countdown clock that started when the player entered the
     // zone. This makes late decoding unable to freeze or reset the visible timer.
-    const wallElapsed=this.redZoneClockStartedAt
-      ? Math.max(0,performance.now()/1000-this.redZoneClockStartedAt)
+    const wallElapsed=clockStartedAt
+      ? Math.max(0,performance.now()/1000-clockStartedAt)
       : 0;
+    this.redZoneClockStartedAt=clockStartedAt||performance.now()/1000;
     const now=this.ctx.currentTime;
     const source=this.ctx.createBufferSource();
     source.buffer=buffer;
