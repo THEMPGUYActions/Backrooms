@@ -5,7 +5,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260923-lobbymeta2";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling2";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0scale4";
 
 const VHSShader={
@@ -399,7 +399,7 @@ class Chunk{
 
     const rng2=new RNG((Math.imul(this.cx,83492791)^Math.imul(this.cz,2971215073)^this.game.seed)|0);
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-      if(rng2.next()<level.holeChance&&Math.hypot(x-(cells-1)/2,z-(cells-1)/2)>1.7)this.hazards.push({x,z});
+      if(level.id!=="0"&&rng2.next()<level.holeChance&&Math.hypot(x-(cells-1)/2,z-(cells-1)/2)>1.7)this.hazards.push({x,z});
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
@@ -1105,7 +1105,7 @@ class WorldStreamer{
         this.library.ceiling
       );
       this.ceilingSurface.rotation.x=Math.PI/2;
-      this.ceilingSurface.position.set(0,this.game.level.wallHeight+.002,0);
+      this.ceilingSurface.position.set(0,this.game.level.id==="0"?this.game.level.wallHeight-.025:this.game.level.wallHeight+.002,0);
       this.ceilingSurface.updateMatrix();
       this.ceilingSurface.matrixAutoUpdate=false;
       this.ceilingSurface.frustumCulled=false;
