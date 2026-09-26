@@ -19,7 +19,7 @@ export class AudioDirector{
   constructor(){
     this.ctx=null;this.master=null;this.fxBus=null;this.reverb=null;this.delay=null;
     this.ready=false;this.loading=null;this.buffers=new Map();
-    this.stepDistance=0;this.ambientTimer=34;this.buzzTimer=20;this.humGain=null;
+    this.stepDistance=0;this.ambientTimer=70;this.buzzTimer=11;this.humGain=null;this.lastRareEvent=-Infinity;
     this.volume=Number(localStorage.getItem("br.volume")??.65);
   }
   createImpulse(seconds=1.6,decay=2.8){
@@ -55,21 +55,21 @@ export class AudioDirector{
       const feedback=this.ctx.createGain();feedback.gain.value=.14;this.delay.connect(feedback).connect(this.delay);
       const delayGain=this.ctx.createGain();delayGain.gain.value=.1;this.delay.connect(delayGain).connect(this.fxBus);
 
-      this.humGain=this.ctx.createGain();this.humGain.gain.value=.006;
+      this.humGain=this.ctx.createGain();this.humGain.gain.value=.008;
       const humFilter=this.ctx.createBiquadFilter();humFilter.type="lowpass";humFilter.frequency.value=520;humFilter.Q.value=.35;
       humFilter.connect(this.humGain).connect(this.master);
       const humMix=this.ctx.createGain();humMix.gain.value=.9;humMix.connect(humFilter);
-      const o1=this.ctx.createOscillator();o1.type="sine";o1.frequency.value=120;
+      const o1=this.ctx.createOscillator();o1.type="sine";o1.frequency.value=60;
       const o1g=this.ctx.createGain();o1g.gain.value=.52;o1.connect(o1g).connect(humMix);
-      const o2=this.ctx.createOscillator();o2.type="triangle";o2.frequency.value=240;
+      const o2=this.ctx.createOscillator();o2.type="triangle";o2.frequency.value=120;
       const o2g=this.ctx.createGain();o2g.gain.value=.2;o2.connect(o2g).connect(humMix);
-      const o3=this.ctx.createOscillator();o3.type="sine";o3.frequency.value=360;
+      const o3=this.ctx.createOscillator();o3.type="sine";o3.frequency.value=240;
       const o3g=this.ctx.createGain();o3g.gain.value=.08;o3.connect(o3g).connect(humMix);
       o1.start();o2.start();o3.start();
 
       const noise=this.ctx.createBufferSource();noise.buffer=this.createNoiseLoop();noise.loop=true;
       const buzzFilter=this.ctx.createBiquadFilter();buzzFilter.type="bandpass";buzzFilter.frequency.value=1450;buzzFilter.Q.value=.9;
-      const noiseGain=this.ctx.createGain();noiseGain.gain.value=.025;
+      const noiseGain=this.ctx.createGain();noiseGain.gain.value=.038;
       noise.connect(buzzFilter).connect(noiseGain).connect(this.humGain);noise.start();
 
       this.ready=true;
@@ -222,13 +222,13 @@ export class AudioDirector{
 
     if(this.ambientTimer<=0){
       this.ambientSting(.028+Math.random()*.038);
-      this.ambientTimer=42+Math.random()*72;
+      this.ambientTimer=78+Math.random()*110;
     }
 
     // The ballast buzz becomes audible as you approach an actual fluorescent fixture.
     if(this.buzzTimer<=0&&lightState==="ON"){
       if(p>.03){
-        const gain=.022+p*.14;
+        const gain=.035+p*.17;
         this.playBuffer("electric_buzz",{
           gain,
           rate:.9+Math.random()*.16,
@@ -236,15 +236,15 @@ export class AudioDirector{
           send:.38+p*.2,
           delay:.08
         });
-        this.buzzTimer=9+(1-p)*18+Math.random()*9;
+        this.buzzTimer=14+(1-p)*20+Math.random()*11;
       }else{
-        this.buzzTimer=10+Math.random()*15;
+        this.buzzTimer=12+Math.random()*18;
       }
     }
 
-    let target=.006+p*.058+fear*.003;
+    let target=.008+p*.078+fear*.004;
     if(lightState==="FLICKER")target*=.48;
-    if(lightState==="BLACKOUT")target=.0008;
+    if(lightState==="BLACKOUT")target=.00045;
     if(this.humGain)this.humGain.gain.setTargetAtTime(target,this.ctx.currentTime,.11);
   }
 }
