@@ -124,6 +124,33 @@ export class BackroomsAdmin{
                 <button data-admin-event="heal">RESET PLAYER</button>
                 <button data-admin-event="reload">RELOAD WORLD</button>
               </div>
+
+              <div class="admin-section-head second">
+                <div>
+                  <span>ENTITIES</span>
+                  <strong>SUMMON ENTITY</strong>
+                </div>
+                <small>DEV ONLY</small>
+              </div>
+              <div class="admin-action-grid two">
+                <button data-admin-entity="bacteria">BACTERIA</button>
+                <button data-admin-entity="hound">HOUND</button>
+                <button data-admin-entity="skinstealer">SKIN-STEALER</button>
+                <button data-admin-entity="smiler">SMILER</button>
+              </div>
+
+              <div class="admin-section-head second">
+                <div>
+                  <span>LEVEL 0</span>
+                  <strong>ZONE TEST</strong>
+                </div>
+                <small>VISUAL / GAMEPLAY</small>
+              </div>
+              <div class="admin-action-grid three">
+                <button data-admin-zone="blackout">BLACKOUT</button>
+                <button data-admin-zone="red">RED ZONE</button>
+                <button data-admin-zone="clear">CLEAR ZONE</button>
+              </div>
             </section>
 
             <section class="admin-tab" data-admin-panel="debug">
@@ -212,6 +239,12 @@ export class BackroomsAdmin{
     this.root.querySelectorAll("[data-admin-event]").forEach(button=>{
       button.addEventListener("click",()=>this.event(button.dataset.adminEvent));
     });
+    this.root.querySelectorAll("[data-admin-entity]").forEach(button=>{
+      button.addEventListener("click",()=>this.game.entityManager.summon(button.dataset.adminEntity));
+    });
+    this.root.querySelectorAll("[data-admin-zone]").forEach(button=>{
+      button.addEventListener("click",()=>this.zone(button.dataset.adminZone));
+    });
   }
 
   async teleportLevel(id){
@@ -283,6 +316,32 @@ export class BackroomsAdmin{
     }
     if(kind==="clear-cache")location.reload();
     this.game.toast(kind.replace("-", " ").toUpperCase(),1);
+  }
+
+  zone(kind){
+    if(!this.ready||!this.game.running||this.game.introActive)return;
+    if(this.game.level.id!=="0"){this.game.toast("LEVEL 0 ONLY",1.2);return}
+    if(kind==="blackout"){
+      this.game.lightState="BLACKOUT";
+      this.game.lightEventTimer=999999;
+      this.game.audio.lightsOut();
+      this.game.triggerFear(.48);
+      this.game.toast("FORCED BLACKOUT",1.3);
+    }else if(kind==="red"){
+      this.game.world.forceLevel0Zone="red";
+      this.game.world.configure();
+      this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
+      this.game.entityManager.clear();
+      this.game.toast("RED ZONE LOADED",1.3);
+    }else{
+      this.game.world.forceLevel0Zone=null;
+      this.game.lightState="ON";
+      this.game.lightEventTimer=20;
+      this.game.world.configure();
+      this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
+      this.game.entityManager.clear();
+      this.game.toast("ZONE CLEARED",1.3);
+    }
   }
 
   event(kind){
