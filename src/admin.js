@@ -96,6 +96,7 @@ export class BackroomsAdmin{
                 <button data-admin-action="stamina">FULL STAMINA</button>
                 <button data-admin-action="sanity">FULL SANITY</button>
                 <button data-admin-action="battery">FULL BATTERY</button>
+                <button data-admin-action="despawn-entities">DESPAWN ENTITIES</button>
               </div>
             </section>
 
@@ -132,11 +133,19 @@ export class BackroomsAdmin{
                 </div>
                 <small>DEV ONLY</small>
               </div>
-              <div class="admin-action-grid two">
+              <div class="admin-action-grid">
                 <button data-admin-entity="bacteria">BACTERIA</button>
                 <button data-admin-entity="hound">HOUND</button>
                 <button data-admin-entity="skinstealer">SKIN-STEALER</button>
                 <button data-admin-entity="smiler">SMILER</button>
+                <button data-admin-entity="faceling">FACELING</button>
+                <button data-admin-entity="deathmoth">DEATHMOTH</button>
+                <button data-admin-entity="crawler">CRAWLER</button>
+                <button data-admin-entity="wretch">WRETCH</button>
+                <button data-admin-entity="clump">CLUMP</button>
+                <button data-admin-entity="duller">DULLER</button>
+                <button data-admin-entity="partygoer">PARTYGOER</button>
+                <button data-admin-entity="deathrat">DEATH RAT</button>
               </div>
 
               <div class="admin-section-head second">
@@ -309,6 +318,7 @@ export class BackroomsAdmin{
     if(kind==="stamina")p.stamina=100;
     if(kind==="sanity")p.sanity=100;
     if(kind==="battery")p.flashBattery=100;
+    if(kind==="despawn-entities")this.game.entityManager.clear();
     if(kind==="reseed"){
       this.game.seed=(Math.random()*2147483647)|0;
       localStorage.setItem("br.seed",String(this.game.seed));
