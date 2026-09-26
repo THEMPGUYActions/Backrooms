@@ -359,18 +359,41 @@ async function checkEntityModels(){
     return;
   }
 
+  const supported=["fbx","glb","gltf","obj","usdz"];
   for(const [type,entry] of Object.entries(manifest.assets||{})){
-    const assetPath=join(root,"assets/entities",entry.file);
-    try{
-      const info=await stat(assetPath);
-      if(!info.isFile())throw new Error("not a file");
-      if(info.size<20||info.size>95*1024*1024)fail("Entity GLB size is outside safe bounds: "+type);
-      const data=await readFile(assetPath);
-      if(data.subarray(0,4).toString()!=="glTF")fail("Entity asset is not a GLB: "+type);
-      if(data.readUInt32LE(4)!==2)fail("Entity GLB is not glTF 2.0: "+type);
-      if(data.readUInt32LE(8)!==data.length)fail("Entity GLB length header mismatch: "+type);
-    }catch{
-      // Missing models are allowed until the one-time bootstrap source is configured.
+    const candidates=Array.isArray(entry.files)&&entry.files.length
+      ? entry.files
+      : [entry.file||type+".glb"];
+    for(const filename of candidates){
+      const ext=filename.toLowerCase().split(".").pop();
+      if(!supported.includes(ext)){
+        fail("Unsupported entity model format in manifest: "+filename);
+        continue;
+      }
+      const assetPath=join(root,"assets/entities",filename);
+      try{
+        const info=await stat(assetPath);
+        if(!info.isFile())throw new Error("not a file");
+        if(info.size<20||info.size>95*1024*1024)fail("Entity asset size is outside safe bounds: "+type+"/"+filename);
+        const data=await readFile(assetPath);
+        if(ext==="glb"){
+          if(data.subarray(0,4).toString()!=="glTF")fail("Entity GLB magic mismatch: "+type);
+          if(data.readUInt32LE(4)!==2)fail("Entity GLB is not glTF 2.0: "+type);
+          if(data.readUInt32LE(8)!==data.length)fail("Entity GLB length header mismatch: "+type);
+        }else if(ext==="gltf"){
+          try{JSON.parse(data.toString("utf8"))}catch{fail("Entity glTF JSON is invalid: "+type+"/"+filename)}
+        }else if(ext==="fbx"){
+          const ascii=data.subarray(0,256).toString("utf8");
+          const binary=data.subarray(0,21).toString("utf8").startsWith("Kaydara FBX Binary");
+          if(!binary&&!ascii.includes("FBXHeaderExtension"))fail("Entity FBX signature is invalid: "+type+"/"+filename);
+        }else if(ext==="obj"){
+          if(!/^\\s*(?:v|vn|vt|f)\\s/m.test(data.subarray(0,1024*1024).toString("utf8")))fail("Entity OBJ does not look like Wavefront OBJ: "+type+"/"+filename);
+        }else if(ext==="usdz"){
+          if(data[0]!==0x50||data[1]!==0x4b)fail("Entity USDZ is not a ZIP archive: "+type+"/"+filename);
+        }
+      }catch{
+        // Missing models are allowed until the one-time bootstrap source is configured.
+      }
     }
   }
 }
