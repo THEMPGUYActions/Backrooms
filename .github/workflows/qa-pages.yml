@@ -16,14 +16,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  bootstrap-entity-assets:
+    name: Bootstrap missing entity models
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout development branch with LFS
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          lfs: true
+          fetch-depth: 0
+
+      - name: Bootstrap missing entity binaries
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: node scripts/bootstrap-entity-assets.mjs
+        env:
+          SKETCHFAB_ACCESS_TOKEN: ${{ secrets.SKETCHFAB_ACCESS_TOKEN }}
+          ENTITY_SMILER_URL: ${{ secrets.ENTITY_SMILER_URL }}
+          ENTITY_HOUND_URL: ${{ secrets.ENTITY_HOUND_URL }}
+          ENTITY_SKINSTEALER_URL: ${{ secrets.ENTITY_SKINSTEALER_URL }}
+          ENTITY_DULLER_URL: ${{ secrets.ENTITY_DULLER_URL }}
+          ENTITY_DEATHMOTH_URL: ${{ secrets.ENTITY_DEATHMOTH_URL }}
+          ENTITY_FACELING_URL: ${{ secrets.ENTITY_FACELING_URL }}
+          ENTITY_PARTYGOER_URL: ${{ secrets.ENTITY_PARTYGOER_URL }}
+          ENTITY_BACTERIA_URL: ${{ secrets.ENTITY_BACTERIA_URL }}
+
+      - name: Skip bootstrap on non-development runs
+        if: github.event_name != 'push' || github.ref != 'refs/heads/dev'
+        run: echo "Entity bootstrap is only active for development branch pushes."
+
   qa:
     name: QA and static build
+    needs: bootstrap-entity-assets
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Checkout
+      - name: Checkout current branch state
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
+          lfs: true
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -74,6 +110,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: main
+          lfs: true
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -105,6 +145,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: dev
+          lfs: true
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
