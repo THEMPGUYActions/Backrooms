@@ -485,6 +485,9 @@ class Chunk{
 
     for(const hz of this.hazards){
       if(level.id==="0"&&hz.cluster)continue;
+      // Manila Room has its own wood floor; never stamp the normal Level 0
+      // dark hazard decal over that floor.
+      if(level.id==="0"&&this.manilaRoom&&hz.x===this.manilaRoom.cellX&&hz.z===this.manilaRoom.cellZ)continue;
       const p=new THREE.Mesh(new THREE.CircleGeometry(cell*.22,18),lib.dark);
       p.rotation.x=-Math.PI/2;p.position.set(this.originX+hz.x*cell+cell/2,.013,this.originZ+hz.z*cell+cell/2);g.add(p);
     }
@@ -765,7 +768,7 @@ class Chunk{
       const tabletop=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.12,8),wood);tabletop.position.y=.78;table.add(tabletop);
       for(const [x,z] of [[-.62,-.46],[.62,-.46],[-.62,.46],[.62,.46]])box(table,new THREE.BoxGeometry(.09,.72,.09),wood,x,.36,z);
       box(table,new THREE.BoxGeometry(.42,.08,.26),wood,0,.84,0);g.add(table);
-      for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(p.x+x*1.65,0,p.z);box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,-.27,.23,-.27);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,.27,.23,-.27);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);g.add(chair)}
+      for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(p.x+x*1.65,0,p.z);chair.rotation.y=x<0?Math.PI/2:-Math.PI/2;box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);for(const [lx,lz] of [[-.27,-.27],[.27,-.27],[-.27,.27],[.27,.27]])box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,lx,.23,lz);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);g.add(chair)}
       box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
       box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
       if(!this.level0Blackout){
