@@ -1944,3 +1944,53 @@ button,.audio-gate{
 .touch-device .control-touch-only{display:grid!important}
 
 .touch-device #mobile-controls .look-zone{display:block}
+
+
+/* 2026-09-25 pause/admin polish */
+#pause.screen{z-index:240;padding:0;background:rgba(3,4,3,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#pause.screen::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.58),rgba(0,0,0,.22) 58%,rgba(0,0,0,.58));pointer-events:none}
+.minecraft-pause{position:relative;width:min(980px,92vw);max-height:min(760px,90svh);margin:auto;display:flex;flex-direction:column;border:1px solid rgba(224,228,216,.16);background:rgba(10,12,10,.94);box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.7);font-family:"Courier New",monospace;color:rgba(232,235,225,.82);overflow:hidden}
+.pause-brand{display:flex;justify-content:space-between;align-items:center;padding:22px 26px 18px;border-bottom:1px solid rgba(224,228,216,.1)}
+.pause-kicker{display:block;font-size:8px;letter-spacing:.28em;color:rgba(218,220,204,.32)}
+.pause-brand h1{margin:5px 0 0;font-size:30px;font-weight:400;letter-spacing:.12em}
+.pause-camera{text-align:right;font-size:7px;line-height:1.8;letter-spacing:.15em;color:rgba(218,220,204,.3)}
+.pause-camera b{font-weight:400;color:rgba(225,229,216,.62)}
+.pause-layout{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:420px}
+.pause-menu{padding:24px 18px;border-right:1px solid rgba(224,228,216,.1);background:rgba(5,6,5,.42)}
+.pause-menu-button{width:100%;min-height:48px;margin-bottom:9px;padding:0 17px;border:1px solid rgba(224,228,216,.1);background:rgba(220,224,211,.035);color:rgba(229,232,222,.58);font:10px "Courier New",monospace;letter-spacing:.14em;text-align:left;cursor:pointer;transition:background .14s,border-color .14s,color .14s,transform .08s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pause-menu-button::after{content:"›";float:right;color:rgba(220,224,211,.2);font-size:16px;line-height:10px}
+.pause-menu-button:hover,.pause-menu-button:focus-visible{outline:none;background:rgba(220,224,211,.085);border-color:rgba(220,224,216,.22);color:rgba(235,238,228,.9)}
+.pause-menu-button:active{transform:translateY(1px)}
+.pause-menu-button.primary{background:rgba(218,216,181,.11);border-color:rgba(218,216,181,.3);color:rgba(237,237,224,.92)}
+.pause-menu-button.danger{color:rgba(224,164,156,.64)}
+.pause-panel{padding:28px 30px;min-width:0}
+.pause-panel-head{padding-bottom:17px;border-bottom:1px solid rgba(224,228,216,.08)}
+.pause-panel-head span{display:block;font-size:7px;letter-spacing:.2em;color:rgba(220,224,211,.3)}
+.pause-panel-head strong{display:block;margin-top:7px;font-size:13px;font-weight:400;letter-spacing:.08em;color:rgba(232,235,225,.74)}
+.pause-category{display:none}.pause-category.active{display:block}
+.pause-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:22px;border:1px solid rgba(224,228,216,.07)}
+.pause-status-grid div{padding:17px;background:rgba(220,224,211,.025);min-width:0}
+.pause-status-grid span{display:block;font-size:6px;letter-spacing:.18em;color:rgba(220,224,211,.25)}
+.pause-status-grid b{display:block;margin-top:8px;font-size:9px;font-weight:400;letter-spacing:.07em;color:rgba(231,234,224,.62);overflow:hidden;text-overflow:ellipsis}
+.pause-note{margin-top:18px;padding:14px;border-left:2px solid rgba(220,218,177,.28);background:rgba(220,218,177,.035);font-size:8px;line-height:1.7;color:rgba(220,224,211,.38)}
+.pause-tabs{display:flex;gap:7px;margin:20px 0 16px}
+.pause-tab{border:0;border-bottom:1px solid rgba(224,228,216,.08);background:transparent;color:rgba(220,224,211,.32);padding:9px 12px;font:8px "Courier New",monospace;letter-spacing:.14em;cursor:pointer}
+.pause-tab.active{color:rgba(233,236,225,.78);border-bottom-color:rgba(220,218,177,.5)}
+.settings-page{display:none}.settings-page.active{display:block}
+.pause-setting{display:grid;grid-template-columns:150px minmax(0,1fr) 55px;align-items:center;gap:14px;min-height:52px;border-bottom:1px solid rgba(224,228,216,.07);font-size:8px;letter-spacing:.12em;color:rgba(220,224,211,.48)}
+.pause-setting>span{color:rgba(226,229,219,.62)}
+.pause-setting input[type=range]{width:100%;accent-color:#b8b38b}
+.pause-setting select{justify-self:end;min-width:130px;padding:9px 10px;background:#0b0d0b;border:1px solid rgba(224,228,216,.13);color:rgba(230,233,222,.72);font:8px "Courier New",monospace}
+.pause-setting b{font-size:7px;font-weight:400;text-align:right;color:rgba(220,224,211,.28)}
+.pause-setting.check{grid-template-columns:18px 1fr;cursor:pointer}
+.pause-setting.check input{width:14px;height:14px;accent-color:#b8b38b}
+.pause-small-button{margin-top:16px;padding:10px 13px;border:1px solid rgba(224,228,216,.12);background:rgba(220,224,211,.035);color:rgba(230,233,222,.55);font:8px "Courier New",monospace;letter-spacing:.12em;cursor:pointer}
+.pause-controls-list{margin-top:19px;border-top:1px solid rgba(224,228,216,.07)}
+.pause-controls-list .control-row{min-height:54px}
+.pause-footer{display:flex;justify-content:space-between;padding:11px 18px;border-top:1px solid rgba(224,228,216,.08);font-size:6px;letter-spacing:.18em;color:rgba(220,224,211,.22)}
+#admin-open{appearance:none;z-index:300;min-width:86px;height:42px;padding:0 15px;border:1px solid rgba(224,228,216,.2);background:rgba(7,8,7,.94);box-shadow:0 8px 24px rgba(0,0,0,.3);color:rgba(231,234,224,.68);font:8px "Courier New",monospace;letter-spacing:.2em;cursor:pointer;touch-action:manipulation;pointer-events:auto;user-select:none}
+#admin-open:hover,#admin-open:focus-visible{outline:none;background:rgba(220,224,211,.09);border-color:rgba(220,224,211,.34);color:rgba(237,239,230,.92)}
+#admin-open:active{transform:translateY(1px)}
+#admin-open[hidden]{display:none!important}
+@media(max-width:720px){.minecraft-pause{width:94vw;max-height:92svh}.pause-brand{padding:17px 16px 14px}.pause-brand h1{font-size:23px}.pause-layout{grid-template-columns:1fr;min-height:0}.pause-menu{padding:13px 14px;border-right:0;border-bottom:1px solid rgba(224,228,216,.08)}.pause-menu-button{min-height:43px;margin-bottom:6px}.pause-panel{padding:18px 16px;overflow:auto}.pause-status-grid{grid-template-columns:1fr 1fr}.pause-setting{grid-template-columns:105px minmax(0,1fr) 45px}.pause-footer{padding:9px 13px}}
+@media(max-width:440px){.pause-status-grid{grid-template-columns:1fr}.pause-setting{grid-template-columns:90px minmax(0,1fr)}.pause-setting b{display:none}.pause-footer span:nth-child(2){display:none}}
