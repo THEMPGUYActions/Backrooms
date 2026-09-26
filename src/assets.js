@@ -312,6 +312,10 @@ export function makeLibrary(level){
   ceiling.color.setHex(level.theme.ceiling);
   ceiling.emissive=new THREE.Color(level.id==="0"?0x776621:0x252725);
   ceiling.emissiveIntensity=level.id==="0"?.055:level.id==="1"?0:.028;
+  const redWall=createPBRMaterial({base:0x8b1717,seed:211,rough:.94,scale:1,normalStrength:.28});
+  const redFloor=createPBRMaterial({base:0x4a1212,seed:212,rough:.99,scale:5,normalStrength:.12});
+  redWall.color.setHex(0xb51b1b);
+  redFloor.color.setHex(0x6b1717);
   return {
     floor,
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:level.id==="0"?1:3.8,normalStrength:.35}),
@@ -346,10 +350,10 @@ export function makeLibrary(level){
     exitDoor:new THREE.MeshStandardMaterial({color:0xd8d1bd,roughness:.68,metalness:.03,emissive:level.theme.accent,emissiveIntensity:.12}),
     exitFrame:new THREE.MeshStandardMaterial({color:0xf3f0e4,roughness:.56,metalness:0}),
     wallAnomaly:new THREE.MeshStandardMaterial({color:0xd2bf61,roughness:.72,metalness:0,emissive:0xffdc69,emissiveIntensity:.7}),
-    redWall:createPBRMaterial({base:0x651713,seed:211,rough:.94,scale:1,normalStrength:.28}),
+    redWall,
     pole:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.82,metalness:0}),
     pillar:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.88,metalness:0}),
-    redFloor:createPBRMaterial({base:0x3d1714,seed:212,rough:.99,scale:5,normalStrength:.12}),
+    redFloor,
     manilaWall:createPBRMaterial({base:0x8a7357,seed:213,rough:.9,scale:1.2,normalStrength:.22}),
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
