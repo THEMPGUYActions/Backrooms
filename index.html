@@ -86,6 +86,8 @@
     <div class="tape-noise" aria-hidden="true"></div>
   </section>
 
+  <button id="admin-open" type="button" hidden aria-label="Open admin panel" aria-expanded="false">ADMIN</button>
+
   <section id="mobile-controls" class="hidden" aria-hidden="true">
     <div id="stick-zone" class="touch-zone"><div id="stick-knob"></div></div>
     <button id="mobile-flash" class="touch-button">LIGHT</button>
@@ -94,77 +96,62 @@
     <div id="look-zone" class="look-zone"></div>
   </section>
 
-  <section id="pause" class="screen hidden">
-    <div class="vhs-pause">
-      <div class="pause-head">
-        <span>CAM 01</span>
-        <span>PAUSE</span>
-        <span>FRAME HOLD</span>
+  <section id="pause" class="screen hidden" aria-label="Pause menu">
+    <div class="minecraft-pause">
+      <div class="pause-brand">
+        <div><span class="pause-kicker">THE BACKROOMS</span><h1>PAUSED</h1></div>
+        <div class="pause-camera">CAM 01<br><b id="pause-level">LEVEL 0</b></div>
       </div>
-
-      <div class="pause-title">RECORDING PAUSED</div>
-      <div class="pause-sub">The camera is still rolling. Movement is stopped.</div>
-
-      <div class="pause-columns">
-        <div class="pause-section">
-          <div class="pause-section-title">SETTINGS</div>
-
-          <label class="pause-row">
-            <span>QUALITY</span>
-            <select id="quality">
-              <option value="auto">AUTO</option>
-              <option value="low">LOW</option>
-              <option value="medium">MEDIUM</option>
-              <option value="high">HIGH</option>
-            </select>
-          </label>
-
-          <label class="pause-row">
-            <span>VOLUME</span>
-            <input id="volume" type="range" min="0" max="1" step="0.02" value="0.65">
-          </label>
-
-          <label class="pause-row">
-            <span>LOOK SPEED</span>
-            <input id="sensitivity" type="range" min="0.5" max="2" step="0.05" value="1">
-          </label>
-
-          <label class="pause-check">
-            <input id="shake" type="checkbox" checked>
-            <span>CAMERA SHAKE</span>
-          </label>
-
-          <label class="pause-check">
-            <input id="flashlight" type="checkbox" checked>
-            <span>START WITH FLASHLIGHT</span>
-          </label>
-        </div>
-
-        <div class="pause-section">
-          <div class="pause-section-title">CONTROLS</div>
-
-          <div class="control-list">
-            <div class="control-row"><span>MOVE</span><span class="control-pc"><kbd>W A S D</kbd></span><span class="control-mobile"><kbd>LEFT STICK</kbd></span></div>
-            <div class="control-row"><span>LOOK</span><span class="control-pc"><kbd>MOUSE</kbd></span><span class="control-mobile"><kbd>DRAG RIGHT SIDE</kbd></span></div>
-            <div class="control-row"><span>RUN</span><span class="control-pc"><kbd>SHIFT</kbd><small>HOLD</small></span><span class="control-mobile"><kbd>RUN BUTTON</kbd><small>HOLD</small></span></div>
-            <div class="control-row"><span>LIGHT</span><span class="control-pc"><kbd>F</kbd><small>FLASHLIGHT</small></span><span class="control-mobile"><kbd>LIGHT BUTTON</kbd></span></div>
-            <div class="control-row"><span>PAUSE</span><span class="control-pc"><kbd>ESC</kbd><small>MENU</small></span><span class="control-mobile"><kbd>PAUSE BUTTON</kbd></span></div>
-            <div class="control-row control-touch-only"><span>TOUCH</span><span class="control-mobile"><kbd>LEFT STICK</kbd><small>DRAG RIGHT SIDE TO LOOK</small></span></div>
+      <div class="pause-layout">
+        <nav class="pause-menu" aria-label="Pause menu">
+          <button id="resume" class="pause-menu-button primary">Resume Game</button>
+          <button class="pause-menu-button" data-pause-tab="settings">Settings</button>
+          <button class="pause-menu-button" data-pause-tab="controls">How to Play</button>
+          <button id="fullscreen" class="pause-menu-button">Fullscreen</button>
+          <button id="restart" class="pause-menu-button danger">Restart Run</button>
+        </nav>
+        <section class="pause-panel">
+          <div class="pause-panel-head"><span id="pause-panel-kicker">GAME</span><strong id="pause-panel-title">THE RECORDING IS PAUSED</strong></div>
+          <div class="pause-category active" data-pause-panel="game">
+            <div class="pause-status-grid">
+              <div><span>LEVEL</span><b id="pause-status-level">LEVEL 0</b></div>
+              <div><span>STATUS</span><b>PAUSED</b></div>
+              <div><span>OBJECTIVE</span><b id="pause-status-objective">Find a way out.</b></div>
+              <div><span>CAMERA</span><b>CAM 01 / VHS</b></div>
+            </div>
+            <div class="pause-note">The world is frozen. Resume when you're ready to keep walking.</div>
           </div>
-        </div>
+          <div class="pause-category" data-pause-panel="settings">
+            <div class="pause-tabs" role="tablist">
+              <button class="pause-tab active" data-settings-tab="game">Game</button>
+              <button class="pause-tab" data-settings-tab="video">Video</button>
+              <button class="pause-tab" data-settings-tab="audio">Audio</button>
+            </div>
+            <div class="settings-page active" data-settings-panel="game">
+              <label class="pause-setting"><span>Look Speed</span><input id="sensitivity" type="range" min="0.5" max="2" step="0.05" value="1"><b>1.00</b></label>
+              <label class="pause-setting check"><input id="shake" type="checkbox" checked><span>Camera Shake</span></label>
+              <label class="pause-setting check"><input id="flashlight" type="checkbox" checked><span>Start With Flashlight</span></label>
+            </div>
+            <div class="settings-page" data-settings-panel="video">
+              <label class="pause-setting"><span>Quality</span><select id="quality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+              <button id="fullscreen-settings" class="pause-small-button" type="button">Toggle Fullscreen</button>
+            </div>
+            <div class="settings-page" data-settings-panel="audio">
+              <label class="pause-setting"><span>Volume</span><input id="volume" type="range" min="0" max="1" step="0.02" value="0.65"><b>65%</b></label>
+            </div>
+          </div>
+          <div class="pause-category" data-pause-panel="controls">
+            <div class="control-list pause-controls-list">
+              <div class="control-row"><span>MOVE</span><span class="control-pc"><kbd>W A S D</kbd></span><span class="control-mobile"><kbd>LEFT STICK</kbd></span></div>
+              <div class="control-row"><span>LOOK</span><span class="control-pc"><kbd>MOUSE</kbd></span><span class="control-mobile"><kbd>DRAG RIGHT SIDE</kbd></span></div>
+              <div class="control-row"><span>RUN</span><span class="control-pc"><kbd>SHIFT</kbd><small>HOLD</small></span><span class="control-mobile"><kbd>RUN BUTTON</kbd><small>HOLD</small></span></div>
+              <div class="control-row"><span>LIGHT</span><span class="control-pc"><kbd>F</kbd><small>FLASHLIGHT</small></span><span class="control-mobile"><kbd>LIGHT BUTTON</kbd></span></div>
+              <div class="control-row"><span>PAUSE</span><span class="control-pc"><kbd>ESC</kbd><small>MENU</small></span><span class="control-mobile"><kbd>PAUSE BUTTON</kbd></span></div>
+            </div>
+          </div>
+        </section>
       </div>
-
-      <div class="pause-bottom">
-        <button id="resume" class="pause-button">RESUME</button>
-        <button id="fullscreen" class="pause-button">FULLSCREEN</button>
-        <button id="restart" class="pause-button danger">RESTART RUN</button>
-      </div>
-
-      <div class="pause-footer">
-        <span id="pause-level">LEVEL 0</span>
-        <span>THE BACKROOMS</span>
-        <span>ESC TO RESUME</span>
-      </div>
+      <div class="pause-footer"><span>ESC TO RESUME</span><span>THE BACKROOMS</span><span>LEVEL <b id="pause-footer-level">0</b></span></div>
     </div>
   </section>
 
