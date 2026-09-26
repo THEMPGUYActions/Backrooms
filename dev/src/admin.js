@@ -15,13 +15,19 @@ export class BackroomsAdmin{
     if(!this.game.admin.enabled||!this.game.mounted||!this.game.running||this.game.introActive)return;
     this.build();
     this.bind();
-    this.opener=document.createElement("button");
-    this.opener.id="admin-open";
+    this.opener=document.getElementById("admin-open");
+    if(!this.opener){
+      this.opener=document.createElement("button");
+      this.opener.id="admin-open";
+      this.opener.type="button";
+      this.opener.textContent="ADMIN";
+      this.opener.setAttribute("aria-label","Open admin panel");
+      document.body.appendChild(this.opener);
+    }
     this.opener.type="button";
-    this.opener.textContent="ADMIN";
     this.opener.setAttribute("aria-label","Open admin panel");
     this.opener.setAttribute("aria-expanded","false");
-    document.body.appendChild(this.opener);
+    this.opener.hidden=false;
     let lastTouchActivation=0;
     const toggle=(event)=>{
       event?.preventDefault?.();
@@ -29,14 +35,12 @@ export class BackroomsAdmin{
       if(!this.game.running||this.game.introActive)return;
       this.opened?this.close():this.open();
     };
-    // Click is the canonical activation path for mouse, keyboard, and touch.
-    // Add a touchend fallback for iOS/WebKit and suppress its compatibility
-    // click so one tap can never toggle the panel twice.
     this.opener.addEventListener("click",event=>{
       if(performance.now()-lastTouchActivation<700)return;
       toggle(event);
     });
-    this.opener.addEventListener("touchend",event=>{
+    this.opener.addEventListener("pointerup",event=>{
+      if(event.pointerType==="mouse")return;
       lastTouchActivation=performance.now();
       toggle(event);
     },{passive:false});
