@@ -2,6 +2,9 @@ name: TEMP - Bootstrap Real Entity Models
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
