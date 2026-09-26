@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v22";
+const CACHE_NAME="backrooms-assets-v23";
 const CORE=[
   "index.html",
   "styles.css",
@@ -102,7 +102,8 @@ self.addEventListener("message",event=>{
       Promise.all([
         ...pbr.map(file=>cache.add(new URL("./assets/pbr/"+file,base)).catch(()=>null)),
         ...foundFootage.map(file=>cache.add(new URL("./assets/found-footage/"+file,base)).catch(()=>null)),
-        ...audio.map(file=>cache.add(new URL("./assets/audio/"+file,base)).catch(()=>null))
+        ...audio.map(file=>cache.add(new URL("./assets/audio/"+file,base)).catch(()=>null)),
+        cache.add(new URL("./assets/RedZone.ogg",base)).catch(()=>null)
       ])
     )
   );
