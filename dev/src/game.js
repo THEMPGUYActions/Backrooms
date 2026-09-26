@@ -355,8 +355,8 @@ class Chunk{
         // broad multi-cell openings made the floor feel disconnected from
         // the ceiling grid and too much like a warehouse.
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.08)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.08)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.025)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.025)this.setEdge(x,z,"south",true);
         }
       }
 
