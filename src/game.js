@@ -1725,7 +1725,7 @@ function steerAroundWalls(game,entity,desired,dt){
 
 class EntityManager{
   constructor(game){this.game=game;this.entities=[];this.serial=0;this.lastUpdate=0;this.bacteriaSpawned=false}
-  clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[]}
+  clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[];this.bacteriaSpawned=false}
   create(type,position,key=null){
     const def=ENTITY_TYPES[type];if(!def)return null;
     const group=new THREE.Group();group.position.copy(position);def.factory(group);group.userData.entityType=type;group.userData.entityLabel=def.label;
