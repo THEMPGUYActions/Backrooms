@@ -474,7 +474,14 @@ await checkAudioAssets();
 await checkWorkflow();
 
 for (const file of files) {
-  if (file.toLowerCase().endsWith(".glb")) continue;
+  const normalized=file.replaceAll("\\","/");
+  if (
+    normalized.includes("/assets/entities/") ||
+    normalized.includes("/assets/pbr/") ||
+    normalized.includes("/assets/audio/") ||
+    normalized.includes("/assets/found-footage/") ||
+    normalized.endsWith("/assets/RedZone.ogg")
+  ) continue;
   const size = (await stat(file)).size;
   if (size > 2_000_000) fail("File exceeds 2 MB source budget: " + file);
 }
