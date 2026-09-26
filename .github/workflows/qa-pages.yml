@@ -1,0 +1,110 @@
+name: QA and Pages
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: backrooms-pages
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    name: QA and static build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build
+        run: npm run build
+
+      - name: Quality checks
+        run: npm run check
+
+      - name: Verify build
+        run: |
+          test -s dist/index.html
+          test -s dist/src/main.js
+          test -s dist/styles.css
+          test -f dist/.nojekyll
+
+      - name: Upload CI build
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backrooms-preview-${{ github.event.pull_request.number || github.run_number }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy-production:
+    name: Publish production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: qa
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build production
+        run: npm run build
+
+      - name: Publish main to Pages root
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          keep_files: true
+          force_orphan: false
+          full_commit_message: "deploy: production ${{ github.sha }}"
+
+  deploy-dev:
+    name: Publish development
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: qa
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Build development
+        run: npm run build
+
+      - name: Publish dev to /dev/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          destination_dir: dev
+          full_commit_message: "deploy: dev ${{ github.sha }}"
