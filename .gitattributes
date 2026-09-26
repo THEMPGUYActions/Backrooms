@@ -1,2 +1,6 @@
-# Entity models are binary assets. Git LFS keeps large GLBs manageable while they remain part of this repository.
+# Large binary media is committed to this repository through Git LFS.
 assets/entities/*.glb filter=lfs diff=lfs merge=lfs -text
+assets/pbr/*.png filter=lfs diff=lfs merge=lfs -text
+assets/audio/*.ogg filter=lfs diff=lfs merge=lfs -text
+assets/found-footage/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/RedZone.ogg filter=lfs diff=lfs merge=lfs -text
