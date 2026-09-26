@@ -1406,7 +1406,7 @@ class Player{
     this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.yaw=0;this.pitch=0;
     this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;
     this.flashlight=true;this.flashBattery=100;
-    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;
+    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;
     this.viewYaw=0;this.viewPitch=0;
   }
   reset(){
@@ -1414,6 +1414,7 @@ class Player{
     this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;
     this.health=this.stamina=this.hydration=this.sanity=100;this.flashBattery=100;
     this.flashlight=this.game.startFlash;
+    this.flashWarmup=1.15;
     this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();
     this.game.camera.position.set(0,this.eyeY,0);this.game.camera.rotation.set(0,0,0,"YXZ");
   }
@@ -1432,6 +1433,7 @@ class Player{
     this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
     const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;
     if(run)this.stamina=Math.max(0,this.stamina-dt*15);else this.stamina=Math.min(100,this.stamina+dt*9);
+    this.flashWarmup=Math.max(0,this.flashWarmup-dt);
     if(this.flashlight&&this.flashBattery>0){
       this.flashBattery=Math.max(0,this.flashBattery-dt*(run?.46:.31));
       if(this.flashBattery<=0)this.flashlight=false;
@@ -1507,8 +1509,10 @@ class Player{
 
     this.game.flash.distance=25;
     this.game.flash.decay=2;
+    const warmup=1-Math.min(1,this.flashWarmup/1.15);
+    const flashRamp=.12+.88*THREE.MathUtils.smoothstep(warmup,0,1);
     this.game.flash.intensity=this.flashlight
-      ? (.34+beamPower*.66)*washScale
+      ? (.34+beamPower*.66)*washScale*flashRamp
       : 0;
 
     this.game.flashFill.distance=25;
@@ -1516,7 +1520,7 @@ class Player{
     this.game.flashFill.penumbra=.94;
     this.game.flashFill.decay=2;
     this.game.flashFill.intensity=this.flashlight
-      ? (.10+beamPower*.55)*beamScale
+      ? (.10+beamPower*.55)*beamScale*flashRamp
       : 0;
 
     this.game.blackoutLight.position.copy(this.game.camera.position);
