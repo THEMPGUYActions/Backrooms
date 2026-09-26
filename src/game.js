@@ -1519,6 +1519,10 @@ class Player{
       ? (.10+beamPower*.55)*beamScale
       : 0;
 
+    this.game.blackoutLight.position.copy(this.game.camera.position);
+    const blackout=this.game.level.id==="0"&&this.game.lightState==="BLACKOUT";
+    this.game.blackoutLight.intensity=blackout?.22:0;
+
     this.game.flashFillTarget.position.copy(this.game.camera.position)
       .addScaledVector(flashForward,2.0);
 
@@ -1938,6 +1942,10 @@ export class BackroomsGame{
     this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.045);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();
     this.flashFillTarget=new THREE.Object3D();
+    this.blackoutLight=new THREE.PointLight(0xffe8bd,0,2.6,2);
+    this.blackoutLight.name="level0_blackout_proximity";
+    this.blackoutLight.castShadow=false;
+    this.scene.add(this.blackoutLight);
     // SpacePotato uses two deferred AreaLights for the flashlight: one broad
     // wash and one 0.25-radian directional beam. Two spotlights are the closest
     // portable WebGL equivalent without introducing a screen-space light decal.
@@ -2289,7 +2297,9 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      this.lightEventTimer=this.level.id==="1"?30:10+Math.random()*18;
+      // SpacePotatoee/MinecraftFoundFootage uses 20 ticks for the generic blackout event.
+      // Minecraft runs at 20 ticks per second, so this is exactly 1 second here.
+      this.lightEventTimer=this.level.id==="0"?1:30;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
@@ -2301,7 +2311,7 @@ export class BackroomsGame{
   }
   updateHorror(dt){
     this.horror=Math.max(0,this.horror-dt*.18);
-    if(this.running&&!this.paused&&this.level.id==="0"){
+    if(this.running&&!this.paused&&this.level.id==="0"&&this.lightState!=="BLACKOUT"){
       this.intercomTimer-=dt;
       if(this.intercomTimer<=0){
         this.intercomTimer=110+Math.random()*170;
@@ -2311,9 +2321,21 @@ export class BackroomsGame{
     document.documentElement.style.setProperty("--fear",this.horror.toFixed(3));
     document.body.classList.toggle("fear",this.horror>.08);
     if(!this.running||this.paused||this.dead||this.scareTimer>0)return;
-    this.scareTimer=18+Math.random()*35;
-    if(Math.random()<(this.level.id==="0"?.58:.76)){this.audio.distantKnock((Math.random()<.5?-1:1)*(.85+Math.random()*1.1));this.triggerFear(this.level.id==="2"?.32:.18)}
-    if(Math.random()<.28){this.audio.ambientSting(.08+Math.random()*.08);this.triggerFear(.12)}
+    this.scareTimer=this.level.id==="0"?52+Math.random()*54:26+Math.random()*42;
+    if(this.level.id==="0"&&this.lightState==="BLACKOUT")return;
+    if(this.level.id==="0"){
+      const roll=Math.random();
+      if(roll<.60){
+        this.audio.distantKnock((Math.random()<.5?-1:1)*(.9+Math.random()*1.2));
+        this.triggerFear(.14);
+      }else if(roll<.82){
+        this.audio.ambientSting(.045+Math.random()*.045);
+        this.triggerFear(.07);
+      }
+    }else{
+      if(Math.random()<.55){this.audio.distantKnock((Math.random()<.5?-1:1)*(.85+Math.random()*1.1));this.triggerFear(this.level.id==="2"?.30:.16)}
+      else if(Math.random()<.35){this.audio.ambientSting(.065+Math.random()*.065);this.triggerFear(.10)}
+    }
   }
   toast(text,duration=2){
     const el=document.getElementById("toast");el.textContent=text;el.classList.remove("hidden");clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.add("hidden"),duration*1000)
@@ -2422,8 +2444,8 @@ export class BackroomsGame{
       const zone=zoneChunk?.level0Region?.type||"maze";
       const blackout=zone==="blackout";
       const red=zone==="red";
-      this.ambient.intensity=blackout?.006:red?.014:.020;
-      this.scene.fog.density=blackout?.044:red?.034:.027;
+      this.ambient.intensity=blackout?.010:red?.014:.020;
+      this.scene.fog.density=blackout?.036:red?.034:.027;
       this.scene.fog.color.setHex(blackout?0x000000:red?0x120000:0x000000);
       document.documentElement.style.setProperty("--level0-zone",zone);
     }
