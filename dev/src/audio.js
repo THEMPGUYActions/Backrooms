@@ -23,7 +23,7 @@ export class AudioDirector{
     this.stepDistance=0;this.ambientTimer=70;this.buzzTimer=11;this.humGain=null;this.lastRareEvent=-Infinity;
     this.volume=Number(localStorage.getItem("br.volume")??.65);
     this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;this.redZoneLoading=null;
-    this.redZoneMedia=null;this.redZoneMetadataPromise=null;this.redZonePrimePromise=null;this.redZoneClockStartedAt=0;
+    this.redZoneMedia=null;this.redZoneMediaSource=null;this.redZoneMediaGain=null;this.redZoneMediaUnlocked=false;this.redZoneMetadataPromise=null;this.redZonePrimePromise=null;this.redZoneClockStartedAt=0;
   }
   createImpulse(seconds=1.6,decay=2.8){
     const length=Math.floor(this.ctx.sampleRate*seconds),buffer=this.ctx.createBuffer(2,length,this.ctx.sampleRate);
@@ -131,8 +131,11 @@ export class AudioDirector{
       }else if(this.isEnabled()&&this.ready){
         this.clickToEnter();
       }
-      if(!this.ready)this.init().then(()=>this.primeRedZone()).catch(error=>console.warn("[Backrooms] Audio init failed:",error));
-      else this.primeRedZone().catch(()=>{});
+      if(!this.ready){
+        this.init().then(()=>this.unlockRedZoneMedia()).catch(error=>console.warn("[Backrooms] Audio init failed:",error));
+      }else{
+        this.unlockRedZoneMedia().catch(()=>{});
+      }
     }catch(error){
       console.warn("[Backrooms] Audio unlock failed:",error);
     }
@@ -190,26 +193,56 @@ export class AudioDirector{
     }).finally(()=>{this.redZoneMetadataPromise=null});
     return this.redZoneMetadataPromise;
   }
-  async primeRedZone(){
-    if(this.buffers.has("red_zone"))return this.buffers.get("red_zone");
-    if(this.redZonePrimePromise)return this.redZonePrimePromise;
-    this.redZonePrimePromise=(async()=>{
-      await this.init();
-      const response=await fetch(RED_ZONE_AUDIO,{cache:"force-cache"});
-      if(!response.ok)throw new Error("HTTP "+response.status+" while loading RedZone.ogg");
-      const bytes=await response.arrayBuffer();
-      this.debug("RedZone bytes loaded",{bytes:bytes.byteLength});
-      const decoded=await this.ctx.decodeAudioData(bytes);
-      this.buffers.set("red_zone",decoded);
-      this.redZoneDuration=decoded.duration;
-      this.debug("RedZone decoded",{duration:decoded.duration});
-      return decoded;
-    })().catch(error=>{
-      this.debug("RedZone prime failed",{name:error?.name,message:error?.message||String(error)});
+  async unlockRedZoneMedia(){
+    await this.init();
+    if(this.redZoneMediaUnlocked&&this.redZoneMedia)return this.redZoneMedia;
+    if(!this.redZoneMedia){
+      const media=new Audio();
+      media.preload="auto";
+      media.src=RED_ZONE_AUDIO;
+      media.setAttribute("playsinline","");
+      media.setAttribute("webkit-playsinline","");
+      media.controls=false;
+      media.loop=false;
+      media.crossOrigin="anonymous";
+      this.redZoneMedia=media;
+
+      try{
+        this.redZoneMediaSource=this.ctx.createMediaElementSource(media);
+        this.redZoneMediaGain=this.ctx.createGain();
+        this.redZoneMediaGain.gain.value=0;
+        this.redZoneMediaSource.connect(this.redZoneMediaGain).connect(this.master);
+      }catch(error){
+        this.debug("RedZone media graph failed",{name:error?.name,message:error?.message||String(error)});
+        return null;
+      }
+    }
+
+    const media=this.redZoneMedia;
+    try{
+      // iOS WebKit applies the user-gesture restriction per media element.
+      // Touching play() here, during the intro/audio unlock gesture, unlocks
+      // this exact element for later Red Zone playback.
+      media.muted=false;
+      media.volume=1;
+      const playPromise=media.play();
+      await Promise.resolve(playPromise);
+      this.redZoneMediaUnlocked=true;
+      this.debug("RedZone media unlocked",{readyState:media.readyState,duration:media.duration});
+      media.pause();
+      try{media.currentTime=0}catch{}
+      return media;
+    }catch(error){
+      this.debug("RedZone media unlock failed",{name:error?.name,message:error?.message||String(error)});
       return null;
-    }).finally(()=>{this.redZonePrimePromise=null});
-    return this.redZonePrimePromise;
+    }
   }
+
+  async primeRedZone(){
+    // Kept as a compatibility alias for callers from older builds.
+    return this.unlockRedZoneMedia();
+  }
+
   startRedZoneClock(){
     this.redZoneClockStartedAt=performance.now()/1000;
     if(this.redZoneDuration<=0)this.getRedZoneMetadata().catch(()=>{});
@@ -222,39 +255,50 @@ export class AudioDirector{
       }
     }
 
-    const buffer=await this.primeRedZone();
-    if(!buffer||!this.ready)return null;
+    const media=this.redZoneMedia||await this.unlockRedZoneMedia();
+    if(!media||!this.redZoneMediaGain)return null;
 
-    const clockStartedAt=this.redZoneClockStartedAt;
+    const duration=Number.isFinite(media.duration)&&media.duration>0
+      ?media.duration
+      :await this.getRedZoneMetadata();
+    if(duration>0)this.redZoneDuration=duration;
+
+    const clockStartedAt=this.redZoneClockStartedAt||performance.now()/1000;
     this.stopRedZone();
-    // Preserve the countdown clock that started when the player entered the
-    // zone. This makes late decoding unable to freeze or reset the visible timer.
-    const wallElapsed=clockStartedAt
-      ? Math.max(0,performance.now()/1000-clockStartedAt)
-      : 0;
-    this.redZoneClockStartedAt=clockStartedAt||performance.now()/1000;
-    const now=this.ctx.currentTime;
-    const source=this.ctx.createBufferSource();
-    source.buffer=buffer;
-    const gain=this.ctx.createGain();
-    gain.gain.setValueAtTime(.9,this.ctx.currentTime);
-    source.connect(gain).connect(this.master);
-    this.redZoneSource=source;
-    this.redZoneGain=gain;
-    this.redZoneStartedAt=now-wallElapsed;
-    this.redZoneDuration=buffer.duration;
-    source.onended=()=>{
-      if(this.redZoneSource===source)this.redZoneSource=null;
+    this.redZoneClockStartedAt=clockStartedAt;
+
+    try{media.currentTime=0}catch{}
+    this.redZoneMediaGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.redZoneMediaGain.gain.setValueAtTime(0,this.ctx.currentTime);
+    this.redZoneMediaGain.gain.linearRampToValueAtTime(.9,this.ctx.currentTime+.06);
+
+    try{
+      await media.play();
+    }catch(error){
+      this.redZoneMediaGain.gain.setTargetAtTime(0,this.ctx.currentTime,.02);
+      this.debug("RedZone media playback failed",{name:error?.name,message:error?.message||String(error)});
+      return null;
+    }
+
+    this.redZoneStartedAt=this.ctx.currentTime;
+    media.onended=()=>{
+      if(this.redZoneMedia===media){
+        this.redZoneMediaGain?.gain.setTargetAtTime(0,this.ctx.currentTime,.03);
+        this.redZoneStartedAt=0;
+      }
     };
-    source.start(now);
-    this.debug("RedZone playback started",{duration:buffer.duration,audioState:this.ctx.state});
-    return {duration:buffer.duration,startedAt:this.redZoneStartedAt};
+    this.debug("RedZone media playback started",{duration:this.redZoneDuration,audioState:this.ctx.state,readyState:media.readyState});
+    return {duration:this.redZoneDuration,startedAt:this.redZoneStartedAt};
   }
   stopRedZone(){
     const source=this.redZoneSource;
     if(source){try{source.stop()}catch{}}
-    if(this.redZoneMedia){try{this.redZoneMedia.pause()}catch{}}
-    this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneClockStartedAt=0;
+    if(this.redZoneMedia){
+      try{this.redZoneMedia.pause()}catch{}
+      try{this.redZoneMedia.currentTime=0}catch{}
+    }
+    if(this.redZoneMediaGain)this.redZoneMediaGain.gain.setTargetAtTime(0,this.ctx?.currentTime||0,.02);
+    this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;
   }
   redZoneElapsed(){
     if(!this.redZoneDuration)return 0;
