@@ -1478,7 +1478,7 @@ class Player{
     this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.yaw=0;this.pitch=0;
     this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;
     this.flashlight=true;this.flashBattery=100;
-    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;
+    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;this.redFlashBoost=1;
     this.viewYaw=0;this.viewPitch=0;
   }
   reset(){
@@ -1487,6 +1487,7 @@ class Player{
     this.health=this.stamina=this.hydration=this.sanity=100;this.flashBattery=100;
     this.flashlight=this.game.startFlash;
     this.flashWarmup=1.15;
+    this.redFlashBoost=1;
     this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();
     this.game.camera.position.set(0,this.eyeY,0);this.game.camera.rotation.set(0,0,0,"YXZ");
   }
@@ -1558,6 +1559,18 @@ class Player{
 
     const batteryPower=Math.max(0,this.flashBattery/100);
     const beamPower=Math.pow(batteryPower,.72);
+    const currentLevel0Chunk=this.game.level.id==="0"
+      ? this.game.world.chunkAt(this.position.x,this.position.z)
+      : null;
+    const inRedZone=!!(
+      currentLevel0Chunk?.level0Region?.type==="red" ||
+      (this.game.level.id==="0"&&this.game.redZoneTrapped)
+    );
+    // Red Rooms are intentionally harder to navigate, so the flashlight
+    // gets a stronger output there without bypassing battery degradation.
+    const redBoostTarget=inRedZone?1.85:1;
+    this.redFlashBoost+=(redBoostTarget-this.redFlashBoost)*(1-Math.exp(-dt*7));
+    const flashZoneBoost=Math.max(1,Math.min(1.85,this.redFlashBoost));
     const flashForward=new THREE.Vector3(0,0,-1).applyQuaternion(this.game.camera.quaternion).normalize();
     // Keep the source slightly behind the camera so a wall can never contain
     // the light origin. This matters most when the player is inches from a wall.
@@ -1589,7 +1602,7 @@ class Player{
     const warmup=1-Math.min(1,this.flashWarmup/1.15);
     const flashRamp=.12+.88*THREE.MathUtils.smoothstep(warmup,0,1);
     this.game.flash.intensity=this.flashlight
-      ? (.34+beamPower*.66)*washScale*flashRamp
+      ? (.34+beamPower*.66)*washScale*flashRamp*flashZoneBoost
       : 0;
 
     this.game.flashFill.distance=25;
@@ -1597,7 +1610,7 @@ class Player{
     this.game.flashFill.penumbra=.94;
     this.game.flashFill.decay=2;
     this.game.flashFill.intensity=this.flashlight
-      ? (.10+beamPower*.55)*beamScale*flashRamp
+      ? (.10+beamPower*.55)*beamScale*flashRamp*flashZoneBoost
       : 0;
 
     this.game.blackoutLight.position.copy(this.game.camera.position);
