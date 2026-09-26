@@ -131,7 +131,8 @@ export class AudioDirector{
       }else if(this.isEnabled()&&this.ready){
         this.clickToEnter();
       }
-      if(!this.ready)this.init().then(()=>this.primeRedZone()).catch(error=>console.warn("[Backrooms] Audio init failed:",error));\n      else this.primeRedZone().catch(()=>{});
+      if(!this.ready)this.init().then(()=>this.primeRedZone()).catch(error=>console.warn("[Backrooms] Audio init failed:",error));
+      else this.primeRedZone().catch(()=>{});
     }catch(error){
       console.warn("[Backrooms] Audio unlock failed:",error);
     }
