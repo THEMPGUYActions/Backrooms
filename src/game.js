@@ -1910,7 +1910,9 @@ class EntityManager{
       lastSeen:null,lastHeard:null,lastPlayerX:this.game.player.position.x,lastPlayerZ:this.game.player.position.z,
       stalkSeed:Math.random()*1000,waypoint:null,path:null,pathIndex:0,pathTimer:0,pathKey:"",model:null,soundTimer:1+Math.random()*3
     };
-    this.entities.push(e);\n    this.modelLibrary.attach(e).catch(()=>{});\n    return e;
+    this.entities.push(e);
+    this.modelLibrary.attach(e).catch(()=>{});
+    return e;
   }
   summon(type){
     if(!ENTITY_TYPES[type])return false;
