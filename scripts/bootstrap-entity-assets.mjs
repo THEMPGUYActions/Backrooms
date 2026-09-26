@@ -8,6 +8,7 @@ const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
 const GLB_MAGIC = Buffer.from("glTF");
+const FBX_BINARY_MAGIC = Buffer.from("Kaydara FBX Binary  \\0");
 
 const entityManifest = JSON.parse(await readFile(join(root,"data","entity-assets.json"),"utf8"));
 const pbrLock = JSON.parse(await readFile(join(root,"data","pbr-assets-lock.json"),"utf8"));
@@ -41,12 +42,24 @@ const ffDir=join(root,"assets","found-footage");
 async function sha256(path){
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
-async function validGlb(path){
+async function validEntity(path){
   try{
     const info=await stat(path);
     if(!info.isFile()||info.size<20||info.size>MAX_ENTITY_BYTES)return false;
+    const ext=path.toLowerCase().split(".").pop();
     const data=await readFile(path);
-    return data.subarray(0,4).equals(GLB_MAGIC)&&data.readUInt32LE(4)===2&&data.readUInt32LE(8)===data.length;
+    if(ext==="glb")return data.subarray(0,4).equals(GLB_MAGIC)&&data.readUInt32LE(4)===2&&data.readUInt32LE(8)===data.length;
+    if(ext==="gltf"){JSON.parse(data.toString("utf8"));return true;}
+    if(ext==="fbx"){
+      const ascii=data.subarray(0,256).toString("utf8");
+      return data.subarray(0,FBX_BINARY_MAGIC.length).equals(FBX_BINARY_MAGIC)||ascii.includes("FBXHeaderExtension");
+    }
+    if(ext==="obj"){
+      const text=data.subarray(0,1024*1024).toString("utf8");
+      return /^\\s*(?:v|vn|vt|f)\\s/m.test(text);
+    }
+    if(ext==="usdz")return data.subarray(0,2).equals(Buffer.from([0x50,0x4b]));
+    return false;
   }catch{return false}
 }
 async function validPng(path){
@@ -85,28 +98,62 @@ await mkdir(pbrDir,{recursive:true});
 await mkdir(audioDir,{recursive:true});
 await mkdir(ffDir,{recursive:true});
 
-// 1. Real entity models: only fetch when the binary is absent.
+// 1. Real entity models: accept any supported runtime format and only fetch when all are absent.
 for(const [type,entry] of Object.entries(entityManifest.assets||{})){
-  const target=join(entityDir,entry.file);
-  if(await validGlb(target))continue;
+  const candidates=Array.isArray(entry.files)&&entry.files.length
+    ? entry.files
+    : [entry.file||((type)+".glb")];
+  let alreadyPresent=false;
+  for(const filename of candidates){
+    if(await validEntity(join(entityDir,filename))){alreadyPresent=true;break;}
+  }
+  if(alreadyPresent)continue;
+
   const configured=String(process.env["ENTITY_"+type.toUpperCase()+"_URL"]||entry.directUrl||"").trim();
   let url=configured;
+  let targetFile=String(entry.defaultFile||candidates.find(name=>name.toLowerCase().endsWith(".glb"))||candidates[0]);
   if(!url&&process.env.SKETCHFAB_ACCESS_TOKEN?.trim()&&entry.uid){
     const r=await fetch("https://api.sketchfab.com/v3/models/"+entry.uid+"/download",{
       headers:{Authorization:"Bearer "+process.env.SKETCHFAB_ACCESS_TOKEN.trim(),Accept:"application/json","User-Agent":"THEMPGUY-Backrooms-asset-bootstrap/1.0"}
     });
-    if(!r.ok)throw new Error("Sketchfab download request failed for "+entry.file+": HTTP "+r.status);
+    if(!r.ok)throw new Error("Sketchfab download request failed for "+type+": HTTP "+r.status);
     const json=await r.json();
     url=json?.glb?.url||"";
+    targetFile=candidates.find(name=>name.toLowerCase().endsWith(".glb"))||targetFile;
   }
   if(!url){
     console.warn("[assets] No source configured for missing entity "+type+"; leaving it for later bootstrap.");
     continue;
   }
-  console.log("[assets] Downloading entity "+type+" once...");
+
+  // Direct model URLs can be any supported format. When the URL has a real
+  // extension, preserve it; signed URLs without one use defaultFile.
+  try{
+    const pathname=new URL(url).pathname.toLowerCase();
+    const ext=pathname.split(".").pop();
+    const match=candidates.find(name=>name.toLowerCase().endsWith("."+ext));
+    if(match)targetFile=match;
+  }catch{}
+
+  console.log("[assets] Downloading entity "+type+" ("+targetFile+") once...");
   const data=await download(url);
-  const meta=await saveChecked(target,data,"glb");
-  downloaded.entities.push({type,file:entry.file,url,bytes:meta.bytes,sha256:meta.sha256});
+  const target=join(entityDir,targetFile);
+  await mkdir(join(target,".."),{recursive:true});
+  const ext=targetFile.toLowerCase().split(".").pop();
+  if(ext==="glb"&&(!data.subarray(0,4).equals(GLB_MAGIC)||data.readUInt32LE(4)!==2||data.readUInt32LE(8)!==data.length))
+    throw new Error("Invalid glTF 2.0 GLB: "+targetFile);
+  if(ext==="gltf"){try{JSON.parse(data.toString("utf8"))}catch{throw new Error("Invalid glTF JSON: "+targetFile)}}
+  if(ext==="fbx"){
+    const ascii=data.subarray(0,256).toString("utf8");
+    if(!data.subarray(0,FBX_BINARY_MAGIC.length).equals(FBX_BINARY_MAGIC)&&!ascii.includes("FBXHeaderExtension"))
+      throw new Error("Invalid FBX: "+targetFile);
+  }
+  if(ext==="obj"&&!/^\\s*(?:v|vn|vt|f)\\s/m.test(data.subarray(0,1024*1024).toString("utf8")))
+    throw new Error("Invalid OBJ: "+targetFile);
+  if(ext==="usdz"&&!data.subarray(0,2).equals(Buffer.from([0x50,0x4b])))
+    throw new Error("Invalid USDZ archive: "+targetFile);
+  await writeFile(target,data);
+  downloaded.entities.push({type,file:targetFile,url,bytes:data.length,sha256:createHash("sha256").update(data).digest("hex")});
   changed=true;
 }
 
