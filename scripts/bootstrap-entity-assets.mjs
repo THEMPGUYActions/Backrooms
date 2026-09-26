@@ -149,16 +149,26 @@ for(const entry of SPB_FILES){
 }
 
 // Manifests live beside the committed assets so the build has no network dependency.
+async function writeManifestIfChanged(path,value){
+  const next=JSON.stringify(value,null,2)+"\\n";
+  let previous="";
+  try{previous=await readFile(path,"utf8");}catch{}
+  if(previous!==next){
+    await writeFile(path,next);
+    changed=true;
+  }
+}
+
 const pbrFiles={};
 for(const [filename,entry] of Object.entries(pbrLock.files||{})){
   const path=join(pbrDir,filename);
   const data=await readFile(path);
   pbrFiles[filename]={...entry,bytes:data.length,sha256:createHash("sha256").update(data).digest("hex")};
 }
-await writeFile(join(pbrDir,"manifest.json"),JSON.stringify({
+await writeManifestIfChanged(join(pbrDir,"manifest.json"),{
   pack:pbrLock.pack,author:pbrLock.author,source:pbrLock.source,license:pbrLock.license,
   files:pbrFiles
-},null,2)+"\n");
+});
 
 const audioFiles={};
 for(const [filename,entry] of Object.entries(audioLock.files||{})){
@@ -166,9 +176,9 @@ for(const [filename,entry] of Object.entries(audioLock.files||{})){
   const data=await readFile(path);
   audioFiles[filename]={...entry,bytes:data.length,sha256:createHash("sha256").update(data).digest("hex")};
 }
-await writeFile(join(audioDir,"manifest.json"),JSON.stringify({
+await writeManifestIfChanged(join(audioDir,"manifest.json"),{
   pack:audioLock.pack,license:audioLock.license,files:audioFiles
-},null,2)+"\n");
+});
 
 const ffFiles={};
 for(const entry of SPB_FILES){
@@ -182,10 +192,10 @@ for(const entry of SPB_FILES){
     sha256:createHash("sha256").update(data).digest("hex")
   };
 }
-await writeFile(join(ffDir,"manifest.json"),JSON.stringify({
+await writeManifestIfChanged(join(ffDir,"manifest.json"),{
   source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,license:"GPL-3.0-only",
   files:ffFiles
-},null,2)+"\n");
+});
 
 if(!changed){
   console.log("[assets] All bootstrap assets are already committed. No external downloads performed.");
