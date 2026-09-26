@@ -7,6 +7,7 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
+import { EntityModelLibrary } from "./entity-models.js?v=20260926-entity-models1";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1838,8 +1839,67 @@ function steerAroundWalls(game,entity,desired,dt){
   entity.group.rotation.y+=Math.atan2(Math.sin(targetYaw-current),Math.cos(targetYaw-current))*Math.min(1,dt*9);
 }
 
+function entityPathKey(a,b,step){
+  return Math.round(a.x/step)+":"+Math.round(a.z/step)+"->"+Math.round(b.x/step)+":"+Math.round(b.z/step);
+}
+
+function entityPathfind(game,start,goal,step=2.0){
+  const half=Math.max(12,Math.min(26,game.level.cellSize*3.2));
+  const minX=Math.floor((Math.min(start.x,goal.x)-half)/step);
+  const maxX=Math.ceil((Math.max(start.x,goal.x)+half)/step);
+  const minZ=Math.floor((Math.min(start.z,goal.z)-half)/step);
+  const maxZ=Math.ceil((Math.max(start.z,goal.z)+half)/step);
+  const width=Math.max(1,Math.min(30,maxX-minX+1)),height=Math.max(1,Math.min(30,maxZ-minZ+1));
+  const ox=Math.floor(((start.x+goal.x)*.5)/step)-Math.floor(width/2);
+  const oz=Math.floor(((start.z+goal.z)*.5)/step)-Math.floor(height/2);
+  const sx=Math.max(0,Math.min(width-1,Math.round(start.x/step)-ox));
+  const sz=Math.max(0,Math.min(height-1,Math.round(start.z/step)-oz));
+  const gx=Math.max(0,Math.min(width-1,Math.round(goal.x/step)-ox));
+  const gz=Math.max(0,Math.min(height-1,Math.round(goal.z/step)-oz));
+  const blocked=new Uint8Array(width*height);
+  const index=(x,z)=>z*width+x;
+  const worldAt=(x,z)=>({x:(ox+x)*step,z:(oz+z)*step});
+  for(let z=0;z<height;z++)for(let x=0;x<width;x++){
+    const p=worldAt(x,z),q=game.world.collision(p,.30);
+    blocked[index(x,z)]=(Math.abs(q.x-p.x)>.08||Math.abs(q.z-p.z)>.08)?1:0;
+  }
+  blocked[index(sx,sz)]=0;blocked[index(gx,gz)]=0;
+  const open=[{x:sx,z:sz,g:0,f:0,parent:-1}];
+  const nodes=new Map([[sx+","+sz,open[0]]]);
+  const closed=new Set();
+  const dirs=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[-1,1,1.414],[1,-1,1.414],[-1,-1,1.414]];
+  let best=null,iterations=0;
+  while(open.length&&iterations++<900){
+    let bestIndex=0;
+    for(let i=1;i<open.length;i++)if(open[i].f<open[bestIndex].f)bestIndex=i;
+    const cur=open.splice(bestIndex,1)[0];
+    const key=cur.x+","+cur.z;
+    if(closed.has(key))continue;
+    closed.add(key);
+    if(cur.x===gx&&cur.z===gz){best=cur;break}
+    for(const [dx,dz,cost] of dirs){
+      const nx=cur.x+dx,nz=cur.z+dz;
+      if(nx<0||nz<0||nx>=width||nz>=height)continue;
+      if(blocked[index(nx,nz)])continue;
+      if(dx&&dz&&(blocked[index(cur.x+dx,cur.z)]||blocked[index(cur.x,cur.z+dz)]))continue;
+      const nk=nx+","+nz;if(closed.has(nk))continue;
+      const g=cur.g+cost;
+      const h=Math.hypot(gx-nx,gz-nz);
+      const old=nodes.get(nk);
+      if(old&&old.g<=g)continue;
+      const n={x:nx,z:nz,g,f:g+h,parent:cur};
+      nodes.set(nk,n);open.push(n);
+    }
+  }
+  if(!best)return [];
+  const path=[];
+  for(let n=best;n;n=n.parent)path.push(worldAt(n.x,n.z));
+  path.reverse();
+  return path;
+}
+
 class EntityManager{
-  constructor(game){this.game=game;this.entities=[];this.serial=0;this.lastUpdate=0;this.bacteriaSpawned=false}
+  constructor(game){this.game=game;this.entities=[];this.serial=0;this.lastUpdate=0;this.modelLibrary=new EntityModelLibrary(game);this.hearingCooldown=0}
   clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[];this.bacteriaSpawned=false}
   create(type,position,key=null){
     const def=ENTITY_TYPES[type];if(!def)return null;
@@ -1848,9 +1908,9 @@ class EntityManager{
     const e={
       key:key||"manual:"+(++this.serial),type,def,group,state:"idle",cool:0,age:0,motion:0,
       lastSeen:null,lastHeard:null,lastPlayerX:this.game.player.position.x,lastPlayerZ:this.game.player.position.z,
-      stalkSeed:Math.random()*1000,waypoint:null
+      stalkSeed:Math.random()*1000,waypoint:null,path:null,pathIndex:0,pathTimer:0,pathKey:"",model:null,soundTimer:1+Math.random()*3
     };
-    this.entities.push(e);return e;
+    this.entities.push(e);\n    this.modelLibrary.attach(e).catch(()=>{});\n    return e;
   }
   summon(type){
     if(!ENTITY_TYPES[type])return false;
@@ -1862,22 +1922,26 @@ class EntityManager{
     this.game.triggerFear(.12);this.game.toast("SUMMONED "+e.def.label.toUpperCase(),1.4);return true;
   }
   spawnForChunks(){
-    // Level 0 uses a delayed Bacteria encounter instead of continuously
-    // populating the safe opening with hostile entities. This mirrors the
-    // game adaptations where Bacteria becomes a late Lobby threat.
-    if(this.game.level.id==="0"&&!this.bacteriaSpawned&&this.game.gameTime>=180){
-      const p=this.game.player,rng=new RNG((this.game.seed^0xBAc7e)|0),angle=rng.next()*Math.PI*2,distance=28+rng.next()*18;
-      const pos=new THREE.Vector3(p.position.x+Math.cos(angle)*distance,0,p.position.z+Math.sin(angle)*distance);
-      const e=this.create("bacteria",pos,"level0:bacteria");
-      if(e){e.state="stalk";e.lastSeen=null;e.lastHeard=null;this.bacteriaSpawned=true;this.game.audio.scare();this.game.triggerFear(.16);this.game.toast("SOMETHING IS MOVING.",2.2)}
-    }
+    // Current Level 0 canon explicitly leaves entities unconfirmed. Keep it
+    // empty here; visual/audio hallucinations are handled by the horror layer.
+    if(this.game.level.id==="0")return;
+    const pools={
+      "1":["duller","hound","skinstealer","smiler","clump","crawler","wretch"],
+      "2":["smiler","hound","deathmoth"],
+      "3":["hound"],
+      "4":[]
+    };
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
-      const type=this.game.level.entity,def=ENTITY_TYPES[type];if(!def)continue;
-      const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91),grid=this.game.level.gridSize||CELLS;
+      const pool=pools[this.game.level.id]||[this.game.level.entity];
+      const rng=new RNG(c.seedKey()^0x4a91);
+      const type=pool[Math.floor(rng.next()*pool.length)];
+      const def=ENTITY_TYPES[type];if(!def)continue;
+      const cell=this.game.level.cellSize,grid=this.game.level.gridSize||CELLS;
       const minSpawn=1,maxSpawn=Math.max(1,grid-2);
       const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2;
-      this.create(type,new THREE.Vector3(x,0,z),key);
+      const e=this.create(type,new THREE.Vector3(x,0,z),key);
+      if(e)e.state="idle";
     }
   }
   chooseStalkPoint(e,p){
@@ -1888,6 +1952,7 @@ class EntityManager{
   }
   update(dt){
     const p=this.game.player;
+    this.hearingCooldown=Math.max(0,this.hearingCooldown-dt);
     for(const e of [...this.entities]){
       const dx=p.position.x-e.group.position.x,dz=p.position.z-e.group.position.z,d=Math.hypot(dx,dz)||.001;
       e.cool-=dt;e.age+=dt;e.motion=Math.max(0,e.motion-dt*2);
@@ -1896,6 +1961,18 @@ class EntityManager{
       if(visible)e.lastSeen=p.position.clone();
       if(heard)e.lastHeard=p.position.clone();
       const target=e.lastSeen||e.lastHeard;
+      if(target){
+        const step=this.game.level.id==="0"?2.0:Math.max(1.5,Math.min(2.4,this.game.level.cellSize*.34));
+        const pathKey=entityPathKey(e.group.position,target,step);
+        if(!e.path||e.pathKey!==pathKey||e.pathTimer<=0){
+          e.path=entityPathfind(this.game,e.group.position,target,step);
+          e.pathIndex=1;
+          e.pathKey=pathKey;
+          e.pathTimer=.42+Math.random()*.22;
+        }else e.pathTimer-=dt;
+      }else{
+        e.path=null;e.pathIndex=0;e.pathTimer=0;
+      }
       if(d>72&&e.key.startsWith("manual:")){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
       const def=e.def;
       if(def.behavior==="light"){
@@ -1934,11 +2011,23 @@ class EntityManager{
       }else if(e.state==="chase"){
         const predicted=p.position.clone();
         if(e.lastSeen)predicted.lerp(p.position,.55);
-        steerAroundWalls(this.game,e,predicted.sub(e.group.position),dt);
+        const waypoint=e.path?.[e.pathIndex];
+        if(waypoint){
+          if(Math.hypot(waypoint.x-e.group.position.x,waypoint.z-e.group.position.z)<.8)e.pathIndex++;
+          const next=e.path?.[e.pathIndex]||predicted;
+          steerAroundWalls(this.game,e,next.clone().sub(e.group.position),dt);
+        }else steerAroundWalls(this.game,e,predicted.sub(e.group.position),dt);
       }else if(e.state==="investigate"&&target){
-        const desired=target.clone().sub(e.group.position);
-        if(desired.length()>1.5)steerAroundWalls(this.game,e,desired,dt);
-        else e.state="stalk";
+        const waypoint=e.path?.[e.pathIndex];
+        if(waypoint){
+          if(Math.hypot(waypoint.x-e.group.position.x,waypoint.z-e.group.position.z)<.8)e.pathIndex++;
+          const next=e.path?.[e.pathIndex]||target;
+          steerAroundWalls(this.game,e,next.clone().sub(e.group.position),dt);
+        }else{
+          const desired=target.clone().sub(e.group.position);
+          if(desired.length()>1.5)steerAroundWalls(this.game,e,desired,dt);
+          else e.state="stalk";
+        }
       }else if(e.state==="stalk"){
         const point=this.chooseStalkPoint(e,p),desired=point.sub(e.group.position);
         if(desired.length()>2)steerAroundWalls(this.game,e,desired,dt);
@@ -1950,6 +2039,12 @@ class EntityManager{
         this.game.die("THE "+def.label.toUpperCase()+" FOUND YOU.");continue;
       }
       if(e.state==="chase"&&e.cool<=0){this.game.triggerFear(.035);e.cool=.8}
+      this.modelLibrary.update(e,dt);
+      if(e.soundTimer<=0){
+        if(e.state==="chase")this.game.audio.entityCue?.(e.type,e.state,d);
+        else if(e.state==="investigate"&&Math.random()<.45)this.game.audio.entityCue?.(e.type,"alert",d);
+        e.soundTimer=e.state==="chase"?.7+Math.random()*.9:3+Math.random()*6;
+      }else e.soundTimer-=dt;
       animateEntity(e,dt);
       e.lastPlayerX=p.position.x;e.lastPlayerZ=p.position.z;
     }
