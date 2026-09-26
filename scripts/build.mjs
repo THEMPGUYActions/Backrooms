@@ -92,10 +92,11 @@ for (const path of ["index.html", "styles.css", "favicon.svg", "sw.js", "src", "
 
 const entitySource=join(root,"assets","entities");
 try{
-  const entityEntries=await (await import("node:fs/promises")).readdir(entitySource,{withFileTypes:true});
-  for(const entry of entityEntries){
-    if(entry.isFile()&&entry.name.toLowerCase().endsWith(".glb"))
-      await cp(join(entitySource,entry.name),join(entityDir,entry.name));
+  const entityInfo=await stat(entitySource);
+  if(entityInfo.isDirectory()){
+    // Keep every entity format plus companion files such as OBJ/MTL/textures.
+    // This intentionally supports FBX, GLB, GLTF, OBJ, and USDZ packages.
+    await cp(entitySource,entityDir,{recursive:true});
   }
 }catch(error){
   if(error?.code!=="ENOENT")throw error;
