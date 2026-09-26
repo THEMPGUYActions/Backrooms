@@ -84,8 +84,13 @@ function installRoof(game){
 
   const originalConfigure=world.configure.bind(world);
   world.configure=async(...args)=>{
-    const result=await originalConfigure(...args);
+    if(world.__level0RoofGroup){
+      game.scene.remove(world.__level0RoofGroup);
+      world.__level0RoofGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+      world.__level0RoofGroup=null;
+    }
     world.__level0RoofSignature="";
+    const result=await originalConfigure(...args);
     if(game.level?.id!=="0"&&world.ceilingSurface)world.ceilingSurface.visible=true;
     return result;
   };
