@@ -78,9 +78,13 @@ function installRoof(game){
       );
       let i=0;
       for(let z=0;z<tiles;z++)for(let x=0;x<tiles;x++){
+        const isManilaTile=!!chunk.manilaRoom&&x===chunk.manilaRoom.cellX&&z===chunk.manilaRoom.cellZ;
+        // The source Manila Room has a low interior ceiling with the fluorescent
+        // fixture sitting just below it. Keep the normal Level 0 roof elsewhere.
+        const roofY=isManilaTile?3.125:game.level.wallHeight-.025;
         const m=new THREE.Matrix4().makeTranslation(
           chunk.originX+x*tileSize+tileSize/2,
-          game.level.wallHeight-.025,
+          roofY,
           chunk.originZ+z*tileSize+tileSize/2
         );
         mesh.setMatrixAt(i++,m);
