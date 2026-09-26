@@ -1,4 +1,5 @@
 import { BackroomsGame } from "./game.js?v=20260925-entityai2";
+import { installBackroomsFixes } from "./fixes.js?v=20260926-roofflashmanila";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20260925-entityai2";
 /* DEV_ADMIN_END */
@@ -22,6 +23,7 @@ const registerCache=async()=>{
 
 registerCache();
 const game=new BackroomsGame();
+installBackroomsFixes(game,BackroomsAdmin);
 /* DEV_ADMIN_START */
 if(game.admin.enabled){
   window.addEventListener("backrooms:game-ready",()=>{
