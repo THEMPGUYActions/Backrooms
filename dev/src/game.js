@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0scale4";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
 
 const VHSShader={
   name:"BackroomsVHS",

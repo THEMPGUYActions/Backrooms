@@ -303,12 +303,17 @@ export function disposeLibrary(library){
 
 export function makeLibrary(level){
   const ceiling=createPBRMaterial({base:level.id==="1"?0x767976:level.theme.ceiling,seed:89+Number(level.id),rough:level.id==="1"?.97:.9,scale:level.id==="1"?4:2,normalStrength:level.id==="1"?.22:.24});
+  const floor=createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18});
+  if(level.id==="0"){
+    floor.emissive=new THREE.Color(0x2a2418);
+    floor.emissiveIntensity=.075;
+  }
   ceiling.side=THREE.FrontSide;
   ceiling.color.setHex(level.theme.ceiling);
   ceiling.emissive=new THREE.Color(level.id==="0"?0x776621:0x252725);
   ceiling.emissiveIntensity=level.id==="0"?.055:level.id==="1"?0:.028;
   return {
-    floor:createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18}),
+    floor,
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:level.id==="0"?1:3.8,normalStrength:.35}),
     wall2:createPBRMaterial({base:level.theme.wall,seed:129+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.35}),
     wallBottom:createPBRMaterial({base:level.theme.wall,seed:129+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.08}),
