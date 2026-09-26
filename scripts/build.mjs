@@ -46,76 +46,37 @@ if (lock.source !== "https://opengameart.org/content/backrooms-pbr-texture-pack"
 const PBR_FILES = Object.keys(lock.files);
 if (PBR_FILES.length !== 12) throw new Error("Expected exactly 12 locked PBR map files.");
 
-async function downloadAudioAsset(filename){
-  const expected=audioLock.files[filename];
-  if(!expected?.url?.startsWith("https://opengameart.org/sites/default/files/"))throw new Error("Audio asset source URL is invalid: "+filename);
-  const response=await fetch(expected.url,{headers:{"Accept":"audio/ogg,audio/*;q=0.9","User-Agent":"THEMPGUY-Backrooms-build/1.0"}});
-  if(!response.ok)throw new Error("OpenGameArt audio download failed for "+filename+": HTTP "+response.status);
-  const contentType=String(response.headers.get("content-type")||"").toLowerCase();
-  if(contentType&&!contentType.startsWith("audio/")&&!contentType.includes("ogg")&&!contentType.includes("octet-stream"))throw new Error("Unexpected audio content type for "+filename+": "+contentType);
-  const data=Buffer.from(await response.arrayBuffer());
-  if(!data.length||data.length>MAX_AUDIO_BYTES)throw new Error("Invalid audio size for "+filename);
-  const sha256=createHash("sha256").update(data).digest("hex");
-  await writeFile(join(audioDir,filename),data);
-  return {url:expected.url,source:expected.source,author:expected.author,license:expected.license,bytes:data.length,sha256};
-}
-async function downloadSpacePotatoAsset(entry){
-  const sourceCommit=entry.sourceCommit||SPB_SOURCE_COMMIT;
-  const url="https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/"+sourceCommit+"/"+entry.path;
-  const response=await fetch(url,{headers:{"Accept":"image/png","User-Agent":"THEMPGUY-Backrooms-build/1.0"}});
-  if(!response.ok)throw new Error("SpacePotato Found Footage asset download failed for "+entry.name+": HTTP "+response.status);
-  const data=Buffer.from(await response.arrayBuffer());
-  if(!data.length||data.length>MAX_SPB_BYTES)throw new Error("Invalid SpacePotato asset size for "+entry.name);
-  if(data.length<8||!data.subarray(0,8).equals(PNG_SIGNATURE))throw new Error("SpacePotato asset is not a PNG: "+entry.name);
-  const sha256=createHash("sha256").update(data).digest("hex");
-  await mkdir(join(ffDir, entry.name, ".."), { recursive: true });
-  await writeFile(join(ffDir,entry.name),data);
-  return {url,source:SPB_SOURCE_REPO,commit:sourceCommit,bytes:data.length,sha256};
-}
+async function copyLocalAssets(){
+  const localPbr=join(root,"assets","pbr");
+  const localAudio=join(root,"assets","audio");
+  const localFoundFootage=join(root,"assets","found-footage");
 
-async function downloadPbrAsset(filename) {
-  const expected = lock.files[filename];
-  if (!expected?.url?.startsWith("https://opengameart.org/sites/default/files/oga-textures/175228/")) {
-    throw new Error("PBR asset has an invalid OpenGameArt source URL: " + filename);
-  }
-  if (!/^[a-f0-9]{64}$/.test(expected.sha256 || "")) {
-    throw new Error("PBR asset is missing a valid SHA-256 lock: " + filename);
+  const requiredPbr=Object.keys(lock.files);
+  for(const filename of requiredPbr){
+    const source=join(localPbr,filename);
+    const info=await stat(source).catch(()=>null);
+    if(!info?.isFile())throw new Error("Missing committed PBR asset: "+filename);
+    await cp(source,join(pbrDir,filename));
   }
 
-  const response = await fetch(expected.url, {
-    headers: {
-      "Accept": "image/png",
-      "User-Agent": "THEMPGUY-Backrooms-build/1.0"
-    }
-  });
-  if (!response.ok) {
-    throw new Error("OpenGameArt download failed for " + filename + ": HTTP " + response.status);
+  for(const filename of Object.keys(audioLock.files)){
+    const source=join(localAudio,filename);
+    const info=await stat(source).catch(()=>null);
+    if(!info?.isFile())throw new Error("Missing committed audio asset: "+filename);
+    await cp(source,join(audioDir,filename));
   }
 
-  const data = Buffer.from(await response.arrayBuffer());
-  if (data.length > MAX_ASSET_BYTES) {
-    throw new Error("Downloaded PBR map exceeds 6 MiB: " + filename);
-  }
-  if (data.length < 24 || !data.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
-    throw new Error("Downloaded PBR map is not a PNG: " + filename);
-  }
-
-  const width = data.readUInt32BE(16);
-  const height = data.readUInt32BE(20);
-  if (width !== 1024 || height !== 1024) {
-    throw new Error("Downloaded PBR map is not 1024x1024: " + filename + " (" + width + "x" + height + ")");
+  for(const entry of SPB_FILES){
+    const source=join(localFoundFootage,entry.name);
+    const info=await stat(source).catch(()=>null);
+    if(!info?.isFile())throw new Error("Missing committed Found Footage asset: "+entry.name);
+    await mkdir(join(ffDir,entry.name,".."),{recursive:true});
+    await cp(source,join(ffDir,entry.name));
   }
 
-  const sha256 = createHash("sha256").update(data).digest("hex");
-  if (sha256 !== expected.sha256) {
-    throw new Error("OpenGameArt PBR map changed from its locked checksum: " + filename);
-  }
-  if (data.length !== expected.bytes) {
-    throw new Error("OpenGameArt PBR map size changed from its locked byte count: " + filename);
-  }
-
-  await writeFile(join(pbrDir, filename), data);
-  return { url: expected.url, bytes: data.length, sha256 };
+  await cp(join(localPbr,"manifest.json"),join(pbrDir,"manifest.json"));
+  await cp(join(localAudio,"manifest.json"),join(audioDir,"manifest.json"));
+  await cp(join(localFoundFootage,"manifest.json"),join(ffDir,"manifest.json"));
 }
 
 await rm(dist, { recursive: true, force: true });
@@ -154,16 +115,7 @@ const manifest = {
   files: {}
 };
 
-for (const filename of PBR_FILES) {
-  manifest.files[filename] = await downloadPbrAsset(filename);
-}
-
-await writeFile(join(pbrDir,"manifest.json"),JSON.stringify(manifest,null,2)+"\n","utf8");
-const spbManifest={source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,license:"GPL-3.0-only",files:{}};
-for(const entry of SPB_FILES)spbManifest.files[entry.name]=await downloadSpacePotatoAsset(entry);
-await writeFile(join(ffDir,"manifest.json"),JSON.stringify(spbManifest,null,2)+"\n","utf8");const audioManifest={pack:audioLock.pack,license:audioLock.license,files:{}};
-for(const filename of Object.keys(audioLock.files))audioManifest.files[filename]=await downloadAudioAsset(filename);
-await writeFile(join(audioDir,"manifest.json"),JSON.stringify(audioManifest,null,2)+"\n","utf8");
+await copyLocalAssets();
 const builtMain=await readFile(join(dist,"src","main.js"),"utf8");
 const productionBuild=process.env.BACKROOMS_PRODUCTION_BUILD==="1";
 if(productionBuild){
@@ -174,8 +126,8 @@ if(productionBuild){
 }
 await writeFile(join(dist,".nojekyll"),"","utf8");
 
-console.log("Downloaded and checksum-verified "+PBR_FILES.length+" CC0 OpenGameArt PBR maps.");
-console.log("Downloaded "+Object.keys(audioLock.files).length+" CC0 OpenGameArt audio assets.");
-console.log("Downloaded "+SPB_FILES.length+" bundled Found Footage assets.");
+console.log("Copied "+PBR_FILES.length+" committed CC0 OpenGameArt PBR maps.");
+console.log("Copied "+Object.keys(audioLock.files).length+" committed CC0 OpenGameArt audio assets.");
+console.log("Copied "+SPB_FILES.length+" committed Found Footage assets.");
 console.log("PBR manifest size: " + (await stat(join(pbrDir, "manifest.json"))).size + " bytes.");
 console.log("Built static site in dist/");
