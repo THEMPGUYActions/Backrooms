@@ -127,6 +127,13 @@ for (const path of ["index.html", "styles.css", "favicon.svg", "sw.js", "src", "
   await cp(join(root, path), join(dist, path), { recursive: true });
 }
 
+const redZoneSource=join(root,"assets","RedZone.ogg");
+const redZoneTarget=join(dist,"assets","RedZone.ogg");
+const redZoneStat=await stat(redZoneSource);
+if(!redZoneStat.isFile()||redZoneStat.size<=0||redZoneStat.size>MAX_AUDIO_BYTES)throw new Error("RedZone.ogg is missing or invalid.");
+await mkdir(join(dist,"assets"),{recursive:true});
+await cp(redZoneSource,redZoneTarget);
+
 const manifest = {
   pack: lock.pack,
   author: lock.author,
@@ -149,6 +156,8 @@ const builtMain=await readFile(join(dist,"src","main.js"),"utf8");
 const productionBuild=process.env.BACKROOMS_PRODUCTION_BUILD==="1";
 if(productionBuild){
   await writeFile(join(dist,"src","main.js"),builtMain.replace(/\s*\/\* DEV_ADMIN_START \*\/[\s\S]*?\/\* DEV_ADMIN_END \*\//g,""),"utf8");
+  const builtIndex=await readFile(join(dist,"index.html"),"utf8");
+  await writeFile(join(dist,"index.html"),builtIndex.replace(/\s*<!-- DEV_DEBUG_START -->[\s\S]*?<!-- DEV_DEBUG_END -->/g,""),"utf8");
   await rm(join(dist,"src","admin.js"),{force:true});
 }
 await writeFile(join(dist,".nojekyll"),"","utf8");
