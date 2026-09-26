@@ -1,69 +1,117 @@
 {
-  "version": 1,
+  "version": 2,
   "assets": {
     "smiler": {
-      "file": "smiler.glb",
       "uid": "994d17d347da4806968bb8ed9af5dedd",
       "creator": "🇧🇷 Fog 🇧🇷",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/smiler-entity3-backrooms-994d17d347da4806968bb8ed9af5dedd",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "smiler.fbx",
+        "smiler.glb",
+        "smiler.gltf",
+        "smiler.obj",
+        "smiler.usdz"
+      ]
     },
     "hound": {
-      "file": "hound.glb",
       "uid": "b835cbb0440942a0856da6cefd365d38",
       "creator": "🇧🇷 Fog 🇧🇷",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/hound-backrooms-b835cbb0440942a0856da6cefd365d38",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "hound.fbx",
+        "hound.glb",
+        "hound.gltf",
+        "hound.obj",
+        "hound.usdz"
+      ]
     },
     "skinstealer": {
-      "file": "skinstealer.glb",
       "uid": "c0db7c843ce44bb0a86a0b3a7d7884e1",
       "creator": "Speed12 / RocketOfficial",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/skin-stealer-the-backrooms-blender-302-c0db7c843ce44bb0a86a0b3a7d7884e1",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "skinstealer.fbx",
+        "skinstealer.glb",
+        "skinstealer.gltf",
+        "skinstealer.obj",
+        "skinstealer.usdz"
+      ]
     },
     "duller": {
-      "file": "duller.glb",
       "uid": "84d9383ca8dc4bdbbeba87dae49ccecb",
       "creator": "Hunter198511",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/backrooms-entity-6-duller-84d9383ca8dc4bdbbeba87dae49ccecb",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "duller.fbx",
+        "duller.glb",
+        "duller.gltf",
+        "duller.obj",
+        "duller.usdz"
+      ]
     },
     "deathmoth": {
-      "file": "deathmoth.glb",
       "uid": "6101e3e3991545d6a8cce026fb2a51b2",
       "creator": "Bittergiggle Playz [OFFICIAL]",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/deathmoth-backrooms-6101e3e3991545d6a8cce026fb2a51b2",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "deathmoth.fbx",
+        "deathmoth.glb",
+        "deathmoth.gltf",
+        "deathmoth.obj",
+        "deathmoth.usdz"
+      ]
     },
     "faceling": {
-      "file": "faceling.glb",
       "uid": "76ff872b6d12402ba6d363c6d16f64c7",
       "creator": "TacoModels / original model by AlanH1213",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/backrooms-faceling-ps1psx-style-76ff872b6d12402ba6d363c6d16f64c7",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "faceling.fbx",
+        "faceling.glb",
+        "faceling.gltf",
+        "faceling.obj",
+        "faceling.usdz"
+      ]
     },
     "partygoer": {
-      "file": "partygoer.glb",
       "uid": "0593ef4788b146e4b2f820b10245a948",
       "creator": "bigdowsey",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/the-partygoer-backrooms-entity-0593ef4788b146e4b2f820b10245a948",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "partygoer.fbx",
+        "partygoer.glb",
+        "partygoer.gltf",
+        "partygoer.obj",
+        "partygoer.usdz"
+      ]
     },
     "bacteria": {
-      "file": "bacteria.glb",
       "uid": "fb79a5140b144362abdaca43c0effb5c",
       "creator": "DocoDummy",
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/backrooms-custom-bacteria-lifeform-fb79a5140b144362abdaca43c0effb5c",
-      "directUrl": ""
+      "directUrl": "",
+      "files": [
+        "bacteria.fbx",
+        "bacteria.glb",
+        "bacteria.gltf",
+        "bacteria.obj",
+        "bacteria.usdz"
+      ]
     }
   }
 }
