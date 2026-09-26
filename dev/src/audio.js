@@ -203,7 +203,7 @@ export class AudioDirector{
     this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;
   }
   redZoneElapsed(){
-    if(!this.redZoneSource||!this.ctx)return 0;
+    if(!this.ctx||!this.redZoneStartedAt||!this.redZoneDuration)return 0;
     return Math.max(0,this.ctx.currentTime-this.redZoneStartedAt);
   }
   clickToEnter(){this.tone(1180,.055,"square",.08);this.tone(260,.08,"square",.04)}

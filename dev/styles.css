@@ -2062,29 +2062,31 @@ button,.audio-gate{
   color:rgba(255,238,232,.94);
   background:transparent;
   text-shadow:0 1px 2px #000,0 0 8px rgba(110,0,0,.45);
+  --rz-amp:1px;
   font:700 12px/1.35 "Courier New",monospace;
   letter-spacing:.08em;text-transform:uppercase;
   pointer-events:none;
   transition:opacity .2s ease;
 }
 .zone-actionbar.hidden{display:none}
-.zone-actionbar.warning{animation:red-zone-actionbar .13s steps(2,end) infinite}
+.zone-actionbar.loading{opacity:.86}
+.zone-actionbar.warning{animation:red-zone-actionbar .34s steps(2,end) infinite}
 .zone-actionbar.trapped{
   color:#ffb9b0;
   animation:red-zone-trapped .18s steps(2,end) infinite;
 }
 @keyframes red-zone-actionbar{
-  0%,100%{transform:translateX(-50%) translate(0,0)}
-  25%{transform:translateX(-50%) translate(-2px,1px)}
-  50%{transform:translateX(-50%) translate(2px,-1px)}
-  75%{transform:translateX(-50%) translate(-1px,-2px)}
+  0%,100%{transform:translateX(calc(-50% + var(--rz-amp))) translateY(0)}
+  25%{transform:translateX(calc(-50% - var(--rz-amp))) translateY(calc(var(--rz-amp) * .55))}
+  50%{transform:translateX(calc(-50% + var(--rz-amp) * .75)) translateY(calc(var(--rz-amp) * -.55))}
+  75%{transform:translateX(calc(-50% - var(--rz-amp) * .55)) translateY(calc(var(--rz-amp) * -.8))}
 }
 @keyframes red-zone-trapped{
-  0%,100%{transform:translateX(-50%) translate(0,0)}
-  20%{transform:translateX(-50%) translate(-3px,1px)}
-  40%{transform:translateX(-50%) translate(2px,-2px)}
-  60%{transform:translateX(-50%) translate(1px,2px)}
-  80%{transform:translateX(-50%) translate(-2px,-1px)}
+  0%,100%{transform:translateX(calc(-50% + var(--rz-amp))) translateY(0)}
+  20%{transform:translateX(calc(-50% - var(--rz-amp))) translateY(calc(var(--rz-amp) * .75))}
+  40%{transform:translateX(calc(-50% + var(--rz-amp) * .8)) translateY(calc(var(--rz-amp) * -1))}
+  60%{transform:translateX(calc(-50% + var(--rz-amp))) translateY(calc(var(--rz-amp) * 1.1))}
+  80%{transform:translateX(calc(-50% - var(--rz-amp) * .8)) translateY(calc(var(--rz-amp) * -.65))}
 }
 @media(max-width:720px){
   .zone-actionbar{bottom:104px;font-size:10px;padding:6px 9px;letter-spacing:.055em}

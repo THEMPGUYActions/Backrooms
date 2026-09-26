@@ -4,7 +4,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
-import { AudioDirector } from "./audio.js?v=20260923-2050";
+import { AudioDirector } from "./audio.js?v=20260926-redzone-audio1";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
 
@@ -1975,6 +1975,9 @@ export class BackroomsGame{
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
     this.redZoneFontTimer=0;
+    this.redZoneAudioToken=0;
+    this.redZoneAudioDuration=0;
+    this.redZoneAudioStarted=false;
     this.redZoneFonts=["system-ui","ui-sans-serif","ui-monospace","ui-rounded","Arial, sans-serif","Helvetica, sans-serif","Verdana, sans-serif","Tahoma, sans-serif","Georgia, serif","Times New Roman, serif","Courier New, monospace","monospace","serif","sans-serif","cursive","fantasy"];
     this.settings={
       shake:localStorage.getItem("br.shake")!=="0",
@@ -2294,7 +2297,7 @@ export class BackroomsGame{
     this.toast(this.level.objective,2.4);
   }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.024:.058);
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.032:.052;
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
@@ -2364,10 +2367,15 @@ export class BackroomsGame{
   triggerFear(amount=.25){this.horror=Math.max(this.horror,Math.max(0,Math.min(1,amount)));this.player.shake=Math.min(.055,this.player.shake+amount*.07)}
   updateRedZone(dt){
     const bar=document.getElementById("zone-actionbar");
+    const resetBar=()=>{
+      if(bar){bar.classList.add("hidden","loading");bar.classList.remove("warning","trapped");bar.style.fontFamily="";bar.style.animationDuration="";}
+    };
+
     if(this.level.id!=="0"){
-      this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;
-      bar?.classList.add("hidden");
-      if(bar)bar.style.fontFamily="";
+      this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
+      this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.redZoneAudioToken++;
+      this.audio.stopRedZone();
+      resetBar();
       return;
     }
 
@@ -2377,21 +2385,26 @@ export class BackroomsGame{
     const id=region?.id||null;
 
     if(!inRed&&!this.redZoneTrapped){
-      this.redZoneTimer=0;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;
-      bar?.classList.add("hidden");
+      this.redZoneTimer=0;this.redZoneId=null;this.redZoneBounds=null;
+      this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.redZoneAudioToken++;
+      this.audio.stopRedZone();
+      resetBar();
       return;
     }
 
     if(inRed&&this.redZoneId!==id&&!this.redZoneTrapped){
       this.redZoneId=id;
-      this.redZoneTimer=60;
+      this.redZoneTimer=30;
+      this.redZoneFontTimer=0;
+      this.redZoneAudioDuration=0;
+      this.redZoneAudioStarted=false;
+      const token=++this.redZoneAudioToken;
+
       const parts=String(id).split(":");
       const mx=Number(parts[1]),mz=Number(parts[2]);
       const size=this.world.size||80;
       if(id==="red:global"){
-        this.redZoneBounds={
-          minX:-Infinity,maxX:Infinity,minZ:-Infinity,maxZ:Infinity
-        };
+        this.redZoneBounds={minX:-Infinity,maxX:Infinity,minZ:-Infinity,maxZ:Infinity};
       }else{
         const minCx=mx*LEVEL0_REGION_CHUNKS+3,maxCx=minCx+LEVEL0_RED_SIZE-1;
         const minCz=mz*LEVEL0_REGION_CHUNKS+3,maxCz=minCz+LEVEL0_RED_SIZE-1;
@@ -2402,15 +2415,28 @@ export class BackroomsGame{
           maxZ:(maxCz+1)*size-size/2-.55
         };
       }
-      this.redZoneFontTimer=0;
       this.triggerFear(.18);
+
+      if(bar){
+        bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nPREPARE TO LEAVE";
+        bar.classList.remove("hidden","warning","trapped");
+        bar.classList.add("loading");
+      }
+
+      this.audio.playRedZone().then(info=>{
+        if(token!==this.redZoneAudioToken||this.redZoneTrapped||!info)return;
+        this.redZoneAudioDuration=Math.max(.05,info.duration);
+        this.redZoneAudioStarted=true;
+      }).catch(error=>console.warn("[Backrooms] Red Zone sound failed:",error));
     }
 
     if(this.redZoneTrapped){
       if(bar){
         bar.textContent="RED ZONE\nTRAPPED FOREVER";
-        bar.classList.remove("hidden","warning");
+        bar.classList.remove("hidden","warning","loading");
         bar.classList.add("trapped");
+        bar.style.setProperty("--rz-amp","4px");
+        bar.style.animationDuration=".055s";
         this.redZoneFontTimer-=dt;
         if(this.redZoneFontTimer<=0){
           this.redZoneFontTimer=.5;
@@ -2421,26 +2447,50 @@ export class BackroomsGame{
       return;
     }
 
-    this.redZoneTimer=Math.max(0,this.redZoneTimer-dt);
-    if(this.redZoneTimer<=0){
+    if(!this.redZoneAudioStarted||this.redZoneAudioDuration<=0){
+      if(bar){
+        bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nPREPARING...";
+        bar.classList.remove("hidden","warning","trapped");
+        bar.classList.add("loading");
+      }
+      return;
+    }
+
+    const elapsed=this.audio.redZoneElapsed();
+    const progress=Math.max(0,Math.min(1,elapsed/this.redZoneAudioDuration));
+    // Nonlinear timing: the displayed 30-second clock moves slowly at first
+    // and accelerates toward zero, while still landing exactly on 0 when audio ends.
+    const curve=Math.pow(progress,2.15);
+    this.redZoneTimer=Math.max(0,30*(1-curve));
+
+    if(this.redZoneTimer<=.001||progress>=1){
+      this.redZoneTimer=0;
       this.redZoneTrapped=true;
+      this.redZoneAudioDuration=0;
+      this.redZoneAudioStarted=false;
+      this.audio.stopRedZone();
       this.triggerFear(.8);
       this.audio.ambientSting(.12);
       this.world.setLevel0AllRed(true);
       this.redZoneBounds={minX:-Infinity,maxX:Infinity,minZ:-Infinity,maxZ:Infinity};
       if(bar){
         bar.textContent="RED ZONE\nTRAPPED FOREVER";
-        bar.classList.remove("hidden","warning");
+        bar.classList.remove("hidden","warning","loading");
         bar.classList.add("trapped");
       }
       return;
     }
 
     if(bar){
-      const seconds=Math.ceil(this.redZoneTimer);
+      const seconds=this.redZoneTimer.toFixed(1);
+      const danger=1-Math.max(0,Math.min(1,this.redZoneTimer/30));
+      const amp=1.05+danger*3.35;
+      const speed=Math.max(.045,.34-danger*.295);
       bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nLEAVE IN "+seconds+"s";
-      bar.classList.remove("hidden","trapped");
+      bar.classList.remove("hidden","trapped","loading");
       bar.classList.add("warning");
+      bar.style.setProperty("--rz-amp",amp.toFixed(2)+"px");
+      bar.style.animationDuration=speed.toFixed(3)+"s";
       this.redZoneFontTimer-=dt;
       if(this.redZoneFontTimer<=0){
         this.redZoneFontTimer=.5;
