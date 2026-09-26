@@ -96,6 +96,7 @@ export class BackroomsAdmin{
                 <button data-admin-action="stamina">FULL STAMINA</button>
                 <button data-admin-action="sanity">FULL SANITY</button>
                 <button data-admin-action="battery">FULL BATTERY</button>
+                <button data-admin-action="despawn-entities">DESPAWN ENTITIES</button>
               </div>
             </section>
 
@@ -123,6 +124,41 @@ export class BackroomsAdmin{
                 <button data-admin-event="fear">TRIGGER FEAR</button>
                 <button data-admin-event="heal">RESET PLAYER</button>
                 <button data-admin-event="reload">RELOAD WORLD</button>
+              </div>
+
+              <div class="admin-section-head second">
+                <div>
+                  <span>ENTITIES</span>
+                  <strong>SUMMON ENTITY</strong>
+                </div>
+                <small>DEV ONLY</small>
+              </div>
+              <div class="admin-action-grid">
+                <button data-admin-entity="bacteria">BACTERIA</button>
+                <button data-admin-entity="hound">HOUND</button>
+                <button data-admin-entity="skinstealer">SKIN-STEALER</button>
+                <button data-admin-entity="smiler">SMILER</button>
+                <button data-admin-entity="faceling">FACELING</button>
+                <button data-admin-entity="deathmoth">DEATHMOTH</button>
+                <button data-admin-entity="crawler">CRAWLER</button>
+                <button data-admin-entity="wretch">WRETCH</button>
+                <button data-admin-entity="clump">CLUMP</button>
+                <button data-admin-entity="duller">DULLER</button>
+                <button data-admin-entity="partygoer">PARTYGOER</button>
+                <button data-admin-entity="deathrat">DEATH RAT</button>
+              </div>
+
+              <div class="admin-section-head second">
+                <div>
+                  <span>LEVEL 0</span>
+                  <strong>ZONE TEST</strong>
+                </div>
+                <small>VISUAL / GAMEPLAY</small>
+              </div>
+              <div class="admin-action-grid three">
+                <button data-admin-zone="blackout">BLACKOUT</button>
+                <button data-admin-zone="red">RED ZONE</button>
+                <button data-admin-zone="clear">CLEAR ZONE</button>
               </div>
             </section>
 
@@ -212,6 +248,12 @@ export class BackroomsAdmin{
     this.root.querySelectorAll("[data-admin-event]").forEach(button=>{
       button.addEventListener("click",()=>this.event(button.dataset.adminEvent));
     });
+    this.root.querySelectorAll("[data-admin-entity]").forEach(button=>{
+      button.addEventListener("click",()=>this.game.entityManager.summon(button.dataset.adminEntity));
+    });
+    this.root.querySelectorAll("[data-admin-zone]").forEach(button=>{
+      button.addEventListener("click",()=>this.zone(button.dataset.adminZone));
+    });
   }
 
   async teleportLevel(id){
@@ -276,6 +318,7 @@ export class BackroomsAdmin{
     if(kind==="stamina")p.stamina=100;
     if(kind==="sanity")p.sanity=100;
     if(kind==="battery")p.flashBattery=100;
+    if(kind==="despawn-entities")this.game.entityManager.clear();
     if(kind==="reseed"){
       this.game.seed=(Math.random()*2147483647)|0;
       localStorage.setItem("br.seed",String(this.game.seed));
@@ -283,6 +326,40 @@ export class BackroomsAdmin{
     }
     if(kind==="clear-cache")location.reload();
     this.game.toast(kind.replace("-", " ").toUpperCase(),1);
+  }
+
+  zone(kind){
+    if(!this.ready||!this.game.running||this.game.introActive)return;
+    if(this.game.level.id!=="0"){this.game.toast("LEVEL 0 ONLY",1.2);return}
+    const cx=Math.floor((this.game.player.position.x+this.game.world.size/2)/this.game.world.size);
+    const cz=Math.floor((this.game.player.position.z+this.game.world.size/2)/this.game.world.size);
+    if(kind==="blackout"){
+      this.game.world.forceLevel0Zone={type:"blackout",cx,cz};
+      this.game.lightState="ON";
+      this.game.lightEventTimer=20;
+      this.game.world.configure();
+      this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
+      this.game.entityManager.clear();
+      this.game.audio.lightsOut();
+      this.game.triggerFear(.48);
+      this.game.toast("BLACKOUT ZONE LOADED",1.3);
+    }else if(kind==="red"){
+      this.game.world.forceLevel0Zone={type:"red",cx,cz};
+      this.game.lightState="ON";
+      this.game.lightEventTimer=20;
+      this.game.world.configure();
+      this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
+      this.game.entityManager.clear();
+      this.game.toast("RED ZONE LOADED",1.3);
+    }else{
+      this.game.world.forceLevel0Zone=null;
+      this.game.lightState="ON";
+      this.game.lightEventTimer=20;
+      this.game.world.configure();
+      this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
+      this.game.entityManager.clear();
+      this.game.toast("ZONE CLEARED",1.3);
+    }
   }
 
   event(kind){

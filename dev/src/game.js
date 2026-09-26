@@ -325,6 +325,9 @@ class Chunk{
       this.zone="maze";
       this.megaType=null;
       this.level0Region=level0RegionAt(this.cx,this.cz,this.game.seed);
+      if(this.world.forceLevel0Zone&&Math.abs(this.cx-this.world.forceLevel0Zone.cx)<=1&&Math.abs(this.cz-this.world.forceLevel0Zone.cz)<=1){
+        this.level0Region={type:this.world.forceLevel0Zone.type,id:"forced:"+this.world.forceLevel0Zone.type};
+      }
       this.level0SpawnCell={x:Math.floor(cells/2),z:Math.floor(cells/2)};
       this.level0Blackout=this.level0Region.type==="blackout";
       this.level0PillarArea=this.level0Region.type==="pillars";
@@ -764,7 +767,9 @@ class Chunk{
       for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(p.x+x*1.65,0,p.z);box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,-.27,.23,-.27);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,.27,.23,-.27);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);g.add(chair)}
       box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
       box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
-      const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.userData.light=true;fixture.userData.baseEmissive=1.5;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffc46a,baseIntensity:70,intensity:70,distance:10,decay:2,fixture});
+      if(!this.level0Blackout){
+        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.userData.light=true;fixture.userData.baseEmissive=1.5;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffc46a,baseIntensity:70,intensity:70,distance:10,decay:2,fixture});
+      }
       return;
     }
 
@@ -772,6 +777,7 @@ class Chunk{
     const candidates=[];
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x===centerCell&&z===centerCell)continue;const mask=this.walls[this.index(x,z)],closed=(mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0);candidates.push({x,z,mask,closed})}
     if(next()<.25){const dead=candidates.filter(c=>c.closed===3),room=dead.length?dead[Math.floor(next()*dead.length)]:null;if(room){const p=center(room.x,room.z),open=!(room.mask&1)?"north":!(room.mask&2)?"east":!(room.mask&4)?"south":"west";const t=new THREE.Mesh(new THREE.TorusGeometry(cell*.19,.11,8,18,Math.PI),lib.wall);t.position.set(p.x,2.1,p.z);t.rotation.y=open==="east"||open==="west"?Math.PI/2:0;g.add(t)}}
+    if(this.level0Blackout)return;
     const propRng=new RNG(this.seedKey()^0x71a4);
     for(let i=0;i<2;i++){const room=candidates[propRng.int(0,Math.max(0,candidates.length-1))];if(!room)continue;const p=center(room.x,room.z);if(propRng.next()<.35){const mat=lib.light.clone();mat.emissiveIntensity=2.5;const f=box(g,new THREE.BoxGeometry(1.65,.055,.46),mat,p.x,level.wallHeight-.08,p.z,0,propRng.next()<.5?0:Math.PI/2,0);f.userData.light=true;f.userData.baseEmissive=2.5;this.fixtures.push(f);this.lightSources.push({position:new THREE.Vector3(p.x,level.wallHeight-.25,p.z),color:level.theme.light,baseIntensity:165,intensity:165,distance:0,decay:2,fixture:f})}}
   }
@@ -1053,6 +1059,7 @@ class WorldStreamer{
   constructor(game){
     this.game=game;this.chunks=new Map();this.library=null;this.radius=2;this.size=0;
     this.surfaceSize=0;this.floorSurface=null;this.ceilingSurface=null;
+    this.forceLevel0Zone=null;
   }
   key(cx,cz){return cx+","+cz}
   async configure(onProgress=()=>{}){
@@ -1524,157 +1531,312 @@ function entityNoiseTexture(base="#b6b2aa",dark="#716d67"){
   const canvas=document.createElement("canvas");canvas.width=64;canvas.height=64;
   const ctx=canvas.getContext("2d");ctx.fillStyle=base;ctx.fillRect(0,0,64,64);
   const image=ctx.getImageData(0,0,64,64),d=image.data;
+  let s=0x91e10da5;
+  const rand=()=>{s|=0;s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296};
   for(let i=0;i<d.length;i+=4){
-    const n=Math.random()*42-21;
+    const n=rand()*42-21;
     d[i]=Math.max(0,Math.min(255,d[i]+n));
     d[i+1]=Math.max(0,Math.min(255,d[i+1]+n));
     d[i+2]=Math.max(0,Math.min(255,d[i+2]+n));
   }
-  ctx.putImageData(image,0,0);
-  ctx.globalAlpha=.18;ctx.fillStyle=dark;
-  for(let i=0;i<18;i++)ctx.fillRect(Math.random()*64,Math.random()*64,1+Math.random()*7,1+Math.random()*2);
+  ctx.putImageData(image,0,0);ctx.globalAlpha=.18;ctx.fillStyle=dark;
+  for(let i=0;i<18;i++)ctx.fillRect(rand()*64,rand()*64,1+rand()*7,1+rand()*2);
   const texture=new THREE.CanvasTexture(canvas);
   texture.colorSpace=THREE.SRGBColorSpace;
-  texture.wrapS=THREE.RepeatWrapping;texture.wrapT=THREE.RepeatWrapping;
-  texture.repeat.set(2,2);
+  texture.wrapS=THREE.RepeatWrapping;texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(2,2);
   return texture;
 }
 
+function entityMat(color,roughness=1,emissive=0){
+  return new THREE.MeshStandardMaterial({color,roughness,emissive:emissive?color:0,emissiveIntensity:emissive});
+}
+
+function limb(group,material,position,length=.65,radius=.09){
+  const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(radius,length,5,7),material);
+  mesh.position.copy(position);group.add(mesh);return mesh;
+}
+
 function makeBacteria(group){
-  const wireMat=new THREE.LineBasicMaterial({color:0x050505,transparent:true,opacity:.92});
-  const glowMat=new THREE.MeshStandardMaterial({color:0x080808,roughness:1,emissive:0x000000});
-  const points=[];
-  const addWire=(a,b)=>{points.push(a.x,a.y,a.z,b.x,b.y,b.z)};
-  const hip=new THREE.Vector3(0,1.35,0),chest=new THREE.Vector3(0,2.25,0),head=new THREE.Vector3(0,3.0,0);
-  addWire(hip,chest);addWire(chest,head);
-  addWire(new THREE.Vector3(-.08,1.35,0),new THREE.Vector3(-.28,.35,-.08));
-  addWire(new THREE.Vector3(.08,1.35,0),new THREE.Vector3(.28,.35,-.08));
-  addWire(new THREE.Vector3(-.08,2.3,0),new THREE.Vector3(-.7,1.35,-.02));
-  addWire(new THREE.Vector3(.08,2.3,0),new THREE.Vector3(.7,1.35,-.02));
-  addWire(new THREE.Vector3(-.7,1.35,-.02),new THREE.Vector3(-.95,.7,-.12));
-  addWire(new THREE.Vector3(.7,1.35,-.02),new THREE.Vector3(.95,.7,-.12));
-  const lineGeom=new THREE.BufferGeometry();
-  lineGeom.setAttribute("position",new THREE.Float32BufferAttribute(points,3));
-  group.add(new THREE.LineSegments(lineGeom,wireMat));
-  const headMesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.42,1),glowMat);
-  headMesh.scale.set(1,.9,1.15);headMesh.position.set(0,3,0);group.add(headMesh);
-  const jaw=new THREE.Mesh(new THREE.TorusGeometry(.19,.045,5,12,Math.PI),wireMat);
-  jaw.rotation.set(Math.PI/2,0,0);jaw.position.set(0,2.92,-.39);group.add(jaw);
-  group.userData.height=3.2;
+  const mat=entityMat(0x030303,1),wire=new THREE.LineBasicMaterial({color:0x030303,transparent:true,opacity:.94});
+  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.43,1),mat);core.scale.set(1,1.3,.8);core.position.y=2.25;group.add(core);
+  const parts={legs:[],arms:[],head:core};
+  for(const side of [-1,1]){
+    const leg=limb(group,wire,new THREE.Vector3(side*.22,.78,0),1.15,.055);leg.rotation.z=side*.3;parts.legs.push(leg);
+    const arm=limb(group,wire,new THREE.Vector3(side*.48,1.65,0),1.25,.055);arm.rotation.z=-side*.28;parts.arms.push(arm);
+  }
+  const neck=limb(group,wire,new THREE.Vector3(0,1.72,0),.65,.05);parts.neck=neck;
+  group.userData={height:3.25,parts,anim:"idle",phase:Math.random()*6.28};
 }
 
 function makeHound(group){
-  const fur=new THREE.MeshStandardMaterial({color:0x090909,roughness:1});
-  const eye=new THREE.MeshStandardMaterial({color:0xffe7a8,emissive:0xffd36a,emissiveIntensity:4});
-  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.8,6,10),fur);
-  torso.rotation.z=Math.PI/2;torso.scale.set(1.15,.75,1.0);torso.position.set(0,.85,0);group.add(torso);
+  const fur=entityMat(0x090909),eye=entityMat(0xffe7a8,.7,4);
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.8,6,10),fur);torso.rotation.z=Math.PI/2;torso.scale.set(1.15,.75,1);torso.position.y=.78;group.add(torso);
   const head=new THREE.Mesh(new THREE.SphereGeometry(.38,12,9),fur);head.scale.set(1.05,.9,1.2);head.position.set(0,1.02,-.58);group.add(head);
-  for(const x of [-.15,.15]){
-    const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.09,.65,5,7),fur);leg.rotation.z=x<0?.22:-.22;leg.position.set(x,.48,.03);group.add(leg);
-  }
-  for(const x of [-.13,.13]){
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.045,8,6),eye);e.position.set(x,1.08,-.91);group.add(e);
-  }
+  const legs=[];
+  for(const x of [-.16,.16])for(const z of [-.2,.25]){const l=limb(group,fur,new THREE.Vector3(x,.48,z),.65,.09);l.rotation.z=x<0?.22:-.22;legs.push(l)}
+  for(const x of [-.13,.13]){const e=new THREE.Mesh(new THREE.SphereGeometry(.045,8,6),eye);e.position.set(x,1.08,-.91);group.add(e)}
   const mouth=new THREE.Mesh(new THREE.TorusGeometry(.16,.035,5,16,Math.PI),eye);mouth.rotation.set(Math.PI/2,0,0);mouth.position.set(0,.91,-.92);group.add(mouth);
-  group.userData.height=1.35;
+  group.userData={height:1.35,parts:{legs,head},anim:"idle",phase:Math.random()*6.28};
 }
 
 function makeSkinStealer(group){
-  const tex=entityNoiseTexture("#b9b5ae","#6c6964");
-  const skin=new THREE.MeshStandardMaterial({color:0xc8c4bc,roughness:.92,map:tex});
-  const dark=new THREE.MeshStandardMaterial({color:0xeeeae2,roughness:.8});
-  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.32,1.15,8,12),skin);
-  body.scale.set(.8,1.35,.72);body.position.y=1.35;group.add(body);
+  const tex=entityNoiseTexture("#b9b5ae","#6c6964"),skin=new THREE.MeshStandardMaterial({color:0xc8c4bc,roughness:.92,map:tex});
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.32,1.15,8,12),skin);body.scale.set(.8,1.35,.72);body.position.y=1.35;group.add(body);
   const head=new THREE.Mesh(new THREE.SphereGeometry(.31,14,10),skin);head.scale.set(.9,1.1,.82);head.position.set(0,2.42,0);group.add(head);
-  for(const x of [-.11,.11]){
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.035,8,6),dark);e.position.set(x,2.47,-.275);group.add(e);
-  }
-  for(const x of [-.2,.2]){
-    const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.09,.9,6,8),skin);arm.position.set(x,1.38,0);arm.rotation.z=x<0?.08:-.08;group.add(arm);
-  }
-  group.userData.height=2.75;
+  const arms=[];for(const x of [-.2,.2])arms.push(limb(group,skin,new THREE.Vector3(x,1.38,0),.9,.09));
+  for(const x of [-.11,.11]){const e=new THREE.Mesh(new THREE.SphereGeometry(.035,8,6),entityMat(0xeeeae2));e.position.set(x,2.47,-.275);group.add(e)}
+  group.userData={height:2.75,parts:{arms,head,body},anim:"idle",phase:Math.random()*6.28};
 }
 
 function makeSmiler(group){
-  const dark=new THREE.MeshStandardMaterial({color:0x000000,roughness:1});
-  const glow=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:10});
+  const dark=entityMat(0x000000),glow=entityMat(0xffffff,.4,10);
   const face=new THREE.Mesh(new THREE.CircleGeometry(.78,32),dark);face.rotation.y=Math.PI;group.add(face);
-  for(const x of [-.25,.25]){
-    const e=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),glow);e.position.set(x,.18,-.06);group.add(e);
-  }
+  for(const x of [-.25,.25]){const e=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),glow);e.position.set(x,.18,-.06);group.add(e)}
   const smile=new THREE.Mesh(new THREE.TorusGeometry(.36,.065,8,28,Math.PI),glow);smile.rotation.set(Math.PI/2,0,0);smile.position.set(0,-.12,-.07);group.add(smile);
-  group.userData.height=1.6;
+  group.userData={height:1.6,parts:{face},anim:"idle",phase:Math.random()*6.28,float:true};
+}
+
+function makeFaceling(group){
+  const skin=entityMat(0xc7c0b5,.95),dark=entityMat(0x171717);
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.35,.9,8,10),skin);body.scale.set(.8,1.5,.65);body.position.y=1.15;group.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.38,16,12),skin);head.scale.set(.86,1.12,.78);head.position.y=2.38;group.add(head);
+  group.userData={height:2.9,parts:{head,body},anim:"idle",phase:Math.random()*6.28,faceless:true,dark};
+}
+
+function makeDeathmoth(group){
+  const wing=entityMat(0x302b25,.9),body=entityMat(0x111111),parts={};
+  for(const side of [-1,1]){
+    const w=new THREE.Mesh(new THREE.BufferGeometry(),wing);
+    const shape=new THREE.Shape();shape.moveTo(0,0);shape.lineTo(side*1.15,.55);shape.lineTo(side*.85,-.65);shape.lineTo(0,-.18);shape.closePath();
+    w.geometry.setFromPoints(shape.getPoints(5));w.geometry.computeVertexNormals();w.position.y=1.5;group.add(w);(parts.wings??=[]).push(w);
+  }
+  const b=new THREE.Mesh(new THREE.CapsuleGeometry(.08,.8,5,8),body);b.position.y=1.5;group.add(b);parts.body=b;
+  group.userData={height:2.1,parts,anim:"idle",phase:Math.random()*6.28,flying:true};
+}
+
+function makeCrawler(group){
+  const mat=entityMat(0x252323),parts={legs:[]};
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.8,6,8),mat);body.rotation.z=Math.PI/2;body.position.y=.42;group.add(body);parts.body=body;
+  for(const x of [-.38,-.13,.13,.38]){const l=limb(group,mat,new THREE.Vector3(x,.28,.05),.58,.055);l.rotation.z=x*.8;parts.legs.push(l)}
+  group.userData={height:.85,parts,anim:"idle",phase:Math.random()*6.28,crawler:true};
+}
+
+function makeWretch(group){
+  const skin=entityMat(0x756d67,.98),dark=entityMat(0x151515);
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,7,10),skin);body.scale.set(.8,1.35,.7);body.position.y=1.05;group.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.32,12,9),skin);head.position.y=2.2;group.add(head);
+  const arms=[];for(const x of [-.2,.2])arms.push(limb(group,skin,new THREE.Vector3(x,1.1,0),1.1,.075));
+  group.userData={height:2.65,parts:{arms,head,body},anim:"idle",phase:Math.random()*6.28};
+}
+
+function makeClump(group){
+  const mat=entityMat(0x514c49,.98),parts={blobs:[]};
+  for(let i=0;i<8;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(.2+.08*(i%3),8,6),mat);m.position.set((i%4-.15)*.24,.25+(i%2)*.22,Math.floor(i/4)*.24-.24);group.add(m);parts.blobs.push(m)}
+  group.userData={height:.8,parts,anim:"idle",phase:Math.random()*6.28,clump:true};
+}
+
+function makeDuller(group){
+  const mat=entityMat(0x3b3937,.98),parts={legs:[]};
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.27,.7,7,9),mat);body.scale.set(.8,1.2,.65);body.position.y=.82;group.add(body);parts.body=body;
+  for(const x of [-.15,.15])parts.legs.push(limb(group,mat,new THREE.Vector3(x,.35,0),.62,.08));
+  group.userData={height:1.9,parts,anim:"idle",phase:Math.random()*6.28,duller:true};
+}
+
+function makePartygoer(group){
+  const suit=entityMat(0x3b0b13,.9),mask=entityMat(0x7b101c,.8,1.2),parts={};
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.95,7,10),suit);body.scale.set(.8,1.3,.7);body.position.y=1.15;group.add(body);parts.body=body;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.34,14,10),mask);head.position.y=2.3;group.add(head);parts.head=head;
+  const arms=[];for(const x of [-.2,.2])arms.push(limb(group,suit,new THREE.Vector3(x,1.2,0),.95,.08));parts.arms=arms;
+  group.userData={height:2.75,parts,anim:"idle",phase:Math.random()*6.28};
+}
+
+function makeDeathrat(group){
+  const mat=entityMat(0x191716),eye=entityMat(0xd8c39a,.6,3),parts={legs:[]};
+  const body=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),mat);body.scale.set(1.5,.75,.8);body.position.y=.25;group.add(body);
+  for(const x of [-.18,.18])parts.legs.push(limb(group,mat,new THREE.Vector3(x,.17,0),.28,.045));
+  for(const x of [-.08,.08]){const e=new THREE.Mesh(new THREE.SphereGeometry(.025,6,5),eye);e.position.set(x,.31,-.2);group.add(e)}
+  group.userData={height:.5,parts,anim:"idle",phase:Math.random()*6.28,rat:true};
+}
+
+const ENTITY_TYPES={
+  bacteria:{label:"Bacteria",factory:makeBacteria,range:42,speed:2.25,attack:1.1,behavior:"stalk"},
+  hound:{label:"Hound",factory:makeHound,range:30,speed:2.15,attack:1.0,behavior:"hunt"},
+  skinstealer:{label:"Skin-Stealer",factory:makeSkinStealer,range:32,speed:1.55,attack:1.0,behavior:"ambush"},
+  smiler:{label:"Smiler",factory:makeSmiler,range:38,speed:1.35,attack:1.05,behavior:"light"},
+  faceling:{label:"Faceling",factory:makeFaceling,range:24,speed:1.1,attack:1.0,behavior:"observe"},
+  deathmoth:{label:"Deathmoth",factory:makeDeathmoth,range:38,speed:2.0,attack:.8,behavior:"swarm"},
+  crawler:{label:"Crawler",factory:makeCrawler,range:30,speed:2.5,attack:.85,behavior:"ambush"},
+  wretch:{label:"Wretch",factory:makeWretch,range:26,speed:1.85,attack:1.0,behavior:"frenzy"},
+  clump:{label:"Clump",factory:makeClump,range:20,speed:.75,attack:1.1,behavior:"slow"},
+  duller:{label:"Duller",factory:makeDuller,range:22,speed:1.05,attack:1.0,behavior:"quiet"},
+  partygoer:{label:"Partygoer",factory:makePartygoer,range:34,speed:1.8,attack:1.0,behavior:"stalk"},
+  deathrat:{label:"Death Rat",factory:makeDeathrat,range:24,speed:2.7,attack:.75,behavior:"swarm"}
+};
+
+function animateEntity(e,dt){
+  const u=e.group.userData,parts=u.parts||{},moving=e.motion||0,state=e.state;
+  u.phase=(u.phase||0)+dt*(moving?8:1.2);
+  const t=u.phase,run=state==="chase"||state==="frenzy";
+  u.anim=run?"run":state==="investigate"?"alert":state==="stalk"?"stalk":"idle";
+  if(parts.legs)parts.legs.forEach((l,i)=>{l.rotation.x=Math.sin(t*(run?1.55:.7)+i*Math.PI)*(.25+(moving?.45:0));});
+  if(parts.arms)parts.arms.forEach((a,i)=>{a.rotation.x=Math.sin(t*(run?1.35:.65)+i*Math.PI)*(.16+(moving?.3:0));a.rotation.z=(i?-.08:.08)});
+  if(parts.head)parts.head.rotation.z=Math.sin(t*.8)*.035;
+  if(parts.body)parts.body.rotation.z=Math.sin(t*.9)*.018;
+  if(u.float)u.parts.face.position.y=Math.sin(t*.9)*.08;
+  if(u.flying&&parts.wings)parts.wings.forEach((w,i)=>{w.rotation.z=Math.sin(t*5+i*Math.PI)*.45});
+  if(u.clump&&parts.blobs)parts.blobs.forEach((b,i)=>b.scale.y=1+Math.sin(t*1.7+i)*.08);
+  if(u.rat)u.parts.legs.forEach((l,i)=>l.rotation.x=Math.sin(t*8+i*Math.PI)*.5);
+}
+
+function entityLineOfSight(game,entity,target){
+  const origin=entity.group.position.clone();origin.y+=(entity.group.userData.height||1)*.65;
+  const end=target.position.clone();end.y=Math.max(1.1,end.y);
+  const dir=end.clone().sub(origin),distance=dir.length();if(distance<.01)return true;dir.normalize();
+  const ray=new THREE.Raycaster(origin,dir,0,distance-.15);
+  const groups=[...game.world.chunks.values()].map(c=>c.group);
+  const hits=ray.intersectObjects(groups,true);
+  return !hits.some(h=>h.object?.visible&&h.object?.userData?.entityWall);
+}
+
+function entityNoise(game,entity){
+  const p=game.player,dx=p.position.x-entity.group.position.x,dz=p.position.z-entity.group.position.z,d=Math.hypot(dx,dz);
+  const moved=Math.hypot(p.position.x-(entity.lastPlayerX??p.position.x),p.position.z-(entity.lastPlayerZ??p.position.z));
+  const loud=(p.bobStrength||0)>.45?1.0:.25;
+  return d<Math.max(5,moved*18+loud*7);
+}
+
+function steerAroundWalls(game,entity,desired,dt){
+  const pos=entity.group.position,base=desired.clone().setY(0).normalize();
+  const speed=entity.def.speed*(entity.state==="chase"?1.18:1);
+  const tries=[base,new THREE.Vector3(-base.z,0,base.x),new THREE.Vector3(base.z,0,-base.x),base.clone().multiplyScalar(-1)];
+  let chosen=base;
+  for(const dir of tries){
+    const test=pos.clone().addScaledVector(dir,Math.min(1.2,speed*dt*3));
+    const col=game.world.collision(test,.28);
+    if(Math.hypot(col.x-test.x,col.z-test.z)<.18){chosen=dir;break}
+  }
+  entity.group.position.x+=chosen.x*speed*dt;
+  entity.group.position.z+=chosen.z*speed*dt;
+  entity.motion=Math.min(1,entity.motion+dt*5);
+  const targetYaw=Math.atan2(chosen.x,chosen.z);
+  const current=entity.group.rotation.y;
+  entity.group.rotation.y+=Math.atan2(Math.sin(targetYaw-current),Math.cos(targetYaw-current))*Math.min(1,dt*9);
 }
 
 class EntityManager{
-  constructor(game){this.game=game;this.entities=[];this.serial=0}
-  clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[]}
+  constructor(game){this.game=game;this.entities=[];this.serial=0;this.lastUpdate=0;this.bacteriaSpawned=false}
+  clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[];this.bacteriaSpawned=false}
   create(type,position,key=null){
-    const group=new THREE.Group();group.position.copy(position);
-    if(type==="bacteria")makeBacteria(group);
-    else if(type==="hound")makeHound(group);
-    else if(type==="skinstealer")makeSkinStealer(group);
-    else if(type==="smiler")makeSmiler(group);
-    else return null;
-    group.userData.entityType=type;
+    const def=ENTITY_TYPES[type];if(!def)return null;
+    const group=new THREE.Group();group.position.copy(position);def.factory(group);group.userData.entityType=type;group.userData.entityLabel=def.label;
     this.game.scene.add(group);
-    const e={key:key||"manual:"+(++this.serial),type,group,state:"idle",cool:0,age:0};
-    this.entities.push(e);
-    return e;
+    const e={
+      key:key||"manual:"+(++this.serial),type,def,group,state:"idle",cool:0,age:0,motion:0,
+      lastSeen:null,lastHeard:null,lastPlayerX:this.game.player.position.x,lastPlayerZ:this.game.player.position.z,
+      stalkSeed:Math.random()*1000,waypoint:null
+    };
+    this.entities.push(e);return e;
   }
   summon(type){
-    if(!["bacteria","hound","skinstealer","smiler"].includes(type))return false;
-    const p=this.game.player;
-    const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw));
-    const pos=p.position.clone().addScaledVector(forward,Math.max(5,this.game.level.cellSize*1.5));
-    pos.y=0;
-    this.create(type,pos);
-    this.game.triggerFear(.12);
-    this.game.toast("SUMMONED "+type.replace("skinstealer","SKIN-STEALER").toUpperCase(),1.4);
-    return true;
+    if(!ENTITY_TYPES[type])return false;
+    const p=this.game.player,angle=p.viewYaw;
+    const forward=new THREE.Vector3(-Math.sin(angle),0,-Math.cos(angle));
+    const side=new THREE.Vector3(-forward.z,0,forward.x);
+    const pos=p.position.clone().addScaledVector(forward,Math.max(6,this.game.level.cellSize*1.8)).addScaledVector(side,((this.serial%3)-1)*3);
+    pos.y=0;const e=this.create(type,pos);if(!e)return false;
+    this.game.triggerFear(.12);this.game.toast("SUMMONED "+e.def.label.toUpperCase(),1.4);return true;
   }
   spawnForChunks(){
+    // Level 0 uses a delayed Bacteria encounter instead of continuously
+    // populating the safe opening with hostile entities. This mirrors the
+    // game adaptations where Bacteria becomes a late Lobby threat.
+    if(this.game.level.id==="0"&&!this.bacteriaSpawned&&this.game.gameTime>=180){
+      const p=this.game.player,rng=new RNG((this.game.seed^0xBAc7e)|0),angle=rng.next()*Math.PI*2,distance=28+rng.next()*18;
+      const pos=new THREE.Vector3(p.position.x+Math.cos(angle)*distance,0,p.position.z+Math.sin(angle)*distance);
+      const e=this.create("bacteria",pos,"level0:bacteria");
+      if(e){e.state="stalk";e.lastSeen=null;e.lastHeard=null;this.bacteriaSpawned=true;this.game.audio.scare();this.game.triggerFear(.16);this.game.toast("SOMETHING IS MOVING.",2.2)}
+    }
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
-      const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91);
-      const grid=this.game.level.gridSize||CELLS,minSpawn=1,maxSpawn=Math.max(1,grid-2);
-      const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
-      if(type==="none")continue;
+      const type=this.game.level.entity,def=ENTITY_TYPES[type];if(!def)continue;
+      const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91),grid=this.game.level.gridSize||CELLS;
+      const minSpawn=1,maxSpawn=Math.max(1,grid-2);
+      const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2;
       this.create(type,new THREE.Vector3(x,0,z),key);
     }
+  }
+  chooseStalkPoint(e,p){
+    const a=e.stalkSeed+this.game.gameTime*.13,r=7+4*Math.sin(a*.73);
+    const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw));
+    const side=new THREE.Vector3(-forward.z,0,forward.x);
+    return p.position.clone().addScaledVector(forward,-r).addScaledVector(side,Math.sin(a)*3);
   }
   update(dt){
     const p=this.game.player;
     for(const e of [...this.entities]){
-      const dx=p.position.x-e.group.position.x,dz=p.position.z-e.group.position.z,d=Math.hypot(dx,dz)||.001;e.cool-=dt;e.age+=dt;
-      if(d>65&&e.key.startsWith("manual:")){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
-      if(e.type==="bacteria"){
-        if(d<28&&e.state!=="chase"){e.state="chase";this.game.triggerFear(.38);this.game.audio.scare();e.cool=1.2}
-        if(e.state==="chase"){const speed=d<10?2.55:1.55;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
-        if(d<1.15&&!this.game.admin?.god)this.game.die("THE BACTERIA FOUND YOU.");
-        e.group.lookAt(p.position.x,e.group.position.y,p.position.z);
-      }else if(e.type==="hound"){
-        const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw)),to=new THREE.Vector3(dx,0,dz).normalize(),looking=forward.dot(to)<-.48;
-        if(d<13&&!looking)e.state="chase";
-        if(d<10&&looking)e.state="intimidated";
-        if(e.state==="chase"){const speed=1.75;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
-        if(e.state==="intimidated"){e.group.position.x-=dx/d*.65*dt;e.group.position.z-=dz/d*.65*dt;if(d>14)e.state="idle"}
-        if(d<1.05&&e.state==="chase"&&!this.game.admin?.god)e.game?.die?.("A HOUND GOT YOU.");
-        if(d<1.05&&e.state==="chase"&&!this.game.admin?.god)this.game.die("A HOUND GOT YOU.");
-        e.group.lookAt(p.position.x,.7,p.position.z);
-      }else if(e.type==="skinstealer"){
-        const light=this.game.player.flashlight;
-        if(d<18&&light)e.group.position.x-=dx/d*.55*dt,e.group.position.z-=dz/d*.55*dt;
-        else if(d<18)e.group.position.x+=dx/d*.75*dt,e.group.position.z+=dz/d*.75*dt;
-        if(d<1.0&&!this.game.admin?.god)this.game.die("THE SKIN-STEALER CAUGHT YOU.");
-        e.group.lookAt(p.position.x,e.group.position.y+.9,p.position.z);
-      }else if(e.type==="smiler"){
-        const light=this.game.player.flashlight;
-        if(light&&d<20){e.group.position.x-=dx/d*1.35*dt;e.group.position.z-=dz/d*1.35*dt}
-        else if(!light&&d<16){e.group.position.x+=dx/d*.9*dt;e.group.position.z+=dz/d*.9*dt}
-        if(d<1.1&&!this.game.admin?.god)this.game.die("THE SMILER GOT TOO CLOSE.");
-        e.group.lookAt(p.position.x,p.position.y,e.group.position.z);
+      const dx=p.position.x-e.group.position.x,dz=p.position.z-e.group.position.z,d=Math.hypot(dx,dz)||.001;
+      e.cool-=dt;e.age+=dt;e.motion=Math.max(0,e.motion-dt*2);
+      const visible=entityLineOfSight(this.game,e,p),light=p.flashlight;
+      const heard=entityNoise(this.game,e);
+      if(visible)e.lastSeen=p.position.clone();
+      if(heard)e.lastHeard=p.position.clone();
+      const target=e.lastSeen||e.lastHeard;
+      if(d>72&&e.key.startsWith("manual:")){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
+      const def=e.def;
+      if(def.behavior==="light"){
+        // Smilers are drawn toward light. Eye contact/slow movement keeps the
+        // encounter from instantly becoming a straight-line attack.
+        const eyeToEntity=new THREE.Vector3(e.group.position.x-p.position.x,0,e.group.position.z-p.position.z).normalize();
+        const view=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw));
+        const watching=view.dot(eyeToEntity)>.35;
+        if(light&&d<30)e.state=watching?"stalk":"chase";
+        else if(!light&&d<20)e.state=watching?"observe":"stalk";
+        else if(d>36)e.state="idle";
+      }else if(def.behavior==="hunt"){
+        if(visible&&d<def.range)e.state=d<12?"chase":"investigate";
+        else if(heard)e.state="investigate";
+        else if(d>def.range)e.state="stalk";
+      }else if(def.behavior==="ambush"){
+        if(visible&&d<def.range)e.state=d<8?"chase":"stalk";
+        else if(heard)e.state="investigate";
+        else if(d>14)e.state="stalk";
+      }else if(def.behavior==="observe"){
+        if(visible&&d<18)e.state="observe";else if(heard)e.state="investigate";else e.state="idle";
+      }else if(def.behavior==="swarm"){
+        if(visible||heard)e.state=d<12?"chase":"investigate";else e.state="idle";
+      }else if(def.behavior==="frenzy"){
+        if(d<def.range)e.state="chase";else if(heard)e.state="investigate";else e.state="stalk";
+      }else if(def.behavior==="quiet"){
+        if(heard&&d<def.range)e.state="investigate";else if(visible&&d<8)e.state="chase";else if(d>def.range)e.state="idle";
+      }else if(def.behavior==="slow"){
+        if(d<12&&visible)e.state="chase";else if(heard)e.state="investigate";else e.state="idle";
+      }else{
+        if(visible&&d<def.range)e.state=d<10?"chase":"stalk";else if(heard)e.state="investigate";else if(d>def.range)e.state="stalk";
       }
+
+      if(e.state==="chase"&&def.behavior==="light"&&light){
+        steerAroundWalls(this.game,e,new THREE.Vector3(dx,0,dz).multiplyScalar(-1),dt);
+      }else if(e.state==="chase"){
+        const predicted=p.position.clone();
+        if(e.lastSeen)predicted.lerp(p.position,.55);
+        steerAroundWalls(this.game,e,predicted.sub(e.group.position),dt);
+      }else if(e.state==="investigate"&&target){
+        const desired=target.clone().sub(e.group.position);
+        if(desired.length()>1.5)steerAroundWalls(this.game,e,desired,dt);
+        else e.state="stalk";
+      }else if(e.state==="stalk"){
+        const point=this.chooseStalkPoint(e,p),desired=point.sub(e.group.position);
+        if(desired.length()>2)steerAroundWalls(this.game,e,desired,dt);
+      }else if(e.state==="observe"){
+        e.group.rotation.y=Math.atan2(dx,dz);e.motion=0;
+      }
+      if(def.behavior==="light"&&light&&d<8)this.game.triggerFear(.01);
+      if(d<def.attack&&!this.game.admin?.god&&e.state==="chase"){
+        this.game.die("THE "+def.label.toUpperCase()+" FOUND YOU.");continue;
+      }
+      if(e.state==="chase"&&e.cool<=0){this.game.triggerFear(.035);e.cool=.8}
+      animateEntity(e,dt);
+      e.lastPlayerX=p.position.x;e.lastPlayerZ=p.position.z;
     }
     this.spawnForChunks();
   }
@@ -1739,6 +1901,10 @@ export class BackroomsGame{
     this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(0x000000);
+    // Initialize fog before the first gameplay frame. The constructor starts on Level 0,
+    // but setLevel() is intentionally not called during bootstrap, so update() must never
+    // assume scene.fog already exists.
+    this.scene.fog=new THREE.FogExp2(0x000000,.027);
     this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
     const touchDevice=isTouchControlsDevice();
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"highp"});
@@ -2203,6 +2369,16 @@ export class BackroomsGame{
     this.vhsPass.uniforms.time.value=this.gameTime;
     this.vhsPass.uniforms.fear.value=this.horror;
     this.player.update(dt);this.world.update(dt);this.collectBatteryPickups();this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
+    if(this.level.id==="0"){
+      const zoneChunk=this.world.chunkAt(this.player.position.x,this.player.position.z);
+      const zone=zoneChunk?.level0Region?.type||"maze";
+      const blackout=zone==="blackout";
+      const red=zone==="red";
+      this.ambient.intensity=blackout?.006:red?.014:.020;
+      this.scene.fog.density=blackout?.044:red?.034:.027;
+      this.scene.fog.color.setHex(blackout?0x000000:red?0x120000:0x000000);
+      document.documentElement.style.setProperty("--level0-zone",zone);
+    }
     this.updateArgLayer(dt);
     this.updateLightEvent(dt);
     this.updateHorror(dt);
