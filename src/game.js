@@ -1666,7 +1666,6 @@ class EntityManager{
         if(d<10&&looking)e.state="intimidated";
         if(e.state==="chase"){const speed=1.75;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
         if(e.state==="intimidated"){e.group.position.x-=dx/d*.65*dt;e.group.position.z-=dz/d*.65*dt;if(d>14)e.state="idle"}
-        if(d<1.05&&e.state==="chase"&&!this.game.admin?.god)e.game?.die?.("A HOUND GOT YOU.");
         if(d<1.05&&e.state==="chase"&&!this.game.admin?.god)this.game.die("A HOUND GOT YOU.");
         e.group.lookAt(p.position.x,.7,p.position.z);
       }else if(e.type==="skinstealer"){
