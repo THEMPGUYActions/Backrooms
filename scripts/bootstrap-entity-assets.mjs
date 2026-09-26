@@ -149,16 +149,42 @@ for(const entry of SPB_FILES){
 }
 
 // Manifests live beside the committed assets so the build has no network dependency.
+const pbrFiles={};
+for(const [filename,entry] of Object.entries(pbrLock.files||{})){
+  const path=join(pbrDir,filename);
+  const data=await readFile(path);
+  pbrFiles[filename]={...entry,bytes:data.length,sha256:createHash("sha256").update(data).digest("hex")};
+}
 await writeFile(join(pbrDir,"manifest.json"),JSON.stringify({
   pack:pbrLock.pack,author:pbrLock.author,source:pbrLock.source,license:pbrLock.license,
-  files:pbrLock.files
+  files:pbrFiles
 },null,2)+"\n");
+
+const audioFiles={};
+for(const [filename,entry] of Object.entries(audioLock.files||{})){
+  const path=join(audioDir,filename);
+  const data=await readFile(path);
+  audioFiles[filename]={...entry,bytes:data.length,sha256:createHash("sha256").update(data).digest("hex")};
+}
 await writeFile(join(audioDir,"manifest.json"),JSON.stringify({
-  pack:audioLock.pack,license:audioLock.license,files:audioLock.files
+  pack:audioLock.pack,license:audioLock.license,files:audioFiles
 },null,2)+"\n");
+
+const ffFiles={};
+for(const entry of SPB_FILES){
+  const path=join(ffDir,entry.name);
+  const data=await readFile(path);
+  ffFiles[entry.name]={
+    ...entry,
+    source:SPB_SOURCE_REPO,
+    commit:SPB_SOURCE_COMMIT,
+    bytes:data.length,
+    sha256:createHash("sha256").update(data).digest("hex")
+  };
+}
 await writeFile(join(ffDir,"manifest.json"),JSON.stringify({
   source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,license:"GPL-3.0-only",
-  files:SPB_FILES
+  files:ffFiles
 },null,2)+"\n");
 
 if(!changed){
