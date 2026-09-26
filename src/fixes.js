@@ -169,23 +169,8 @@ function installFlashlight(game){
     originalUpdate(dt);
     if(game.level?.id!=="0")return;
     const on=!!player.flashlight&&player.flashBattery>0;
-    game.flash.visible=true;
-    game.flashFill.visible=true;
-    game.flash.distance=24;
-    game.flash.decay=2;
-    game.flashFill.distance=24;
-    game.flashFill.decay=2;
-    game.flashFill.angle=.34;
-    game.flashFill.penumbra=.88;
-    if(on){
-      const battery=Math.max(.18,player.flashBattery/100);
-      const power=Math.pow(battery,.58);
-      game.flash.intensity=9+15*power;
-      game.flashFill.intensity=18+30*power;
-    }else{
-      game.flash.intensity=0;
-      game.flashFill.intensity=0;
-    }
+    game.flash.visible=on;
+    game.flashFill.visible=on;
   };
 }
 
