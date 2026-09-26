@@ -249,6 +249,9 @@ async function checkAssetSources() {
   if (!buildSource.includes('const LOCK_PATH = join(root, "data", "pbr-assets-lock.json");')) {
     fail("scripts/build.mjs must consume the PBR asset lock");
   }
+  if (!buildSource.includes('join(root,"assets","RedZone.ogg")')) {
+    fail("scripts/build.mjs must explicitly publish assets/RedZone.ogg");
+  }
   if (lock.source !== "https://opengameart.org/content/backrooms-pbr-texture-pack") fail("PBR lock source is unexpected");
   if (lock.license !== "CC0") fail("PBR lock license must be CC0");
   if (lock.author !== "methodical pixel") fail("PBR lock author must be methodical pixel");
