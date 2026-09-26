@@ -728,7 +728,7 @@ class Chunk{
     }
 
     if(this.manilaRoom&&region==="maze"){
-      const p=center(this.manilaRoom.cellX,this.manilaRoom.cellZ),w=8,h=3.15,thick=.42,doorW=1.45,doorH=2.35,side=(w-doorW)/2,wall=lib.manilaWall,wood=lib.officeWood;
+      const p=center(this.manilaRoom.cellX,this.manilaRoom.cellZ),w=8,h=level.wallHeight,thick=.42,doorW=1.45,doorH=2.35,side=(w-doorW)/2,wall=lib.manilaWall,wood=lib.officeWood;
       const wallSegments=[];
       const addHorizontal=(z)=>{
         const y=h/2;
@@ -761,11 +761,14 @@ class Chunk{
       }
       for(const seg of wallSegments)this.collisionSegments.push(seg);
       const floor=new THREE.Mesh(new THREE.PlaneGeometry(w-.25,w-.25),wood);floor.rotation.x=-Math.PI/2;floor.position.set(p.x,.012,p.z);g.add(floor);
-      const table=new THREE.Group();table.position.set(p.x,0,p.z);table.add(new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.12,8),wood));
+      // Match the documented/reference layout: the furniture sits offset from the room center rather than directly under the central roof tile.
+      const furniture=new THREE.Group();
+      furniture.position.set(p.x-1.45,0,p.z+1.25);
+      const table=new THREE.Group();table.position.set(0,0,0);table.add(new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.12,8),wood));
       for(const [x,z] of [[-.62,-.46],[.62,-.46],[-.62,.46],[.62,.46]])box(table,new THREE.BoxGeometry(.09,.72,.09),wood,x,.36,z);
-      box(table,new THREE.BoxGeometry(.42,.08,.26),wood,0,.84,0);g.add(table);
-      for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(p.x+x*1.65,0,p.z);box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,-.27,.23,-.27);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,.27,.23,-.27);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);g.add(chair)}
-      box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
+      box(table,new THREE.BoxGeometry(.42,.08,.26),wood,0,.84,0);furniture.add(table);
+      for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(x*1.65,0,0);box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,-.27,.23,-.27);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,.27,.23,-.27);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);furniture.add(chair)}
+      box(furniture,new THREE.BoxGeometry(1.15,.55,.42),wood,0,.32,.95);g.add(furniture);
       box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
       if(!this.level0Blackout){
         const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.userData.light=true;fixture.userData.baseEmissive=1.5;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffc46a,baseIntensity:70,intensity:70,distance:10,decay:2,fixture});
