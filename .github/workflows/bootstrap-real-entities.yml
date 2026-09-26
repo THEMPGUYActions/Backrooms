@@ -22,53 +22,35 @@ jobs:
           lfs: true
           fetch-depth: 0
 
-      - name: Download supplied models
+      - name: Read signed URLs from temporary branch
         shell: bash
-        env:
-          SMILER_URL: ${{ secrets.ENTITY_SMILER_URL }}
-          HOUND_URL: ${{ secrets.ENTITY_HOUND_URL }}
-          SKINSTEALER_URL: ${{ secrets.ENTITY_SKINSTEALER_URL }}
-          DULLER_URL: ${{ secrets.ENTITY_DULLER_URL }}
-          DEATHMOTH_URL: ${{ secrets.ENTITY_DEATHMOTH_URL }}
-          FACELING_URL: ${{ secrets.ENTITY_FACELING_URL }}
-          PARTYGOER_URL: ${{ secrets.ENTITY_PARTYGOER_URL }}
-          BACTERIA_URL: ${{ secrets.ENTITY_BACTERIA_URL }}
         run: |
           set -u
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 30 -sS \
+            "https://raw.githubusercontent.com/THEMPGUYActions/Backrooms/temp-entity-urls/entity-urls.txt" \
+            -o /tmp/entity-urls.txt
           mkdir -p assets/entities
-          download() {
-            name="$1"
-            url="$2"
+          mapfile -t URLS < <(grep -v '^#' /tmp/entity-urls.txt | sed 's/[[:space:]]*$//')
+          names=(smiler hound skinstealer duller deathmoth faceling partygoer bacteria)
+          for i in "${!names[@]}"; do
+            name="${names[$i]}"
+            url="${URLS[$i]:-}"
             out="assets/entities/$name.glb"
-            if [ -z "$url" ]; then
-              echo "SKIP $name: URL not configured"
-              return 0
-            fi
+            if [ -z "$url" ]; then echo "SKIP $name: blank URL"; continue; fi
             echo "Downloading $name..."
             curl --fail --location --retry 4 --retry-delay 2 --connect-timeout 20 --max-time 180 -sS "$url" -o "$out"
             python3 - "$out" "$name" <<'PY'
-          import sys, struct, os
-          p, name = sys.argv[1], sys.argv[2]
-          data = open(p, "rb").read(12)
-          if len(data) < 12 or data[:4] != b"glTF":
-              raise SystemExit(f"{name}: downloaded file is not a GLB")
-          version, declared = struct.unpack_from("<II", data, 4)
-          actual = os.path.getsize(p)
-          if version != 2:
-              raise SystemExit(f"{name}: unsupported GLB version {version}")
-          if declared > actual:
-              raise SystemExit(f"{name}: truncated GLB ({declared} > {actual})")
-          print(f"OK {name}: GLB v{version}, {actual} bytes")
-          PY
-          }
-          download smiler "$SMILER_URL"
-          download hound "$HOUND_URL"
-          download skinstealer "$SKINSTEALER_URL"
-          download duller "$DULLER_URL"
-          download deathmoth "$DEATHMOTH_URL"
-          download faceling "$FACELING_URL"
-          download partygoer "$PARTYGOER_URL"
-          download bacteria "$BACTERIA_URL"
+import sys, struct, os
+p, name = sys.argv[1], sys.argv[2]
+data = open(p, "rb").read(12)
+if len(data) < 12 or data[:4] != b"glTF": raise SystemExit(f"{name}: not a GLB")
+version, declared = struct.unpack_from("<II", data, 4)
+actual = os.path.getsize(p)
+if version != 2: raise SystemExit(f"{name}: unsupported GLB version {version}")
+if declared > actual: raise SystemExit(f"{name}: truncated GLB")
+print(f"OK {name}: GLB v{version}, {actual} bytes")
+PY
+          done
 
       - name: Commit models to dev
         shell: bash
