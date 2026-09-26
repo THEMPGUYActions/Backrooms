@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20260926-manilalayout4";
+import { BackroomsGame } from "./game.js?v=20260926-level0ceiling2";
 import { installBackroomsFixes } from "./fixes.js?v=20260926-roofmanila3";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20260925-entityai2";
