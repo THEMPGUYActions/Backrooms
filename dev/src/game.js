@@ -4,7 +4,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
-import { AudioDirector } from "./audio.js?v=20260926-redzone-audio3";
+import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
 
@@ -93,6 +93,12 @@ const VHSShader={
 const CELLS=16;
 const BASE_RADIUS=1;
 const MAX_DT=.05;
+const QUERY_PARAMS=new URLSearchParams(location.search);
+function queryFlag(name){
+  if(!QUERY_PARAMS.has(name))return false;
+  const value=String(QUERY_PARAMS.get(name)||"").trim().toLowerCase();
+  return value===""||value==="1"||value==="true"||value==="yes"||value==="on";
+}
 
 function isTouchControlsDevice(){
   const coarse=matchMedia("(pointer:coarse)").matches;
@@ -1971,7 +1977,7 @@ export class BackroomsGame{
     const cryptoApi=globalThis.crypto;
     if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
     this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
-    this.admin={enabled:new URLSearchParams(location.search).get("admin")==="1",god:false,noclip:false};
+    this.admin={enabled:queryFlag("admin"),god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
     this.redZoneFontTimer=0;
@@ -2398,6 +2404,7 @@ export class BackroomsGame{
       this.redZoneFontTimer=0;
       this.redZoneAudioDuration=0;
       this.redZoneAudioStarted=false;
+      this.audio.startRedZoneClock();
       const token=++this.redZoneAudioToken;
 
       const parts=String(id).split(":");
@@ -2428,6 +2435,7 @@ export class BackroomsGame{
       this.audio.getRedZoneMetadata().then(duration=>{
         if(token!==this.redZoneAudioToken||this.redZoneTrapped||!duration)return;
         this.redZoneAudioDuration=duration;
+        this.redZoneAudioStarted=true;
       }).catch(error=>console.warn("[Backrooms] Red Zone metadata failed:",error));
 
       this.audio.playRedZone().then(info=>{
@@ -2466,6 +2474,7 @@ export class BackroomsGame{
     }
 
     const elapsed=this.audio.redZoneElapsed();
+    try{window.__backroomsDebug?.setState?.({redZoneTimer:this.redZoneTimer,redZoneElapsed:elapsed,redZoneDuration:this.redZoneAudioDuration,redZoneStarted:this.redZoneAudioStarted,audioContext:this.audio.ctx?.state||"none"})}catch{}
     const progress=Math.max(0,Math.min(1,elapsed/this.redZoneAudioDuration));
     // Nonlinear timing: the displayed 30-second clock moves slowly at first
     // and accelerates toward zero, while still landing exactly on 0 when audio ends.
