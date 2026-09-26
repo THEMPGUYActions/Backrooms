@@ -158,35 +158,33 @@ export class AudioDirector{
     if(this.redZoneDuration>0)return this.redZoneDuration;
     if(this.redZoneMetadataPromise)return this.redZoneMetadataPromise;
     this.redZoneMetadataPromise=new Promise(resolve=>{
-      const media=new Audio();
-      media.preload="metadata";
-      media.src=RED_ZONE_AUDIO;
-      this.redZoneMedia=media;
+      let media=this.redZoneMedia;
+      if(!media){
+        media=new Audio();
+        media.preload="metadata";
+        media.src=RED_ZONE_AUDIO;
+        media.setAttribute("playsinline","");
+        media.controls=false;
+        media.style.display="none";
+        this.redZoneMedia=media;
+      }
       const finish=()=>{
         const duration=Number.isFinite(media.duration)&&media.duration>0?media.duration:0;
         if(duration)this.redZoneDuration=duration;
         resolve(duration);
       };
+      if(Number.isFinite(media.duration)&&media.duration>0){
+        finish();
+        return;
+      }
       media.addEventListener("loadedmetadata",finish,{once:true});
-      media.addEventListener("error",()=>resolve(0),{once:true});
+      media.addEventListener("error",()=>{
+        console.warn("[Backrooms] RedZone.ogg metadata error:",media.error?.code,media.error?.message||"unknown");
+        resolve(0);
+      },{once:true});
       media.load();
     }).finally(()=>{this.redZoneMetadataPromise=null});
     return this.redZoneMetadataPromise;
-  }
-  async ensureRedZoneBuffer(){
-    if(this.buffers.has("red_zone"))return this.buffers.get("red_zone");
-    if(this.redZoneLoading){await this.redZoneLoading;return this.buffers.get("red_zone")||null}
-    this.redZoneLoading=(async()=>{
-      const response=await fetch(RED_ZONE_AUDIO,{cache:"force-cache"});
-      if(!response.ok)throw new Error("HTTP "+response.status+" while loading RedZone.ogg");
-      const buffer=await response.arrayBuffer();
-      const decoded=await this.ctx.decodeAudioData(buffer);
-      this.buffers.set("red_zone",decoded);
-      return decoded;
-    })();
-    try{return await this.redZoneLoading}
-    catch(error){console.warn("[Backrooms] RedZone.ogg unavailable:",error);return null}
-    finally{this.redZoneLoading=null}
   }
   async playRedZone(){
     await this.init();
@@ -194,40 +192,49 @@ export class AudioDirector{
       try{await this.ctx.resume()}catch(error){console.warn("[Backrooms] Red Zone audio resume failed:",error)}
     }
 
-    // Metadata is tiny compared with decoding the entire OGG. Start the
-    // countdown from the real media duration as soon as metadata is known.
     const duration=await this.getRedZoneMetadata();
-    const buffer=await this.ensureRedZoneBuffer();
-    if(!buffer||!this.ready)return null;
+    if(!duration)return null;
+
+    const media=this.redZoneMedia;
+    if(!media)return null;
 
     this.stopRedZone();
-    const source=this.ctx.createBufferSource();
-    source.buffer=buffer;
-    const gain=this.ctx.createGain();
-    gain.gain.setValueAtTime(.9,this.ctx.currentTime);
-    source.connect(gain).connect(this.master);
-    const startedAt=this.ctx.currentTime;
-    this.redZoneSource=source;
-    this.redZoneGain=gain;
-    this.redZoneStartedAt=startedAt;
-    this.redZoneDuration=buffer.duration||duration;
-    const actualDuration=this.redZoneDuration;
-    source.onended=()=>{
-      if(this.redZoneSource===source)this.redZoneSource=null;
+    media.preload="auto";
+    media.loop=false;
+    media.volume=clamp(this.volume*.9);
+    media.currentTime=0;
+
+    try{
+      // Use Safari's native media pipeline instead of fetching + decodeAudioData().
+      // iOS can stream OGG playback without making us wait for a complete decoded
+      // AudioBuffer, while currentTime stays tied to the real playback clock.
+      await media.play();
+    }catch(error){
+      console.warn("[Backrooms] RedZone.ogg playback failed:",error);
+      return null;
+    }
+
+    this.redZoneStartedAt=this.ctx?.currentTime||0;
+    this.redZoneDuration=Number.isFinite(media.duration)&&media.duration>0?media.duration:duration;
+    media.onended=()=>{
+      if(this.redZoneMedia===media){
+        this.redZoneStartedAt=0;
+      }
     };
-    source.start(startedAt);
-    return {duration:actualDuration,startedAt};
+    return {duration:this.redZoneDuration,startedAt:this.redZoneStartedAt};
   }
   stopRedZone(){
-    const source=this.redZoneSource;
-    if(source){
-      try{source.stop()}catch{}
+    const media=this.redZoneMedia;
+    if(media){
+      try{media.pause()}catch{}
+      try{media.currentTime=0}catch{}
     }
-    this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;
+    this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;
   }
   redZoneElapsed(){
-    if(!this.ctx||!this.redZoneStartedAt||!this.redZoneDuration)return 0;
-    return Math.max(0,this.ctx.currentTime-this.redZoneStartedAt);
+    const media=this.redZoneMedia;
+    if(!media||!this.redZoneDuration)return 0;
+    return Math.max(0,Number.isFinite(media.currentTime)?media.currentTime:0);
   }
   clickToEnter(){this.tone(1180,.055,"square",.08);this.tone(260,.08,"square",.04)}
   tone(freq,duration,type="sine",gain=.05){
