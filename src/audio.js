@@ -373,8 +373,33 @@ export class AudioDirector{
     if(!played){this.tone(62+Math.random()*17,.055,"triangle",.022*intensity);this.noise(.045,.014*intensity,1300)}
   }
   click(){this.tone(420,.03,"square",.02);this.tone(70,.07,"sine",.01)}
+  flickerAt(position=null){
+    if(!this.ready)return;
+    let pan=0;
+    if(position&&this.ctx){
+      const camera=this.game?.camera;
+      const player=this.game?.player;
+      if(player){
+        const dx=position.x-player.position.x,dz=position.z-player.position.z;
+        const angle=Math.atan2(dx,dz);
+        pan=Math.sin(angle-(camera?.rotation?.y??0));
+      }
+    }
+    // Short electrical snap inspired by real fluorescent-flicker recordings.
+    // The researched reference is TemperMode's CC0 "fluorescent light
+    // flickering 1.wav", found on Freesound.
+    this.tone(72+Math.random()*34,.026,"square",.012);
+    this.noise(.055,.018,1050+Math.random()*650);
+    this.playBuffer("electric_buzz",{
+      gain:.018+Math.random()*.012,
+      rate:1.25+Math.random()*.35,
+      pan:clamp(pan,-1,1),
+      send:.16,
+      delay:.035
+    });
+  }
   flicker(){
-    if(Math.random()<.06)this.tone(95,.018,"sine",.0045);
+    this.flickerAt();
   }
   pickup(){this.tone(523,.09,"sine",.04);this.tone(659,.12,"sine",.032)}
   intercom(){
