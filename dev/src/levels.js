@@ -25,7 +25,7 @@ export const LEVELS = {
     cellSize: 8.0,
     wallHeight: 6.0,
     darkness: 0.075,
-    holeChance: 0.010,
+    holeChance: 0,
     pipeChance: 0,
     entity: "figure",
     exitStyle: "mixed",
