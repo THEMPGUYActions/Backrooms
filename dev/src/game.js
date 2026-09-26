@@ -2418,14 +2418,22 @@ export class BackroomsGame{
       this.triggerFear(.18);
 
       if(bar){
-        bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nPREPARE TO LEAVE";
-        bar.classList.remove("hidden","warning","trapped");
-        bar.classList.add("loading");
+        bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nLEAVE IN 30.0s";
+        bar.classList.remove("hidden","warning","trapped","loading");
+        bar.classList.add("warning");
       }
+
+      // Metadata-only duration lookup is fast. The actual OGG decode happens
+      // in parallel for playback and does not hold the visible countdown.
+      this.audio.getRedZoneMetadata().then(duration=>{
+        if(token!==this.redZoneAudioToken||this.redZoneTrapped||!duration)return;
+        this.redZoneAudioDuration=duration;
+        this.redZoneAudioStarted=true;
+      }).catch(error=>console.warn("[Backrooms] Red Zone metadata failed:",error));
 
       this.audio.playRedZone().then(info=>{
         if(token!==this.redZoneAudioToken||this.redZoneTrapped||!info)return;
-        this.redZoneAudioDuration=Math.max(.05,info.duration);
+        this.redZoneAudioDuration=info.duration;
         this.redZoneAudioStarted=true;
       }).catch(error=>console.warn("[Backrooms] Red Zone sound failed:",error));
     }
@@ -2448,10 +2456,12 @@ export class BackroomsGame{
     }
 
     if(!this.redZoneAudioStarted||this.redZoneAudioDuration<=0){
+      // Keep the actionbar live while the audio buffer finishes decoding.
+      // Duration metadata already lets the countdown run without waiting for decode.
       if(bar){
-        bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nPREPARING...";
-        bar.classList.remove("hidden","warning","trapped");
-        bar.classList.add("loading");
+        bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nLEAVE IN 30.0s";
+        bar.classList.remove("hidden","trapped","loading");
+        bar.classList.add("warning");
       }
       return;
     }
