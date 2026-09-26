@@ -154,6 +154,15 @@ try{
   }
   if(state.mobileDisplay!=="none")throw new Error("Mobile controls appeared on desktop after gameplay start: "+JSON.stringify(state));
   if(state.hud==="none")throw new Error("HUD remained hidden after gameplay start");
+
+  const pauseCheck=await command("Runtime.evaluate",{expression:"(()=>{const g=window.backrooms;g.togglePause(true);const m=document.getElementById('mobile-controls');const p=document.getElementById('pause');return JSON.stringify({paused:g.paused,mobileHidden:m?.classList.contains('hidden'),mobileDisplay:m?getComputedStyle(m).display:null,pauseHidden:p?.classList.contains('hidden'),pausePointer:p?getComputedStyle(p).pointerEvents:null})})()",returnByValue:true});
+  const pausedUi=JSON.parse(pauseCheck.result.result.value||"{}");
+  if(!pausedUi.paused||!pausedUi.mobileHidden||pausedUi.mobileDisplay!=="none"||pausedUi.pauseHidden||pausedUi.pausePointer==="none")throw new Error("Pause UI did not take control of the touch layer: "+JSON.stringify(pausedUi));
+
+  const resumeCheck=await command("Runtime.evaluate",{expression:"document.getElementById('resume')?.click();JSON.stringify({paused:window.backrooms.paused,mobileHidden:document.getElementById('mobile-controls')?.classList.contains('hidden')})",returnByValue:true});
+  const resumed=JSON.parse(resumeCheck.result.result.value||"{}");
+  if(resumed.paused)throw new Error("Pause Resume button did not resume the game");
+
   if(state.bootDisplay!=="none"||state.bootPointerEvents!=="none")throw new Error("Intro overlay still blocked gameplay after activation: "+JSON.stringify(state));
 
   await command("Runtime.evaluate",{expression:"location.href='http://127.0.0.1:"+port+"/index.html?admin=1'",returnByValue:true});
