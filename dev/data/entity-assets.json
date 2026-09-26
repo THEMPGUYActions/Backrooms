@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "assets": {
+    "smiler": {
+      "file": "smiler.glb",
+      "uid": "994d17d347da4806968bb8ed9af5dedd",
+      "creator": "🇧🇷 Fog 🇧🇷",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/smiler-entity3-backrooms-994d17d347da4806968bb8ed9af5dedd",
+      "directUrl": ""
+    },
+    "hound": {
+      "file": "hound.glb",
+      "uid": "b835cbb0440942a0856da6cefd365d38",
+      "creator": "🇧🇷 Fog 🇧🇷",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/hound-backrooms-b835cbb0440942a0856da6cefd365d38",
+      "directUrl": ""
+    },
+    "skinstealer": {
+      "file": "skinstealer.glb",
+      "uid": "c0db7c843ce44bb0a86a0b3a7d7884e1",
+      "creator": "Speed12 / RocketOfficial",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/skin-stealer-the-backrooms-blender-302-c0db7c843ce44bb0a86a0b3a7d7884e1",
+      "directUrl": ""
+    },
+    "duller": {
+      "file": "duller.glb",
+      "uid": "84d9383ca8dc4bdbbeba87dae49ccecb",
+      "creator": "Hunter198511",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/backrooms-entity-6-duller-84d9383ca8dc4bdbbeba87dae49ccecb",
+      "directUrl": ""
+    },
+    "deathmoth": {
+      "file": "deathmoth.glb",
+      "uid": "6101e3e3991545d6a8cce026fb2a51b2",
+      "creator": "Bittergiggle Playz [OFFICIAL]",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/deathmoth-backrooms-6101e3e3991545d6a8cce026fb2a51b2",
+      "directUrl": ""
+    },
+    "faceling": {
+      "file": "faceling.glb",
+      "uid": "76ff872b6d12402ba6d363c6d16f64c7",
+      "creator": "TacoModels / original model by AlanH1213",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/backrooms-faceling-ps1psx-style-76ff872b6d12402ba6d363c6d16f64c7",
+      "directUrl": ""
+    },
+    "partygoer": {
+      "file": "partygoer.glb",
+      "uid": "0593ef4788b146e4b2f820b10245a948",
+      "creator": "bigdowsey",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/the-partygoer-backrooms-entity-0593ef4788b146e4b2f820b10245a948",
+      "directUrl": ""
+    },
+    "bacteria": {
+      "file": "bacteria.glb",
+      "uid": "fb79a5140b144362abdaca43c0effb5c",
+      "creator": "DocoDummy",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/backrooms-custom-bacteria-lifeform-fb79a5140b144362abdaca43c0effb5c",
+      "directUrl": ""
+    }
+  }
+}
