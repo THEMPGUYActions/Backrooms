@@ -1724,7 +1724,7 @@ function steerAroundWalls(game,entity,desired,dt){
 }
 
 class EntityManager{
-  constructor(game){this.game=game;this.entities=[];this.serial=0;this.lastUpdate=0}
+  constructor(game){this.game=game;this.entities=[];this.serial=0;this.lastUpdate=0;this.bacteriaSpawned=false}
   clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[]}
   create(type,position,key=null){
     const def=ENTITY_TYPES[type];if(!def)return null;
@@ -1747,6 +1747,15 @@ class EntityManager{
     this.game.triggerFear(.12);this.game.toast("SUMMONED "+e.def.label.toUpperCase(),1.4);return true;
   }
   spawnForChunks(){
+    // Level 0 uses a delayed Bacteria encounter instead of continuously
+    // populating the safe opening with hostile entities. This mirrors the
+    // game adaptations where Bacteria becomes a late Lobby threat.
+    if(this.game.level.id==="0"&&!this.bacteriaSpawned&&this.game.gameTime>=180){
+      const p=this.game.player,rng=new RNG((this.game.seed^0xBAc7e)|0),angle=rng.next()*Math.PI*2,distance=28+rng.next()*18;
+      const pos=new THREE.Vector3(p.position.x+Math.cos(angle)*distance,0,p.position.z+Math.sin(angle)*distance);
+      const e=this.create("bacteria",pos,"level0:bacteria");
+      if(e){e.state="stalk";e.lastSeen=null;e.lastHeard=null;this.bacteriaSpawned=true;this.game.audio.scare();this.game.triggerFear(.16);this.game.toast("SOMETHING IS MOVING.",2.2)}
+    }
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
       const type=this.game.level.entity,def=ENTITY_TYPES[type];if(!def)continue;
@@ -1775,9 +1784,14 @@ class EntityManager{
       if(d>72&&e.key.startsWith("manual:")){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
       const def=e.def;
       if(def.behavior==="light"){
-        if(light&&d<24){e.state="chase";this.game.triggerFear(.015)}
-        else if(!light&&d<18)e.state="stalk";
-        else if(d>32)e.state="idle";
+        // Smilers are drawn toward light. Eye contact/slow movement keeps the
+        // encounter from instantly becoming a straight-line attack.
+        const eyeToEntity=new THREE.Vector3(e.group.position.x-p.position.x,0,e.group.position.z-p.position.z).normalize();
+        const view=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw));
+        const watching=view.dot(eyeToEntity)>.35;
+        if(light&&d<30)e.state=watching?"stalk":"chase";
+        else if(!light&&d<20)e.state=watching?"observe":"stalk";
+        else if(d>36)e.state="idle";
       }else if(def.behavior==="hunt"){
         if(visible&&d<def.range)e.state=d<12?"chase":"investigate";
         else if(heard)e.state="investigate";
