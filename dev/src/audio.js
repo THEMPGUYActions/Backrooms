@@ -115,6 +115,44 @@ export class AudioDirector{
   isEnabled(){
     return !!this.ctx&&this.ctx.state==="running";
   }
+  unlockRedZoneMediaFromGesture(){
+    try{
+      if(!this.ctx)return;
+      if(!this.redZoneMedia){
+        const media=new Audio();
+        media.preload="auto";
+        media.src=RED_ZONE_AUDIO;
+        media.setAttribute("playsinline","");
+        media.setAttribute("webkit-playsinline","");
+        media.controls=false;
+        media.loop=false;
+        this.redZoneMedia=media;
+
+        this.redZoneMediaSource=this.ctx.createMediaElementSource(media);
+        this.redZoneMediaGain=this.ctx.createGain();
+        this.redZoneMediaGain.gain.value=0;
+        // During the actual tap, keep the element alive through the native
+        // iOS media pipeline. It is silent through a zero-gain Web Audio node.
+        this.redZoneMediaSource.connect(this.redZoneMediaGain).connect(this.ctx.destination);
+      }
+
+      const media=this.redZoneMedia;
+      media.muted=false;
+      media.volume=1;
+      const result=media.play();
+      Promise.resolve(result).then(()=>{
+        this.redZoneMediaUnlocked=true;
+        this.debug("RedZone media gesture unlock",{readyState:media.readyState,duration:media.duration});
+        media.pause();
+        try{media.currentTime=0}catch{}
+      }).catch(error=>{
+        this.debug("RedZone gesture unlock failed",{name:error?.name,message:error?.message||String(error)});
+      });
+    }catch(error){
+      this.debug("RedZone gesture setup failed",{name:error?.name,message:error?.message||String(error)});
+    }
+  }
+
   unlockFromGesture(){
     try{
       if(!this.ctx){
@@ -131,6 +169,9 @@ export class AudioDirector{
       }else if(this.isEnabled()&&this.ready){
         this.clickToEnter();
       }
+      // Must happen synchronously in the same tap/click. iOS WebKit applies
+      // the media-element gesture permission per element.
+      this.unlockRedZoneMediaFromGesture();
       if(!this.ready){
         this.init().then(()=>this.unlockRedZoneMedia()).catch(error=>console.warn("[Backrooms] Audio init failed:",error));
       }else{
@@ -211,7 +252,7 @@ export class AudioDirector{
         this.redZoneMediaSource=this.ctx.createMediaElementSource(media);
         this.redZoneMediaGain=this.ctx.createGain();
         this.redZoneMediaGain.gain.value=0;
-        this.redZoneMediaSource.connect(this.redZoneMediaGain).connect(this.master);
+        this.redZoneMediaSource.connect(this.redZoneMediaGain);
       }catch(error){
         this.debug("RedZone media graph failed",{name:error?.name,message:error?.message||String(error)});
         return null;
@@ -268,6 +309,8 @@ export class AudioDirector{
     this.redZoneClockStartedAt=clockStartedAt;
 
     try{media.currentTime=0}catch{}
+    try{this.redZoneMediaGain.disconnect(this.ctx.destination)}catch{}
+    try{this.redZoneMediaGain.connect(this.master)}catch{}
     this.redZoneMediaGain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.redZoneMediaGain.gain.setValueAtTime(0,this.ctx.currentTime);
     this.redZoneMediaGain.gain.linearRampToValueAtTime(.9,this.ctx.currentTime+.06);
