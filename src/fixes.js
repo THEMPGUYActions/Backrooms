@@ -33,6 +33,29 @@ function installRoof(game){
   world.__level0RoofSignature="";
   world.__level0RoofGroup=null;
 
+  const syncRoofMaterial=()=>{
+    const root=world.__level0RoofGroup;
+    const source=world.library?.ceiling;
+    if(!root||!source)return;
+    const material=root.children.find(o=>o.isInstancedMesh)?.material;
+    if(!material)return;
+    for(const key of ["map","roughnessMap","normalMap","aoMap"]){
+      const previous=material[key];
+      if(previous?.userData?.manilaRoofClone)previous.dispose();
+      const sourceTexture=source[key];
+      if(!sourceTexture){material[key]=null;continue}
+      const cloned=sourceTexture.clone();
+      cloned.wrapS=THREE.ClampToEdgeWrapping;
+      cloned.wrapT=THREE.ClampToEdgeWrapping;
+      cloned.repeat.set(1,1);
+      cloned.offset.set(0,0);
+      cloned.needsUpdate=true;
+      cloned.userData.manilaRoofClone=true;
+      material[key]=cloned;
+    }
+    material.needsUpdate=true;
+  };
+
   const rebuild=()=>{
     if(game.level?.id!=="0")return;
     const keys=[...world.chunks.keys()].sort().join("|");
@@ -97,6 +120,12 @@ function installRoof(game){
     world.ceilingSurface&&(world.ceilingSurface.visible=false);
     game.scene.add(root);
     world.__level0RoofGroup=root;
+  };
+
+  const originalUpdateSurfaceTiling=world.updateSurfaceTiling.bind(world);
+  world.updateSurfaceTiling=()=>{
+    originalUpdateSurfaceTiling();
+    syncRoofMaterial();
   };
 
   const originalConfigure=world.configure.bind(world);
