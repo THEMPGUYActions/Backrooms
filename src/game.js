@@ -2056,12 +2056,29 @@ export class BackroomsGame{
       }
     });
 
-    $("resume")?.addEventListener("click",()=>this.togglePause(false));
-    $("restart")?.addEventListener("click",()=>this.restart());
-    $("retry")?.addEventListener("click",()=>this.restart());
-    $("again-ending")?.addEventListener("click",()=>this.restart());
-    $("fullscreen")?.addEventListener("click",()=>this.toggleFullscreen());
-    $("fullscreen-settings")?.addEventListener("click",()=>this.toggleFullscreen());
+    const bindUiButton=(element,handler)=>{
+      if(!element)return;
+      let lastPointer=0;
+      element.addEventListener("pointerup",event=>{
+        if(event.pointerType==="mouse")return;
+        event.preventDefault();
+        event.stopPropagation();
+        lastPointer=performance.now();
+        handler(event);
+      },{passive:false});
+      element.addEventListener("click",event=>{
+        if(performance.now()-lastPointer<700)return;
+        event.preventDefault();
+        event.stopPropagation();
+        handler(event);
+      });
+    };
+    bindUiButton($("resume"),()=>this.togglePause(false));
+    bindUiButton($("restart"),()=>this.restart());
+    bindUiButton($("retry"),()=>this.restart());
+    bindUiButton($("again-ending"),()=>this.restart());
+    bindUiButton($("fullscreen"),()=>this.toggleFullscreen());
+    bindUiButton($("fullscreen-settings"),()=>this.toggleFullscreen());
 
     const pauseTabNames={settings:["SETTINGS","SETTINGS"],controls:["CONTROLS","HOW TO PLAY"]};
     this.pauseTabState=tab=>{
@@ -2073,8 +2090,8 @@ export class BackroomsGame{
       if(kicker)kicker.textContent=meta[0];
       if(title)title.textContent=meta[1];
     };
-    document.querySelectorAll("[data-pause-tab]").forEach(button=>button.addEventListener("click",()=>this.pauseTabState(button.dataset.pauseTab)));
-    document.querySelectorAll("[data-settings-tab]").forEach(button=>button.addEventListener("click",()=>{
+    document.querySelectorAll("[data-pause-tab]").forEach(button=>bindUiButton(button,()=>this.pauseTabState(button.dataset.pauseTab)));
+    document.querySelectorAll("[data-settings-tab]").forEach(button=>bindUiButton(button,()=>{
       const tab=button.dataset.settingsTab;
       document.querySelectorAll("[data-settings-tab]").forEach(x=>x.classList.toggle("active",x===button));
       document.querySelectorAll("[data-settings-panel]").forEach(x=>x.classList.toggle("active",x.dataset.settingsPanel===tab));
@@ -2238,6 +2255,8 @@ export class BackroomsGame{
     this.pauseTabState?.("game");
     const mobile=document.getElementById("mobile-controls");
     mobile?.classList.toggle("paused",this.paused);
+    mobile?.classList.toggle("hidden",this.paused);
+    mobile?.setAttribute("aria-hidden",this.paused?"true":"false");
     if(this.paused){
       document.exitPointerLock?.();
     }else{
