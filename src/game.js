@@ -1901,6 +1901,10 @@ export class BackroomsGame{
     this.startFlash=localStorage.getItem("br.flash")!=="0";
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(0x000000);
+    // Initialize fog before the first gameplay frame. The constructor starts on Level 0,
+    // but setLevel() is intentionally not called during bootstrap, so update() must never
+    // assume scene.fog already exists.
+    this.scene.fog=new THREE.FogExp2(0x000000,.027);
     this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
     const touchDevice=isTouchControlsDevice();
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"highp"});
