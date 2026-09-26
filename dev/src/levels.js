@@ -23,7 +23,7 @@ export const LEVELS = {
     },
     gridSize: 10,
     cellSize: 8.0,
-    wallHeight: 6.0,
+    wallHeight: 3.15,
     darkness: 0.075,
     holeChance: 0,
     pipeChance: 0,
