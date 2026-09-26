@@ -1693,7 +1693,7 @@ function entityLineOfSight(game,entity,target){
   const end=target.position.clone();end.y=Math.max(1.1,end.y);
   const dir=end.clone().sub(origin),distance=dir.length();if(distance<.01)return true;dir.normalize();
   const ray=new THREE.Raycaster(origin,dir,0,distance-.15);
-  const hits=ray.intersectObjects(game.world.sceneGroups||[],true);
+  const groups=[...game.world.chunks.values()].map(c=>c.group);\n  const hits=ray.intersectObjects(groups,true);
   return !hits.some(h=>h.object?.visible&&h.object?.userData?.entityWall);
 }
 
