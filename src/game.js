@@ -474,6 +474,13 @@ class Chunk{
     }
     this.collisionSegments=edges.map(e=>{const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;return e.side==="north"||e.side==="south"?{x1:px-cell/2,z1:e.side==="north"?pz-cell/2:pz+cell/2,x2:px+cell/2,z2:e.side==="north"?pz-cell/2:pz+cell/2}:{x1:e.side==="west"?px-cell/2:px+cell/2,z1:pz-cell/2,x2:e.side==="west"?px-cell/2:px+cell/2,z2:pz+cell/2}});
     addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);
+    if(level.id==="0"&&region==="red"){
+      const redFloor=new THREE.Mesh(new THREE.PlaneGeometry(size,size),lib.redFloor);
+      redFloor.rotation.x=-Math.PI/2;
+      redFloor.position.set(this.originX+size/2,.006,this.originZ+size/2);
+      redFloor.renderOrder=1;
+      g.add(redFloor);
+    }
     if(level.id!=="1"){addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);addInstanced(topHGeom,lib.trimTop,topH);addInstanced(topVGeom,lib.trimTop,topV)}
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
@@ -2332,7 +2339,7 @@ export class BackroomsGame{
 
     if(this.redZoneTrapped){
       if(bar){
-        bar.textContent="YOU ARE TRAPPED IN THE RED ROOMS — THERE IS NO WAY OUT";
+        bar.textContent="RED ZONE\nYOU ARE TRAPPED\nFOREVER";
         bar.classList.remove("hidden","warning");
         bar.classList.add("trapped");
       }
@@ -2345,7 +2352,7 @@ export class BackroomsGame{
       this.triggerFear(.8);
       this.audio.ambientSting(.12);
       if(bar){
-        bar.textContent="YOU ARE TRAPPED IN THE RED ROOMS — FOREVER";
+        bar.textContent="RED ZONE\nYOU ARE TRAPPED\nFOREVER";
         bar.classList.remove("hidden","warning");
         bar.classList.add("trapped");
       }
@@ -2354,9 +2361,7 @@ export class BackroomsGame{
 
     if(bar){
       const seconds=Math.ceil(this.redZoneTimer);
-      bar.textContent=seconds<=10
-        ? "LEAVE THE RED ROOMS — "+seconds+"s"
-        : "RED ROOMS — LEAVE WITHIN "+seconds+"s";
+      bar.textContent="RED ZONE\nMOST DANGEROUS AREA\nLEAVE IN "+seconds+"s";
       bar.classList.remove("hidden","trapped");
       bar.classList.add("warning");
     }
