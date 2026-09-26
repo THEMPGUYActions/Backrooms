@@ -95,7 +95,7 @@ function installRoof(game){
       const tiles=10;
       const tileSize=world.size/tiles;
       const mesh=new THREE.InstancedMesh(
-        new THREE.BoxGeometry(tileSize-.10,.055,tileSize-.10),
+        new THREE.BoxGeometry(tileSize+.04,.055,tileSize+.04),
         material,
         tiles*tiles
       );
