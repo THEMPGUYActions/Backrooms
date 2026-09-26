@@ -761,8 +761,6 @@ class Chunk{
       }
       for(const seg of wallSegments)this.collisionSegments.push(seg);
       const floor=new THREE.Mesh(new THREE.PlaneGeometry(w-.25,w-.25),wood);floor.rotation.x=-Math.PI/2;floor.position.set(p.x,.012,p.z);g.add(floor);
-      // Match the documented/reference layout: the furniture sits offset from the room center rather than directly under the central roof tile.
-      const furniture=new THREE.Group();
       const table=new THREE.Group();table.position.set(p.x,0,p.z);
       const tabletop=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.12,8),wood);tabletop.position.y=.78;table.add(tabletop);
       for(const [x,z] of [[-.62,-.46],[.62,-.46],[-.62,.46],[.62,.46]])box(table,new THREE.BoxGeometry(.09,.72,.09),wood,x,.36,z);
