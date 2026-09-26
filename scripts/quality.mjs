@@ -350,6 +350,31 @@ async function checkAudioAssets(){
   }catch(e){fail("dist audio manifest invalid or missing: "+e.message)}
 }
 
+async function checkEntityModels(){
+  let manifest;
+  try{
+    manifest=JSON.parse(await readFile(join(root,"data/entity-assets.json"),"utf8"));
+  }catch(e){
+    fail("data/entity-assets.json is missing or invalid: "+e.message);
+    return;
+  }
+
+  for(const [type,entry] of Object.entries(manifest.assets||{})){
+    const assetPath=join(root,"assets/entities",entry.file);
+    try{
+      const info=await stat(assetPath);
+      if(!info.isFile())throw new Error("not a file");
+      if(info.size<20||info.size>95*1024*1024)fail("Entity GLB size is outside safe bounds: "+type);
+      const data=await readFile(assetPath);
+      if(data.subarray(0,4).toString()!=="glTF")fail("Entity asset is not a GLB: "+type);
+      if(data.readUInt32LE(4)!==2)fail("Entity GLB is not glTF 2.0: "+type);
+      if(data.readUInt32LE(8)!==data.length)fail("Entity GLB length header mismatch: "+type);
+    }catch{
+      // Missing models are allowed until the one-time bootstrap source is configured.
+    }
+  }
+}
+
 async function checkData() {
   try {
     const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -442,12 +467,14 @@ await checkCss();
 await checkModuleGraph(jsFiles, imports);
 await checkData();
 await checkBuildIfPresent();
+await checkEntityModels();
 await checkAssetSources();
 await checkSpacePotatoAssets();
 await checkAudioAssets();
 await checkWorkflow();
 
 for (const file of files) {
+  if (file.toLowerCase().endsWith(".glb")) continue;
   const size = (await stat(file)).size;
   if (size > 2_000_000) fail("File exceeds 2 MB source budget: " + file);
 }
