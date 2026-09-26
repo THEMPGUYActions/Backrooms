@@ -1994,3 +1994,11 @@ button,.audio-gate{
 #admin-open[hidden]{display:none!important}
 @media(max-width:720px){.minecraft-pause{width:94vw;max-height:92svh}.pause-brand{padding:17px 16px 14px}.pause-brand h1{font-size:23px}.pause-layout{grid-template-columns:1fr;min-height:0}.pause-menu{padding:13px 14px;border-right:0;border-bottom:1px solid rgba(224,228,216,.08)}.pause-menu-button{min-height:43px;margin-bottom:6px}.pause-panel{padding:18px 16px;overflow:auto}.pause-status-grid{grid-template-columns:1fr 1fr}.pause-setting{grid-template-columns:105px minmax(0,1fr) 45px}.pause-footer{padding:9px 13px}}
 @media(max-width:440px){.pause-status-grid{grid-template-columns:1fr}.pause-setting{grid-template-columns:90px minmax(0,1fr)}.pause-setting b{display:none}.pause-footer span:nth-child(2){display:none}}
+
+/* Pause must own the entire interaction layer. Mobile gameplay controls are removed while paused. */
+#pause.screen{z-index:240;pointer-events:auto}
+#pause.screen *{pointer-events:auto}
+#mobile-controls.hidden,#mobile-controls.paused{display:none!important;pointer-events:none!important}
+#admin-open{z-index:300;pointer-events:auto}
+.admin-overlay{z-index:310!important;pointer-events:auto!important}
+.admin-overlay.hidden{pointer-events:none!important}
