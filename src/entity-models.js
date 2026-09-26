@@ -22,11 +22,35 @@ export const ENTITY_MODEL_SOURCES = Object.freeze({
     license: "CC BY 4.0",
     source: "https://sketchfab.com/3d-models/skin-stealer-the-backrooms-blender-302-c0db7c843ce44bb0a86a0b3a7d7884e1"
   },
+  duller: {
+    file: "duller.glb",
+    creator: "Hunter198511",
+    license: "CC BY 4.0",
+    source: "https://sketchfab.com/3d-models/backrooms-entity-6-duller-84d9383ca8dc4bdbbeba87dae49ccecb"
+  },
+  deathmoth: {
+    file: "deathmoth.glb",
+    creator: "Bittergiggle Playz [OFFICIAL]",
+    license: "CC BY 4.0",
+    source: "https://sketchfab.com/3d-models/deathmoth-backrooms-6101e3e3991545d6a8cce026fb2a51b2"
+  },
+  faceling: {
+    file: "faceling.glb",
+    creator: "TacoModels / original model by AlanH1213",
+    license: "CC BY 4.0",
+    source: "https://sketchfab.com/3d-models/backrooms-faceling-ps1psx-style-76ff872b6d12402ba6d363c6d16f64c7"
+  },
   partygoer: {
     file: "partygoer.glb",
-    creator: "Community model; replace with a licensed source file before shipping",
-    license: "REQUIRES SOURCE LICENSE",
-    source: ""
+    creator: "bigdowsey",
+    license: "CC BY 4.0",
+    source: "https://sketchfab.com/3d-models/the-partygoer-backrooms-entity-0593ef4788b146e4b2f820b10245a948"
+  },
+  bacteria: {
+    file: "bacteria.glb",
+    creator: "DocoDummy",
+    license: "CC BY 4.0",
+    source: "https://sketchfab.com/3d-models/backrooms-custom-bacteria-lifeform-fb79a5140b144362abdaca43c0effb5c"
   }
 });
 
