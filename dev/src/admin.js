@@ -22,11 +22,28 @@ export class BackroomsAdmin{
     this.opener.setAttribute("aria-label","Open admin panel");
     this.opener.setAttribute("aria-expanded","false");
     document.body.appendChild(this.opener);
-    this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
+    let lastPointerActivation=0;
+    const toggle=(event)=>{
+      const now=performance.now();
+      if(now-lastPointerActivation<700)return;
+      lastPointerActivation=now;
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      if(!this.game.running||this.game.introActive)return;
+      this.opened?this.close():this.open();
+    };
+    // Handle the button at pointerdown so touch cannot be swallowed by the
+    // canvas/game input layer. Preventing the default touch action also stops
+    // the browser's compatibility click from toggling the panel a second time.
+    this.opener.addEventListener("pointerdown",event=>{
+      if(event.isPrimary!==false)toggle(event);
+    },{passive:false});
+    this.opener.addEventListener("click",event=>{
+      // Keyboard activation has no pointerdown, so keep click as its fallback.
+      if(event.detail===0)toggle(event);
+    }); 
     this.ready=true;
-    requestAnimationFrame(()=>{
-      if(this.game.running&&!this.game.paused&&!this.game.introActive)this.open();
-    });
+    this.opener.hidden=false;
   }
 
   build(){
