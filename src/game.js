@@ -325,6 +325,9 @@ class Chunk{
       this.zone="maze";
       this.megaType=null;
       this.level0Region=level0RegionAt(this.cx,this.cz,this.game.seed);
+      if(this.world.forceLevel0Zone&&Math.abs(this.cx-this.world.forceLevel0Zone.cx)<=1&&Math.abs(this.cz-this.world.forceLevel0Zone.cz)<=1){
+        this.level0Region={type:this.world.forceLevel0Zone.type,id:"forced:"+this.world.forceLevel0Zone.type};
+      }
       this.level0SpawnCell={x:Math.floor(cells/2),z:Math.floor(cells/2)};
       this.level0Blackout=this.level0Region.type==="blackout";
       this.level0PillarArea=this.level0Region.type==="pillars";
@@ -764,7 +767,9 @@ class Chunk{
       for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(p.x+x*1.65,0,p.z);box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,-.27,.23,-.27);box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,.27,.23,-.27);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);g.add(chair)}
       box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
       box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
-      const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.userData.light=true;fixture.userData.baseEmissive=1.5;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffc46a,baseIntensity:70,intensity:70,distance:10,decay:2,fixture});
+      if(!this.level0Blackout){
+        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.userData.light=true;fixture.userData.baseEmissive=1.5;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffc46a,baseIntensity:70,intensity:70,distance:10,decay:2,fixture});
+      }
       return;
     }
 
@@ -772,6 +777,7 @@ class Chunk{
     const candidates=[];
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x===centerCell&&z===centerCell)continue;const mask=this.walls[this.index(x,z)],closed=(mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0);candidates.push({x,z,mask,closed})}
     if(next()<.25){const dead=candidates.filter(c=>c.closed===3),room=dead.length?dead[Math.floor(next()*dead.length)]:null;if(room){const p=center(room.x,room.z),open=!(room.mask&1)?"north":!(room.mask&2)?"east":!(room.mask&4)?"south":"west";const t=new THREE.Mesh(new THREE.TorusGeometry(cell*.19,.11,8,18,Math.PI),lib.wall);t.position.set(p.x,2.1,p.z);t.rotation.y=open==="east"||open==="west"?Math.PI/2:0;g.add(t)}}
+    if(this.level0Blackout)return;
     const propRng=new RNG(this.seedKey()^0x71a4);
     for(let i=0;i<2;i++){const room=candidates[propRng.int(0,Math.max(0,candidates.length-1))];if(!room)continue;const p=center(room.x,room.z);if(propRng.next()<.35){const mat=lib.light.clone();mat.emissiveIntensity=2.5;const f=box(g,new THREE.BoxGeometry(1.65,.055,.46),mat,p.x,level.wallHeight-.08,p.z,0,propRng.next()<.5?0:Math.PI/2,0);f.userData.light=true;f.userData.baseEmissive=2.5;this.fixtures.push(f);this.lightSources.push({position:new THREE.Vector3(p.x,level.wallHeight-.25,p.z),color:level.theme.light,baseIntensity:165,intensity:165,distance:0,decay:2,fixture:f})}}
   }
@@ -1053,6 +1059,7 @@ class WorldStreamer{
   constructor(game){
     this.game=game;this.chunks=new Map();this.library=null;this.radius=2;this.size=0;
     this.surfaceSize=0;this.floorSurface=null;this.ceilingSurface=null;
+    this.forceLevel0Zone=null;
   }
   key(cx,cz){return cx+","+cz}
   async configure(onProgress=()=>{}){
@@ -2203,6 +2210,16 @@ export class BackroomsGame{
     this.vhsPass.uniforms.time.value=this.gameTime;
     this.vhsPass.uniforms.fear.value=this.horror;
     this.player.update(dt);this.world.update(dt);this.collectBatteryPickups();this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
+    if(this.level.id==="0"){
+      const zoneChunk=this.world.chunkAt(this.player.position.x,this.player.position.z);
+      const zone=zoneChunk?.level0Region?.type||"maze";
+      const blackout=zone==="blackout";
+      const red=zone==="red";
+      this.ambient.intensity=blackout?.006:red?.014:.020;
+      this.scene.fog.density=blackout?.044:red?.034:.027;
+      this.scene.fog.color.setHex(blackout?0x000000:red?0x120000:0x000000);
+      document.documentElement.style.setProperty("--level0-zone",zone);
+    }
     this.updateArgLayer(dt);
     this.updateLightEvent(dt);
     this.updateHorror(dt);
