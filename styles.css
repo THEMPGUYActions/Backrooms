@@ -2060,7 +2060,7 @@ button,.audio-gate{
   padding:7px 14px 8px;
   text-align:center;white-space:pre-line;
   color:rgba(255,238,232,.94);
-  background:rgba(20,0,0,.28);
+  background:transparent;
   text-shadow:0 1px 2px #000,0 0 8px rgba(110,0,0,.45);
   font:700 12px/1.35 "Courier New",monospace;
   letter-spacing:.08em;text-transform:uppercase;
