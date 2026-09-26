@@ -1018,19 +1018,30 @@ class Chunk{
     const now=this.game.gameTime;
     const fixtureCount=this.fixtures.length;
     if(!fixtureCount)return;
-    const duration=Math.max(2.8,Math.min(5.8,.16*fixtureCount+.9+Math.random()*1.7));
-    const spacing=duration/fixtureCount;
+    // Every rendered fixture participates, but each gets its own 1-6 pulse
+    // pattern. The starts are spread across the event so the whole ceiling
+    // never strobes in lockstep.
+    const duration=Math.max(4.2,Math.min(9.5,3.1+fixtureCount*.055+Math.random()*2.4));
     const order=this.fixtures.slice();
     for(let i=order.length-1;i>0;i--){
       const j=Math.floor(Math.random()*(i+1));
       [order[i],order[j]]=[order[j],order[i]];
     }
+    const pulseSlots=Math.max(1,fixtureCount*3);
     for(let i=0;i<order.length;i++){
       const fixture=order[i];
-      const offDuration=Math.min(.14,Math.max(.055,spacing*.52+Math.random()*.045));
-      const jitter=Math.min(.035,spacing*.12)*Math.random();
-      const start=i*spacing+jitter;
-      fixture.userData.flickerPulses=[[start,start+offDuration]];
+      const count=1+Math.floor(Math.random()*6);
+      const pulses=[];
+      const baseOffset=(i/pulseSlots)*duration;
+      for(let n=0;n<count;n++){
+        const wave=(n/Math.max(1,count-1||1))*.82*duration;
+        const jitter=(Math.random()-.5)*Math.min(.22,duration*.025);
+        const start=Math.max(0,Math.min(duration-.08,baseOffset+wave+jitter));
+        const offDuration=.055+Math.random()*.105;
+        pulses.push({start,end:Math.min(duration,start+offDuration),played:false});
+      }
+      pulses.sort((a,b)=>a.start-b.start);
+      fixture.userData.flickerPulses=pulses;
       fixture.userData.flickerEventStart=now;
     }
   }
@@ -1038,10 +1049,16 @@ class Chunk{
     const pulses=fixture?.userData?.flickerPulses;
     if(!pulses?.length)return 1;
     const elapsed=this.game.gameTime-(fixture.userData.flickerEventStart??this.game.gameTime);
-    for(const [start,end] of pulses){
-      if(elapsed>=start&&elapsed<end)return .018;
+    let dark=false;
+    for(const pulse of pulses){
+      if(!pulse.played&&elapsed>=pulse.start){
+        pulse.played=true;
+        const p=fixture?.position;
+        if(p)this.game.audio.flickerAt?.(p);
+      }
+      if(elapsed>=pulse.start&&elapsed<pulse.end)dark=true;
     }
-    return 1;
+    return dark?.018:1;
   }
   update(dt){
     const state=this.game.lightState;
@@ -2545,7 +2562,7 @@ export class BackroomsGame{
       this.lightState="BLACKOUT";
       // SpacePotatoee/MinecraftFoundFootage uses 20 ticks for the generic blackout event.
       // Minecraft runs at 20 ticks per second, so this is exactly 1 second here.
-      this.lightEventTimer=this.level.id==="0"?1:30;
+      this.lightEventTimer=this.level.id==="0"?120+Math.random()*240:30;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
