@@ -22,11 +22,21 @@ export class BackroomsAdmin{
     this.opener.setAttribute("aria-label","Open admin panel");
     this.opener.setAttribute("aria-expanded","false");
     document.body.appendChild(this.opener);
-    this.opener.addEventListener("click",()=>this.opened?this.close():this.open());
-    this.ready=true;
-    requestAnimationFrame(()=>{
-      if(this.game.running&&!this.game.paused&&!this.game.introActive)this.open();
+    const toggle=event=>{
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      if(!this.game.running||this.game.introActive)return;
+      this.opened?this.close():this.open();
+    };
+    // Use the normal click path first, with pointerup as an iOS/WebKit fallback.
+    // The opener is intentionally not auto-opened: the ADMIN button itself must
+    // remain visible and be the single way to open the panel.
+    this.opener.addEventListener("click",toggle);
+    this.opener.addEventListener("pointerup",event=>{
+      if(event.pointerType==="touch")toggle(event);
     });
+    this.ready=true;
+    this.opener.hidden=false;
   }
 
   build(){
