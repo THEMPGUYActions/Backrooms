@@ -172,14 +172,28 @@ const exec=promisify(execFile);
 await exec("git",["lfs","install","--local"]);
 await exec("git",["config","user.name","github-actions[bot]"]);
 await exec("git",["config","user.email","41898282+github-actions[bot]@users.noreply.github.com"]);
-await exec("git",["add","assets",".gitattributes"]);
-const status=await exec("git",["status","--porcelain"]);
-if(!status.stdout.trim()){
-  console.log("[assets] No Git changes after download.");
-  process.exit(0);
-}
-await exec("git",["commit","-m","assets: bootstrap bundled media"]);
+
 const branch=process.env.GITHUB_REF_NAME||"dev";
-await exec("git",["push","origin","HEAD:"+branch]);
+let pushed=false;
+for(let attempt=1;attempt<=5&&!pushed;attempt++){
+  // Another queued workflow may have pushed source changes while this bootstrap
+  // was downloading. Rebase the asset work onto the newest remote branch.
+  await exec("git",["fetch","origin",branch]);
+  await exec("git",["reset","--mixed","origin/"+branch]);
+  await exec("git",["add","assets",".gitattributes"]);
+  const status=await exec("git",["status","--porcelain"]);
+  if(!status.stdout.trim()){
+    console.log("[assets] Another run already committed the same assets.");
+    process.exit(0);
+  }
+  await exec("git",["commit","-m","assets: bootstrap bundled media"]);
+  try{
+    await exec("git",["push","origin","HEAD:"+branch]);
+    pushed=true;
+  }catch(error){
+    if(attempt===5)throw error;
+    console.warn("[assets] Remote changed during push; retrying asset commit (attempt "+(attempt+1)+"/5).");
+  }
+}
 console.log("[assets] Committed the newly downloaded media to "+branch+".");
 console.log("[assets] Future builds use committed files and do not probe external URLs.");
