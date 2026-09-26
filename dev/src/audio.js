@@ -23,6 +23,7 @@ export class AudioDirector{
     this.stepDistance=0;this.ambientTimer=70;this.buzzTimer=11;this.humGain=null;this.lastRareEvent=-Infinity;
     this.volume=Number(localStorage.getItem("br.volume")??.65);
     this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;this.redZoneLoading=null;
+    this.redZoneMedia=null;this.redZoneMetadataPromise=null;
   }
   createImpulse(seconds=1.6,decay=2.8){
     const length=Math.floor(this.ctx.sampleRate*seconds),buffer=this.ctx.createBuffer(2,length,this.ctx.sampleRate);
@@ -79,7 +80,6 @@ export class AudioDirector{
       const entries=[
         ["ambient_horror",BACKROOMS_AUDIO_SOURCES.ambient_horror],
         ["electric_buzz",BACKROOMS_AUDIO_SOURCES.electric_buzz],
-        ["red_zone",RED_ZONE_AUDIO],
         ...BACKROOMS_AUDIO_SOURCES.footsteps.map((url,i)=>["footstep_"+String(i+1).padStart(2,"0"),url])
       ];
       Promise.allSettled(entries.map(async([key,url])=>{
@@ -154,15 +154,35 @@ export class AudioDirector{
     const panner=this.ctx.createStereoPanner();panner.pan.value=clamp(pan,-1,1);
     source.connect(gainNode).connect(panner);this.connectFx(panner,send,delay);source.start();return true;
   }
+  async getRedZoneMetadata(){
+    if(this.redZoneDuration>0)return this.redZoneDuration;
+    if(this.redZoneMetadataPromise)return this.redZoneMetadataPromise;
+    this.redZoneMetadataPromise=new Promise(resolve=>{
+      const media=new Audio();
+      media.preload="metadata";
+      media.src=RED_ZONE_AUDIO;
+      this.redZoneMedia=media;
+      const finish=()=>{
+        const duration=Number.isFinite(media.duration)&&media.duration>0?media.duration:0;
+        if(duration)this.redZoneDuration=duration;
+        resolve(duration);
+      };
+      media.addEventListener("loadedmetadata",finish,{once:true});
+      media.addEventListener("error",()=>resolve(0),{once:true});
+      media.load();
+    }).finally(()=>{this.redZoneMetadataPromise=null});
+    return this.redZoneMetadataPromise;
+  }
   async ensureRedZoneBuffer(){
     if(this.buffers.has("red_zone"))return this.buffers.get("red_zone");
     if(this.redZoneLoading){await this.redZoneLoading;return this.buffers.get("red_zone")||null}
     this.redZoneLoading=(async()=>{
       const response=await fetch(RED_ZONE_AUDIO,{cache:"force-cache"});
       if(!response.ok)throw new Error("HTTP "+response.status+" while loading RedZone.ogg");
-      const buffer=await this.ctx.decodeAudioData(await response.arrayBuffer());
-      this.buffers.set("red_zone",buffer);
-      return buffer;
+      const buffer=await response.arrayBuffer();
+      const decoded=await this.ctx.decodeAudioData(buffer);
+      this.buffers.set("red_zone",decoded);
+      return decoded;
     })();
     try{return await this.redZoneLoading}
     catch(error){console.warn("[Backrooms] RedZone.ogg unavailable:",error);return null}
@@ -173,6 +193,10 @@ export class AudioDirector{
     if(this.ctx?.state==="suspended"){
       try{await this.ctx.resume()}catch(error){console.warn("[Backrooms] Red Zone audio resume failed:",error)}
     }
+
+    // Metadata is tiny compared with decoding the entire OGG. Start the
+    // countdown from the real media duration as soon as metadata is known.
+    const duration=await this.getRedZoneMetadata();
     const buffer=await this.ensureRedZoneBuffer();
     if(!buffer||!this.ready)return null;
 
@@ -186,14 +210,13 @@ export class AudioDirector{
     this.redZoneSource=source;
     this.redZoneGain=gain;
     this.redZoneStartedAt=startedAt;
-    this.redZoneDuration=buffer.duration;
+    this.redZoneDuration=buffer.duration||duration;
+    const actualDuration=this.redZoneDuration;
     source.onended=()=>{
-      if(this.redZoneSource===source){
-        this.redZoneSource=null;this.redZoneGain=null;
-      }
+      if(this.redZoneSource===source)this.redZoneSource=null;
     };
     source.start(startedAt);
-    return {duration:buffer.duration,startedAt};
+    return {duration:actualDuration,startedAt};
   }
   stopRedZone(){
     const source=this.redZoneSource;
