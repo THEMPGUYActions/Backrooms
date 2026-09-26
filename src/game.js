@@ -1484,7 +1484,7 @@ class Player{
     // the light origin. This matters most when the player is inches from a wall.
     const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.22);
     this.game.flash.position.copy(flashOrigin);
-    this.game.flashFill.position.copy(flashOrigin);
+    this.game.flashFill.position.copy(flashOrigin).addScaledVector(flashForward,1.35);
 
     const wallDistance=this.game.level.id==="0"
       ? this.game.world.flashlightWallDistance(
@@ -1512,7 +1512,7 @@ class Player{
       : 0;
 
     this.game.flashFill.distance=25;
-    this.game.flashFill.angle=.25;
+    // flashFill is a forward-biased point light; its position provides the directional falloff.
     this.game.flashFill.penumbra=.94;
     this.game.flashFill.decay=2;
     this.game.flashFill.intensity=this.flashlight
@@ -1935,7 +1935,7 @@ export class BackroomsGame{
     // The source Level 0 dimension has no skylight or ambient daylight. Keep
     // the base fill very low so fluorescent fixtures and the flashlight carry
     // the scene.
-    this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.020);this.scene.add(this.ambient);
+    this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.045);this.scene.add(this.ambient);
     this.flashTarget=new THREE.Object3D();
     this.flashFillTarget=new THREE.Object3D();
     // SpacePotato uses two deferred AreaLights for the flashlight: one broad
@@ -1945,7 +1945,7 @@ export class BackroomsGame{
     // 0.25-radian directional beam. A Three.js point light is a closer visual
     // match for the broad component than another concentrated spotlight.
     this.flash=new THREE.PointLight(0xfff1d5,0,25,2);
-    this.flashFill=new THREE.SpotLight(0xfff1d5,0,25,.25,.94,2);
+    this.flashFill=new THREE.PointLight(0xfff1d5,0,28,2);
     this.flash.castShadow=false;
     this.flashFill.castShadow=false;
     this.flashFill.target=this.flashFillTarget;
