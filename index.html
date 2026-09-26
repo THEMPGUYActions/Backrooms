@@ -183,6 +183,97 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="./src/main.js?v=20260923-l0anomaly2"></script>
+  <!-- DEV_DEBUG_START -->
+  <script>
+  (() => {
+    const params = new URLSearchParams(location.search);
+    const flag = name => {
+      if (!params.has(name)) return false;
+      const value = String(params.get(name) || "").trim().toLowerCase();
+      return value === "" || value === "1" || value === "true" || value === "yes" || value === "on";
+    };
+    if (!flag("debug")) return;
+
+    const rows = [];
+    const state = {};
+    const panel = document.createElement("aside");
+    panel.id = "backrooms-debug";
+    panel.style.cssText = [
+      "position:fixed","left:8px","right:8px","top:8px","z-index:2147483647",
+      "max-height:48vh","overflow:auto","padding:10px 12px",
+      "background:rgba(5,4,8,.94)","border:1px solid rgba(255,255,255,.18)",
+      "border-radius:8px","box-shadow:0 8px 30px rgba(0,0,0,.55)",
+      "color:#eee","font:12px/1.42 ui-monospace,SFMono-Regular,Menlo,monospace",
+      "backdrop-filter:blur(8px)","-webkit-backdrop-filter:blur(8px)"
+    ].join(";");
+    panel.innerHTML = '<div style="display:flex;gap:8px;align-items:center;position:sticky;top:0;background:rgba(5,4,8,.96);padding-bottom:7px"><b style="flex:1">BACKROOMS DEBUG</b><button id="br-debug-copy" type="button" style="padding:5px 8px;border:1px solid #777;background:#17121d;color:#fff;border-radius:5px">COPY</button></div><pre id="br-debug-out" style="margin:0;white-space:pre-wrap;word-break:break-word"></pre>';
+    document.body.appendChild(panel);
+    const output = panel.querySelector("#br-debug-out");
+    const stringify = value => {
+      try {
+        if (value instanceof Error) return value.name + ": " + value.message;
+        if (typeof value === "string") return value;
+        return JSON.stringify(value);
+      } catch { return String(value); }
+    };
+    const render = () => {
+      const game = window.backrooms;
+      const audio = game?.audio;
+      const media = audio?.redZoneMedia;
+      const info = {
+        url: location.href,
+        userAgent: navigator.userAgent,
+        screen: innerWidth + "x" + innerHeight + " dpr=" + devicePixelRatio,
+        adminFlag: flag("admin"),
+        debugFlag: flag("debug"),
+        level: game?.level?.id ?? "not initialized",
+        running: game?.running ?? false,
+        paused: game?.paused ?? false,
+        worldReady: game?.worldReady ?? false,
+        audioContext: audio?.ctx?.state ?? "not initialized",
+        audioReady: audio?.ready ?? false,
+        redZoneDuration: audio?.redZoneDuration ?? 0,
+        redZoneElapsed: audio?.redZoneElapsed?.() ?? 0,
+        redZoneBuffer: !!audio?.buffers?.get?.("red_zone"),
+        redZoneMediaReadyState: media?.readyState ?? "-",
+        redZoneMediaNetworkState: media?.networkState ?? "-",
+        redZoneMediaDuration: media?.duration ?? "-",
+        redZoneMediaError: media?.error ? ("code=" + media.error.code) : "-",
+        redZoneCanPlayOgg: media ? (media.canPlayType("audio/ogg; codecs=vorbis") || "no") : "-"
+      };
+      const lines = Object.entries({...info,...state}).map(([k,v]) => k + ": " + stringify(v));
+      output.textContent = lines.join("\n") + "\n\nLOG\n" + rows.slice(-40).join("\n");
+    };
+    const log = (message, detail) => {
+      rows.push(new Date().toISOString().slice(11,23) + " " + message + (detail === undefined ? "" : " " + stringify(detail)));
+      render();
+    };
+    window.__backroomsDebug = { log, setState(values){Object.assign(state,values);render()}, render };
+    window.addEventListener("error", event => log("[window.error]", {
+      message:event.message,source:event.filename,line:event.lineno,column:event.colno
+    }));
+    window.addEventListener("unhandledrejection", event => log("[unhandledrejection]", event.reason));
+    for (const method of ["error","warn"]) {
+      const original = console[method].bind(console);
+      console[method] = (...args) => {
+        original(...args);
+        log("[console." + method + "]", args.map(stringify).join(" "));
+      };
+    }
+    panel.querySelector("#br-debug-copy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(output.textContent);
+        log("[debug] copied");
+      } catch {
+        log("[debug] clipboard unavailable");
+      }
+    });
+    log("[debug] enabled");
+    render();
+    setInterval(render, 250);
+  })();
+  </script>
+  <!-- DEV_DEBUG_END -->
+  <script type="module" src="./src/main.js?v=20260926-debugaudio1"></script>
 </body>
 </html>
