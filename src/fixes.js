@@ -50,7 +50,20 @@ function installRoof(game){
     root.name="level0-roof-tiles";
     const material=world.library?.ceiling?.clone?.();
     if(!material)return;
-    material.color.setHex(0xb5a84e);
+    // Level 0 roof panels represent individual ceiling tiles. Do not inherit
+    // the global floor/ceiling repeat, which is tuned for large surfaces.
+    for(const key of ["map","roughnessMap","normalMap","aoMap"]){
+      const texture=material[key];
+      if(!texture)continue;
+      const cloned=texture.clone();
+      cloned.wrapS=THREE.ClampToEdgeWrapping;
+      cloned.wrapT=THREE.ClampToEdgeWrapping;
+      cloned.repeat.set(1,1);
+      cloned.offset.set(0,0);
+      cloned.needsUpdate=true;
+      material[key]=cloned;
+    }
+    material.color.setHex(0xffffff);
     material.roughness=.92;
     material.metalness=0;
     material.isMaterialShared=false;
