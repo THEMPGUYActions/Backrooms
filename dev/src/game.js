@@ -5,7 +5,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260923-2050";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling2";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260923-l0scale4";
 
 const VHSShader={
@@ -350,17 +350,13 @@ class Chunk{
           const [nx,nz,b,ob]=rng.pick(options);
           this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
         }
-        // Merge adjacent cells into irregular office/retail spaces instead of
-        // leaving the player inside a uniform one-cell maze.
+        // Keep the maze spatially tight so each 8m cell corresponds to one
+        // 8m roof panel. Only a small amount of room merging is allowed;
+        // broad multi-cell openings made the floor feel disconnected from
+        // the ceiling grid and too much like a warehouse.
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.24)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.24)this.setEdge(x,z,"south",true);
-        }
-        for(let z=0;z<cells;z+=2)for(let x=1;x<cells-1;x+=3){
-          if(rng.next()<.72)this.setEdge(x,z,"east",true);
-        }
-        for(let x=0;x<cells;x+=2)for(let z=1;z<cells-1;z+=3){
-          if(rng.next()<.62)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.08)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.08)this.setEdge(x,z,"south",true);
         }
       }
 
@@ -2214,7 +2210,7 @@ export class BackroomsGame{
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.intercomTimer=80+Math.random()*100;
     this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.024:.058);
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.020:.052;
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.032:.052;
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
