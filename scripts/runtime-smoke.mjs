@@ -179,8 +179,7 @@ try{
   });
   const adminButton=adminButtonResult.result?.result?.value;
   if(!adminButton?.ok||adminButton.hidden)throw new Error("Admin opener was not available after gameplay activation: "+JSON.stringify(adminButton));
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:adminButton.x,y:adminButton.y,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:adminButton.x,y:adminButton.y,button:"left",clickCount:1});
+  await command("Runtime.evaluate",{expression:"document.getElementById('admin-open')?.click()",returnByValue:true});
   await delay(250);
 
   const adminStateResult=await command("Runtime.evaluate",{
