@@ -28,23 +28,13 @@ export class BackroomsAdmin{
     this.opener.setAttribute("aria-label","Open admin panel");
     this.opener.setAttribute("aria-expanded","false");
     this.opener.hidden=false;
-    let lastTouchActivation=0;
-    const toggle=(event)=>{
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      if(!this.game.running||this.game.introActive)return;
-      this.opened?this.close():this.open();
-    };
-    this.opener.addEventListener("pointerup",event=>{
-      if(event.pointerType==="mouse")return;
+    // Use the native button click path. This is the most reliable activation
+    // path across iOS Safari/WebKit versions and avoids pointerType quirks.
+    this.opener.addEventListener("click",event=>{
       event.preventDefault();
       event.stopPropagation();
-      lastTouchActivation=performance.now();
-      toggle(event);
-    },{passive:false});
-    this.opener.addEventListener("click",event=>{
-      if(performance.now()-lastTouchActivation<700)return;
-      toggle(event);
+      if(!this.game.running||this.game.introActive)return;
+      this.opened?this.close():this.open();
     });
     this.ready=true;
     this.opener.hidden=false;
