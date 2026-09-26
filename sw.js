@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v20";
+const CACHE_NAME="backrooms-assets-v21";
 const CORE=[
   "index.html",
   "styles.css",
@@ -8,6 +8,7 @@ const CORE=[
   "src/audio.js",
   "src/levels.js",
   "src/admin.js",
+  "src/fixes.js",
   "favicon.svg"
 ];
 
