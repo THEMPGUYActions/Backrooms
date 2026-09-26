@@ -401,6 +401,51 @@ export class AudioDirector{
   flicker(){
     this.flickerAt();
   }
+  entityCue(type,state="alert",distance=8){
+    if(!this.ready)return;
+    const falloff=Math.max(.08,Math.min(1,1/(1+distance*.07)));
+    const chase=state==="chase";
+    if(type==="hound"){
+      this.tone(chase?88:104,chase?.18:.11,"sawtooth",(chase?.035:.022)*falloff);
+      this.noise(chase?.16:.08,(chase?.028:.014)*falloff,430);
+    }else if(type==="smiler"){
+      if(chase){
+        this.tone(52,.24,"sine",.022*falloff);
+        this.tone(1700,.035,"square",.012*falloff);
+      }else{
+        this.tone(980,.045,"sine",.008*falloff);
+      }
+    }else if(type==="skinstealer"){
+      this.noise(chase?.22:.11,(chase?.03:.014)*falloff,260);
+      this.tone(118,.18,"triangle",.018*falloff);
+    }else if(type==="bacteria"){
+      this.playBuffer("ambient_horror",{gain:.07*falloff,rate:.72+Math.random()*.22,pan:(Math.random()-.5)*.35,send:.5,delay:.2});
+      this.noise(.2,.018*falloff,700);
+    }else if(type==="deathmoth"){
+      this.noise(.13,.02*falloff,1800+Math.random()*900);
+      this.tone(170+Math.random()*70,.08,"triangle",.012*falloff);
+    }else if(type==="crawler"){
+      this.noise(.09,.022*falloff,1200);
+      this.tone(72,.12,"square",.012*falloff);
+    }else if(type==="clump"){
+      this.tone(48,.2,"sawtooth",.018*falloff);
+      this.noise(.12,.025*falloff,190);
+    }else if(type==="wretch"){
+      this.tone(64,.3,"sawtooth",.024*falloff);
+      if(chase)this.noise(.22,.025*falloff,360);
+    }else if(type==="duller"||type==="faceling"){
+      this.noise(.07,.01*falloff,550);
+      if(Math.random()<.35)this.tone(72,.09,"triangle",.009*falloff);
+    }else if(type==="partygoer"){
+      this.tone(440,.09,"square",.018*falloff);
+      this.tone(330,.12,"triangle",.012*falloff);
+    }else if(type==="deathrat"){
+      this.noise(.055,.016*falloff,1900);
+      this.tone(112,.06,"square",.01*falloff);
+    }else{
+      this.noise(.08,.012*falloff,800);
+    }
+  }
   pickup(){this.tone(523,.09,"sine",.04);this.tone(659,.12,"sine",.032)}
   intercom(){
     this.tone(1320,.055,"square",.012);
