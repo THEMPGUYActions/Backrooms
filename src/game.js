@@ -4,7 +4,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
-import { AudioDirector } from "./audio.js?v=20260926-redzone-audio1";
+import { AudioDirector } from "./audio.js?v=20260926-redzone-audio3";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
 
@@ -2428,7 +2428,6 @@ export class BackroomsGame{
       this.audio.getRedZoneMetadata().then(duration=>{
         if(token!==this.redZoneAudioToken||this.redZoneTrapped||!duration)return;
         this.redZoneAudioDuration=duration;
-        this.redZoneAudioStarted=true;
       }).catch(error=>console.warn("[Backrooms] Red Zone metadata failed:",error));
 
       this.audio.playRedZone().then(info=>{
