@@ -1,166 +1,185 @@
 import { createHash } from "node:crypto";
-import { readFile, readdir, stat, mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { join, basename, extname } from "node:path";
-import { tmpdir } from "node:os";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { cp, mkdir, readFile, readdir, stat, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 
-const exec = promisify(execFile);
 const root = process.cwd();
-const assetsDir = join(root, "assets", "entities");
-const manifestPath = join(root, "data", "entity-assets.json");
 const MAX_ENTITY_BYTES = 95 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+const PNG_SIGNATURE = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
 const GLB_MAGIC = Buffer.from("glTF");
 
-const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const assets = Object.entries(manifest.assets || {});
+const entityManifest = JSON.parse(await readFile(join(root,"data","entity-assets.json"),"utf8"));
+const pbrLock = JSON.parse(await readFile(join(root,"data","pbr-assets-lock.json"),"utf8"));
+const audioLock = JSON.parse(await readFile(join(root,"data","audio-assets-lock.json"),"utf8"));
 
-function envName(type){
-  return "ENTITY_" + type.replace(/[^a-z0-9]/gi, "_").toUpperCase() + "_URL";
+const SPB_SOURCE_COMMIT = "0c46c8301fc512c318ac93e23b669355b7d4b180";
+const SPB_SOURCE_REPO = "https://github.com/SpacePotatoee/MinecraftFoundFootage";
+const SPB_FILES = [
+  {name:"pbr/concrete/concrete_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/concrete/concrete_color.png"},
+  {name:"pbr/concrete/concrete_normal.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/concrete/concrete_normal.png"},
+  {name:"pbr/bricks/bricks_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/bricks/bricks_color.png"},
+  {name:"pbr/crate/crate_color.png",path:"src/main/resources/assets/spb-revamped/textures/block/pbr/crate/crate_color.png"},
+  {name:"fluorescent_light.png",path:"src/main/resources/assets/spb-revamped/textures/block/fluorescent_light.png"},
+  {name:"wall_trim_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_trim_texture.png"},
+  {name:"newstairs_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/newstairs_texture.png"},
+  {name:"level0/wall_block.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block.png"},
+  {name:"level0/wall_block_2_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2_texture.png"},
+  {name:"level0/wall_block_2.png",path:"src/main/resources/assets/spb-revamped/textures/block/wall_block_2.png"},
+  {name:"level0/wallpaper_bottom_block_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/wallpaper_bottom_block_texture.png"},
+  {name:"level0/pole.png",path:"src/main/resources/assets/spb-revamped/textures/block/pole.png"},
+  {name:"level0/plastic.png",path:"src/main/resources/assets/spb-revamped/textures/block/plastic.png"},
+  {name:"level0/power_pole_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/power_pole_texture.png"},
+  {name:"level0/power_pole_top_texture.png",path:"src/main/resources/assets/spb-revamped/textures/block/power_pole_top_texture.png"}
+];
+
+const entityDir=join(root,"assets","entities");
+const pbrDir=join(root,"assets","pbr");
+const audioDir=join(root,"assets","audio");
+const ffDir=join(root,"assets","found-footage");
+
+async function sha256(path){
+  return createHash("sha256").update(await readFile(path)).digest("hex");
 }
-
-async function isValidGlb(path){
+async function validGlb(path){
   try{
-    const info = await stat(path);
-    if(!info.isFile() || info.size < 20 || info.size > MAX_ENTITY_BYTES)return false;
-    const data = await readFile(path);
-    if(!data.subarray(0,4).equals(GLB_MAGIC))return false;
-    if(data.readUInt32LE(4)!==2)return false;
-    if(data.readUInt32LE(8)!==data.length)return false;
-    return true;
+    const info=await stat(path);
+    if(!info.isFile()||info.size<20||info.size>MAX_ENTITY_BYTES)return false;
+    const data=await readFile(path);
+    return data.subarray(0,4).equals(GLB_MAGIC)&&data.readUInt32LE(4)===2&&data.readUInt32LE(8)===data.length;
   }catch{return false}
 }
-
-const missing=[];
-for(const [type,entry] of assets){
-  const path=join(assetsDir,entry.file);
-  if(!(await isValidGlb(path)))missing.push([type,entry,path]);
+async function validPng(path){
+  try{
+    const info=await stat(path);
+    if(!info.isFile()||info.size<24||info.size>MAX_IMAGE_BYTES)return false;
+    const data=await readFile(path);
+    return data.subarray(0,8).equals(PNG_SIGNATURE);
+  }catch{return false}
+}
+async function validAudio(path){
+  try{
+    const info=await stat(path);
+    return info.isFile()&&info.size>0&&info.size<=MAX_AUDIO_BYTES;
+  }catch{return false}
+}
+async function download(url){
+  const r=await fetch(url,{redirect:"follow",headers:{"User-Agent":"THEMPGUY-Backrooms-asset-bootstrap/1.0"}});
+  if(!r.ok)throw new Error("HTTP "+r.status+" for "+url);
+  return Buffer.from(await r.arrayBuffer());
+}
+async function saveChecked(path,data,kind){
+  await mkdir(join(path,".."),{recursive:true});
+  if(kind==="glb"&&(!data.subarray(0,4).equals(GLB_MAGIC)||data.readUInt32LE(4)!==2||data.readUInt32LE(8)!==data.length))
+    throw new Error("Invalid glTF 2.0 GLB: "+path);
+  if(kind==="png"&&!data.subarray(0,8).equals(PNG_SIGNATURE))
+    throw new Error("Invalid PNG: "+path);
+  await writeFile(path,data);
+  return {bytes:data.length,sha256:createHash("sha256").update(data).digest("hex")};
 }
 
-if(missing.length===0){
-  console.log("[entities] All real entity GLBs are already committed. No external downloads performed.");
-  process.exit(0);
-}
+let changed=false;
+const downloaded={entities:[],pbr:[],audio:[],foundFootage:[]};
+await mkdir(entityDir,{recursive:true});
+await mkdir(pbrDir,{recursive:true});
+await mkdir(audioDir,{recursive:true});
+await mkdir(ffDir,{recursive:true});
 
-console.log("[entities] Missing " + missing.length + " entity model(s): " + missing.map(([type])=>type).join(", "));
-
-async function downloadBytes(url,headers={}){
-  const response=await fetch(url,{
-    redirect:"follow",
-    headers:{
-      "User-Agent":"THEMPGUY-Backrooms-entity-bootstrap/1.0",
-      ...headers
-    }
-  });
-  if(!response.ok)throw new Error("HTTP "+response.status+" for "+url);
-  const data=Buffer.from(await response.arrayBuffer());
-  if(!data.length||data.length>MAX_ENTITY_BYTES*2)throw new Error("Downloaded file is too large for "+url);
-  return data;
-}
-
-async function findGlb(dir){
-  const entries=await readdir(dir,{withFileTypes:true});
-  for(const entry of entries){
-    const path=join(dir,entry.name);
-    if(entry.isDirectory()){
-      const nested=await findGlb(path);
-      if(nested)return nested;
-    }else if(extname(entry.name).toLowerCase()===".glb" && await isValidGlb(path)){
-      return path;
-    }
+// 1. Real entity models: only fetch when the binary is absent.
+for(const [type,entry] of Object.entries(entityManifest.assets||{})){
+  const target=join(entityDir,entry.file);
+  if(await validGlb(target))continue;
+  const configured=String(process.env["ENTITY_"+type.toUpperCase()+"_URL"]||entry.directUrl||"").trim();
+  let url=configured;
+  if(!url&&process.env.SKETCHFAB_ACCESS_TOKEN?.trim()&&entry.uid){
+    const r=await fetch("https://api.sketchfab.com/v3/models/"+entry.uid+"/download",{
+      headers:{Authorization:"Bearer "+process.env.SKETCHFAB_ACCESS_TOKEN.trim(),Accept:"application/json","User-Agent":"THEMPGUY-Backrooms-asset-bootstrap/1.0"}
+    });
+    if(!r.ok)throw new Error("Sketchfab download request failed for "+entry.file+": HTTP "+r.status);
+    const json=await r.json();
+    url=json?.glb?.url||"";
   }
-  return null;
-}
-
-async function materializeDownload(type,entry,url,temp){
-  const data=await downloadBytes(url);
-  const header=data.subarray(0,4);
-  if(header.equals(GLB_MAGIC)){
-    const path=join(temp,entry.file);
-    await writeFile(path,data);
-    return path;
-  }
-  if(header[0]===0x50&&header[1]===0x4b&&header[2]===0x03&&header[3]===0x04){
-    const zip=join(temp,"model.zip");
-    await writeFile(zip,data);
-    await exec("unzip",["-q","-o",zip,"-d",temp]);
-    const glb=await findGlb(temp);
-    if(glb)return glb;
-    throw new Error(type+" archive did not contain a valid GLB. Use a direct .glb download URL for this asset.");
-  }
-  throw new Error(type+" download is neither a GLB nor a ZIP archive.");
-}
-
-async function copyGlb(source,target){
-  const data=await readFile(source);
-  if(!data.subarray(0,4).equals(GLB_MAGIC)||data.readUInt32LE(4)!==2)throw new Error("Invalid GLB: "+source);
-  if(data.readUInt32LE(8)!==data.length)throw new Error("GLB length header mismatch: "+basename(source));
-  if(data.length>MAX_ENTITY_BYTES)throw new Error("GLB exceeds 95 MiB: "+basename(source));
-  const sha256=createHash("sha256").update(data).digest("hex");
-  await writeFile(target,data);
-  return {bytes:data.length,sha256};
-}
-
-async function resolveSketchfabUrl(entry){
-  const token=process.env.SKETCHFAB_ACCESS_TOKEN?.trim();
-  if(!token||!entry.uid)return null;
-
-  const response=await fetch("https://api.sketchfab.com/v3/models/"+entry.uid+"/download",{
-    headers:{
-      "Authorization":"Bearer "+token,
-      "Accept":"application/json",
-      "User-Agent":"THEMPGUY-Backrooms-entity-bootstrap/1.0"
-    }
-  });
-  if(!response.ok)throw new Error("Sketchfab download request failed for "+entry.file+": HTTP "+response.status);
-  const json=await response.json();
-  return json?.glb?.url||json?.gltf?.url||null;
-}
-
-await mkdir(assetsDir,{recursive:true});
-await exec("git",["lfs","install","--local"]);
-
-let downloaded=[];
-for(const [type,entry,target] of missing){
-  const configuredUrl=String(process.env[envName(type)]||entry.directUrl||"").trim();
-  const url=configuredUrl||await resolveSketchfabUrl(entry);
-
   if(!url){
-    console.warn("[entities] No bootstrap URL/token for "+type+". Skipping it. Normal builds remain fully self-contained and make no external model request.");
+    console.warn("[assets] No source configured for missing entity "+type+"; leaving it for later bootstrap.");
     continue;
   }
-
-  console.log("[entities] Bootstrapping "+type+"...");
-  const temp=await mkdtemp(join(tmpdir(),"backrooms-entity-"));
-  try{
-    const selected=await materializeDownload(type,entry,url,temp);
-    const meta=await copyGlb(selected,target);
-    downloaded.push({type,entry,target,...meta});
-    console.log("[entities] Added "+entry.file+" ("+meta.bytes+" bytes, sha256 "+meta.sha256+").");
-  }finally{
-    await rm(temp,{recursive:true,force:true});
-  }
+  console.log("[assets] Downloading entity "+type+" once...");
+  const data=await download(url);
+  const meta=await saveChecked(target,data,"glb");
+  downloaded.entities.push({type,file:entry.file,url,bytes:meta.bytes,sha256:meta.sha256});
+  changed=true;
 }
 
-if(!downloaded.length){
-  console.log("[entities] Nothing was downloaded. Existing local assets remain untouched.");
+// 2. CC0 PBR image maps: download once into /assets/pbr.
+for(const [filename,entry] of Object.entries(pbrLock.files||{})){
+  const target=join(pbrDir,filename);
+  if(await validPng(target))continue;
+  console.log("[assets] Downloading PBR image "+filename+" once...");
+  const data=await download(entry.url);
+  if(data.length!==entry.bytes)throw new Error("PBR byte count changed: "+filename);
+  const got=createHash("sha256").update(data).digest("hex");
+  if(got!==entry.sha256)throw new Error("PBR checksum changed: "+filename);
+  await saveChecked(target,data,"png");
+  downloaded.pbr.push({file:filename,url:entry.url,bytes:data.length,sha256:got});
+  changed=true;
+}
+
+// 3. CC0 sound files: download once into /assets/audio.
+for(const [filename,entry] of Object.entries(audioLock.files||{})){
+  const target=join(audioDir,filename);
+  if(await validAudio(target))continue;
+  console.log("[assets] Downloading audio "+filename+" once...");
+  const data=await download(entry.url);
+  if(data.length>MAX_AUDIO_BYTES)throw new Error("Audio exceeds 8 MiB: "+filename);
+  const meta=await saveChecked(target,data,"audio");
+  downloaded.audio.push({file:filename,url:entry.url,source:entry.source,author:entry.author,license:entry.license,bytes:meta.bytes,sha256:meta.sha256});
+  changed=true;
+}
+
+// 4. Found Footage image assets: download once into /assets/found-footage.
+for(const entry of SPB_FILES){
+  const target=join(ffDir,entry.name);
+  if(await validPng(target))continue;
+  const url="https://raw.githubusercontent.com/SpacePotatoee/MinecraftFoundFootage/"+SPB_SOURCE_COMMIT+"/"+entry.path;
+  console.log("[assets] Downloading Found Footage image "+entry.name+" once...");
+  const data=await download(url);
+  const meta=await saveChecked(target,data,"png");
+  downloaded.foundFootage.push({file:entry.name,url,source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,bytes:meta.bytes,sha256:meta.sha256});
+  changed=true;
+}
+
+// Manifests live beside the committed assets so the build has no network dependency.
+await writeFile(join(pbrDir,"manifest.json"),JSON.stringify({
+  pack:pbrLock.pack,author:pbrLock.author,source:pbrLock.source,license:pbrLock.license,
+  files:pbrLock.files
+},null,2)+"\n");
+await writeFile(join(audioDir,"manifest.json"),JSON.stringify({
+  pack:audioLock.pack,license:audioLock.license,files:audioLock.files
+},null,2)+"\n");
+await writeFile(join(ffDir,"manifest.json"),JSON.stringify({
+  source:SPB_SOURCE_REPO,commit:SPB_SOURCE_COMMIT,license:"GPL-3.0-only",
+  files:SPB_FILES
+},null,2)+"\n");
+
+if(!changed){
+  console.log("[assets] All bootstrap assets are already committed. No external downloads performed.");
   process.exit(0);
 }
 
+const {execFile}=await import("node:child_process");
+const {promisify}=await import("node:util");
+const exec=promisify(execFile);
+await exec("git",["lfs","install","--local"]);
 await exec("git",["config","user.name","github-actions[bot]"]);
 await exec("git",["config","user.email","41898282+github-actions[bot]@users.noreply.github.com"]);
-
-const trackedPaths=downloaded.map(item=>item.target.replace(root+"/",""));
-await exec("git",["add",...trackedPaths,".gitattributes"]);
+await exec("git",["add","assets",".gitattributes"]);
 const status=await exec("git",["status","--porcelain"]);
 if(!status.stdout.trim()){
-  console.log("[entities] Downloads produced no Git changes.");
+  console.log("[assets] No Git changes after download.");
   process.exit(0);
 }
-
-await exec("git",["commit","-m","assets: bootstrap real entity models"]);
+await exec("git",["commit","-m","assets: bootstrap bundled media"]);
 const branch=process.env.GITHUB_REF_NAME||"dev";
 await exec("git",["push","origin","HEAD:"+branch]);
-
-console.log("[entities] Committed "+downloaded.length+" real entity model(s) to "+branch+".");
-console.log("[entities] Future deployments use the committed binaries. External sources are only contacted again if a model file is missing.");
+console.log("[assets] Committed the newly downloaded media to "+branch+".");
+console.log("[assets] Future builds use committed files and do not probe external URLs.");
