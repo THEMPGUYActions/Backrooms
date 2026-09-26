@@ -173,6 +173,16 @@ try{
     }).join("\n");
     throw new Error("Runtime browser errors:\n"+detail);
   }
+  const adminButtonResult=await command("Runtime.evaluate",{
+    expression:"(()=>{const b=document.getElementById('admin-open');if(!b)return false;const r=b.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,hidden:b.hidden}})()",
+    returnByValue:true
+  });
+  const adminButton=adminButtonResult.result?.result?.value;
+  if(!adminButton?.ok||adminButton.hidden)throw new Error("Admin opener was not available after gameplay activation: "+JSON.stringify(adminButton));
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:adminButton.x,y:adminButton.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:adminButton.x,y:adminButton.y,button:"left",clickCount:1});
+  await delay(250);
+
   const adminStateResult=await command("Runtime.evaluate",{
     expression:"JSON.stringify({enabled:window.backrooms.admin.enabled,ready:!!window.backroomsAdmin?.ready,opened:!!window.backroomsAdmin?.opened,panel:!!document.getElementById('admin-panel'),panelVisible:!!document.getElementById('admin-panel')&&!document.getElementById('admin-panel').classList.contains('hidden'),running:window.backrooms.running,introActive:window.backrooms.introActive})",
     returnByValue:true
