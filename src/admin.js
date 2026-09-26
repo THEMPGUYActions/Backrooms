@@ -22,26 +22,24 @@ export class BackroomsAdmin{
     this.opener.setAttribute("aria-label","Open admin panel");
     this.opener.setAttribute("aria-expanded","false");
     document.body.appendChild(this.opener);
-    let lastPointerActivation=0;
+    let lastTouchActivation=0;
     const toggle=(event)=>{
-      const now=performance.now();
-      if(now-lastPointerActivation<700)return;
-      lastPointerActivation=now;
       event?.preventDefault?.();
       event?.stopPropagation?.();
       if(!this.game.running||this.game.introActive)return;
       this.opened?this.close():this.open();
     };
-    // Handle the button at pointerdown so touch cannot be swallowed by the
-    // canvas/game input layer. Preventing the default touch action also stops
-    // the browser's compatibility click from toggling the panel a second time.
-    this.opener.addEventListener("pointerdown",event=>{
-      if(event.isPrimary!==false)toggle(event);
-    },{passive:false});
+    // Click is the canonical activation path for mouse, keyboard, and touch.
+    // Add a touchend fallback for iOS/WebKit and suppress its compatibility
+    // click so one tap can never toggle the panel twice.
     this.opener.addEventListener("click",event=>{
-      // Keyboard activation has no pointerdown, so keep click as its fallback.
-      if(event.detail===0)toggle(event);
-    }); 
+      if(performance.now()-lastTouchActivation<700)return;
+      toggle(event);
+    });
+    this.opener.addEventListener("touchend",event=>{
+      lastTouchActivation=performance.now();
+      toggle(event);
+    },{passive:false});
     this.ready=true;
     this.opener.hidden=false;
   }
