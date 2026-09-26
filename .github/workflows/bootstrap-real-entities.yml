@@ -1,0 +1,84 @@
+name: TEMP - Bootstrap Real Entity Models
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-real-entity-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Download and commit real entity GLBs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev with Git LFS
+        uses: actions/checkout@v6
+        with:
+          ref: dev
+          lfs: true
+          fetch-depth: 0
+
+      - name: Download supplied models
+        shell: bash
+        env:
+          SMILER_URL: ${{ secrets.ENTITY_SMILER_URL }}
+          HOUND_URL: ${{ secrets.ENTITY_HOUND_URL }}
+          SKINSTEALER_URL: ${{ secrets.ENTITY_SKINSTEALER_URL }}
+          DULLER_URL: ${{ secrets.ENTITY_DULLER_URL }}
+          DEATHMOTH_URL: ${{ secrets.ENTITY_DEATHMOTH_URL }}
+          FACELING_URL: ${{ secrets.ENTITY_FACELING_URL }}
+          PARTYGOER_URL: ${{ secrets.ENTITY_PARTYGOER_URL }}
+          BACTERIA_URL: ${{ secrets.ENTITY_BACTERIA_URL }}
+        run: |
+          set -u
+          mkdir -p assets/entities
+          download() {
+            name="$1"
+            url="$2"
+            out="assets/entities/$name.glb"
+            if [ -z "$url" ]; then
+              echo "SKIP $name: URL not configured"
+              return 0
+            fi
+            echo "Downloading $name..."
+            curl --fail --location --retry 4 --retry-delay 2 --connect-timeout 20 --max-time 180 -sS "$url" -o "$out"
+            python3 - "$out" "$name" <<'PY'
+          import sys, struct, os
+          p, name = sys.argv[1], sys.argv[2]
+          data = open(p, "rb").read(12)
+          if len(data) < 12 or data[:4] != b"glTF":
+              raise SystemExit(f"{name}: downloaded file is not a GLB")
+          version, declared = struct.unpack_from("<II", data, 4)
+          actual = os.path.getsize(p)
+          if version != 2:
+              raise SystemExit(f"{name}: unsupported GLB version {version}")
+          if declared > actual:
+              raise SystemExit(f"{name}: truncated GLB ({declared} > {actual})")
+          print(f"OK {name}: GLB v{version}, {actual} bytes")
+          PY
+          }
+          download smiler "$SMILER_URL"
+          download hound "$HOUND_URL"
+          download skinstealer "$SKINSTEALER_URL"
+          download duller "$DULLER_URL"
+          download deathmoth "$DEATHMOTH_URL"
+          download faceling "$FACELING_URL"
+          download partygoer "$PARTYGOER_URL"
+          download bacteria "$BACTERIA_URL"
+
+      - name: Commit models to dev
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/entities
+          if git diff --cached --quiet; then
+            echo "No entity model changes to commit."
+            exit 0
+          fi
+          git commit -m "assets: bootstrap real entity models"
+          git push origin HEAD:dev
