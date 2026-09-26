@@ -1519,75 +1519,161 @@ class Player{
   }
 }
 
+function entityNoiseTexture(base="#b6b2aa",dark="#716d67"){
+  if(typeof document==="undefined")return null;
+  const canvas=document.createElement("canvas");canvas.width=64;canvas.height=64;
+  const ctx=canvas.getContext("2d");ctx.fillStyle=base;ctx.fillRect(0,0,64,64);
+  const image=ctx.getImageData(0,0,64,64),d=image.data;
+  for(let i=0;i<d.length;i+=4){
+    const n=Math.random()*42-21;
+    d[i]=Math.max(0,Math.min(255,d[i]+n));
+    d[i+1]=Math.max(0,Math.min(255,d[i+1]+n));
+    d[i+2]=Math.max(0,Math.min(255,d[i+2]+n));
+  }
+  ctx.putImageData(image,0,0);
+  ctx.globalAlpha=.18;ctx.fillStyle=dark;
+  for(let i=0;i<18;i++)ctx.fillRect(Math.random()*64,Math.random()*64,1+Math.random()*7,1+Math.random()*2);
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.wrapS=THREE.RepeatWrapping;texture.wrapT=THREE.RepeatWrapping;
+  texture.repeat.set(2,2);
+  return texture;
+}
+
+function makeBacteria(group){
+  const wireMat=new THREE.LineBasicMaterial({color:0x050505,transparent:true,opacity:.92});
+  const glowMat=new THREE.MeshStandardMaterial({color:0x080808,roughness:1,emissive:0x000000});
+  const points=[];
+  const addWire=(a,b)=>{points.push(a.x,a.y,a.z,b.x,b.y,b.z)};
+  const hip=new THREE.Vector3(0,1.35,0),chest=new THREE.Vector3(0,2.25,0),head=new THREE.Vector3(0,3.0,0);
+  addWire(hip,chest);addWire(chest,head);
+  addWire(new THREE.Vector3(-.08,1.35,0),new THREE.Vector3(-.28,.35,-.08));
+  addWire(new THREE.Vector3(.08,1.35,0),new THREE.Vector3(.28,.35,-.08));
+  addWire(new THREE.Vector3(-.08,2.3,0),new THREE.Vector3(-.7,1.35,-.02));
+  addWire(new THREE.Vector3(.08,2.3,0),new THREE.Vector3(.7,1.35,-.02));
+  addWire(new THREE.Vector3(-.7,1.35,-.02),new THREE.Vector3(-.95,.7,-.12));
+  addWire(new THREE.Vector3(.7,1.35,-.02),new THREE.Vector3(.95,.7,-.12));
+  const lineGeom=new THREE.BufferGeometry();
+  lineGeom.setAttribute("position",new THREE.Float32BufferAttribute(points,3));
+  group.add(new THREE.LineSegments(lineGeom,wireMat));
+  const headMesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.42,1),glowMat);
+  headMesh.scale.set(1,.9,1.15);headMesh.position.set(0,3,0);group.add(headMesh);
+  const jaw=new THREE.Mesh(new THREE.TorusGeometry(.19,.045,5,12,Math.PI),wireMat);
+  jaw.rotation.set(Math.PI/2,0,0);jaw.position.set(0,2.92,-.39);group.add(jaw);
+  group.userData.height=3.2;
+}
+
+function makeHound(group){
+  const fur=new THREE.MeshStandardMaterial({color:0x090909,roughness:1});
+  const eye=new THREE.MeshStandardMaterial({color:0xffe7a8,emissive:0xffd36a,emissiveIntensity:4});
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.8,6,10),fur);
+  torso.rotation.z=Math.PI/2;torso.scale.set(1.15,.75,1.0);torso.position.set(0,.85,0);group.add(torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.38,12,9),fur);head.scale.set(1.05,.9,1.2);head.position.set(0,1.02,-.58);group.add(head);
+  for(const x of [-.15,.15]){
+    const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.09,.65,5,7),fur);leg.rotation.z=x<0?.22:-.22;leg.position.set(x,.48,.03);group.add(leg);
+  }
+  for(const x of [-.13,.13]){
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.045,8,6),eye);e.position.set(x,1.08,-.91);group.add(e);
+  }
+  const mouth=new THREE.Mesh(new THREE.TorusGeometry(.16,.035,5,16,Math.PI),eye);mouth.rotation.set(Math.PI/2,0,0);mouth.position.set(0,.91,-.92);group.add(mouth);
+  group.userData.height=1.35;
+}
+
+function makeSkinStealer(group){
+  const tex=entityNoiseTexture("#b9b5ae","#6c6964");
+  const skin=new THREE.MeshStandardMaterial({color:0xc8c4bc,roughness:.92,map:tex});
+  const dark=new THREE.MeshStandardMaterial({color:0xeeeae2,roughness:.8});
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.32,1.15,8,12),skin);
+  body.scale.set(.8,1.35,.72);body.position.y=1.35;group.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.31,14,10),skin);head.scale.set(.9,1.1,.82);head.position.set(0,2.42,0);group.add(head);
+  for(const x of [-.11,.11]){
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.035,8,6),dark);e.position.set(x,2.47,-.275);group.add(e);
+  }
+  for(const x of [-.2,.2]){
+    const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.09,.9,6,8),skin);arm.position.set(x,1.38,0);arm.rotation.z=x<0?.08:-.08;group.add(arm);
+  }
+  group.userData.height=2.75;
+}
+
+function makeSmiler(group){
+  const dark=new THREE.MeshStandardMaterial({color:0x000000,roughness:1});
+  const glow=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:10});
+  const face=new THREE.Mesh(new THREE.CircleGeometry(.78,32),dark);face.rotation.y=Math.PI;group.add(face);
+  for(const x of [-.25,.25]){
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),glow);e.position.set(x,.18,-.06);group.add(e);
+  }
+  const smile=new THREE.Mesh(new THREE.TorusGeometry(.36,.065,8,28,Math.PI),glow);smile.rotation.set(Math.PI/2,0,0);smile.position.set(0,-.12,-.07);group.add(smile);
+  group.userData.height=1.6;
+}
+
 class EntityManager{
-  constructor(game){this.game=game;this.entities=[]}
+  constructor(game){this.game=game;this.entities=[];this.serial=0}
   clear(){for(const e of this.entities)this.game.scene.remove(e.group);this.entities=[]}
+  create(type,position,key=null){
+    const group=new THREE.Group();group.position.copy(position);
+    if(type==="bacteria")makeBacteria(group);
+    else if(type==="hound")makeHound(group);
+    else if(type==="skinstealer")makeSkinStealer(group);
+    else if(type==="smiler")makeSmiler(group);
+    else return null;
+    group.userData.entityType=type;
+    this.game.scene.add(group);
+    const e={key:key||"manual:"+(++this.serial),type,group,state:"idle",cool:0,age:0};
+    this.entities.push(e);
+    return e;
+  }
+  summon(type){
+    if(!["bacteria","hound","skinstealer","smiler"].includes(type))return false;
+    const p=this.game.player;
+    const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw));
+    const pos=p.position.clone().addScaledVector(forward,Math.max(5,this.game.level.cellSize*1.5));
+    pos.y=0;
+    this.create(type,pos);
+    this.game.triggerFear(.12);
+    this.game.toast("SUMMONED "+type.replace("skinstealer","SKIN-STEALER").toUpperCase(),1.4);
+    return true;
+  }
   spawnForChunks(){
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
       const cell=this.game.level.cellSize,rng=new RNG(c.seedKey()^0x4a91);
-      const grid=this.game.level.gridSize||CELLS,minSpawn=1,maxSpawn=Math.max(1,grid-2);const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
+      const grid=this.game.level.gridSize||CELLS,minSpawn=1,maxSpawn=Math.max(1,grid-2);
+      const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2,type=this.game.level.entity;
       if(type==="none")continue;
-      const group=new THREE.Group();group.position.set(x,0,z);
-      if(type==="hound"){
-        const mat=new THREE.MeshStandardMaterial({color:0x050505,roughness:.95,metalness:.05});
-        const body=box(group,new THREE.SphereGeometry(.48,12,8),mat,0,.75,0);body.scale.set(.8,1.25,1.15);
-        box(group,new THREE.CapsuleGeometry(.12,.62,5,8),mat,-.3,.45,-.18,0,.12,.1);
-        box(group,new THREE.CapsuleGeometry(.12,.62,5,8),mat,.3,.45,-.18,0,-.12,-.1);
-        const eye=new THREE.MeshStandardMaterial({color:0xffe7a8,emissive:0xffd36a,emissiveIntensity:5});
-        box(group,new THREE.SphereGeometry(.055,8,8),eye,-.12,.86,-.42);box(group,new THREE.SphereGeometry(.055,8,8),eye,.12,.86,-.42);
-      }else if(type==="figure"){
-        const mat=new THREE.MeshStandardMaterial({color:0x010101,roughness:1,metalness:0,transparent:true,opacity:.82});
-        const body=box(group,new THREE.CapsuleGeometry(.16,.98,6,8),mat,0,1.05,0);
-        body.scale.set(.72,1.35,.62);
-        box(group,new THREE.SphereGeometry(.19,10,7),mat,0,1.86,0);
-        box(group,new THREE.CapsuleGeometry(.045,.92,5,7),mat,-.23,1.02,0,0,0,-.08);
-        box(group,new THREE.CapsuleGeometry(.045,.92,5,7),mat,.23,1.02,0,0,0,.08);
-      }else{
-        const mat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1});
-        box(group,new THREE.SphereGeometry(.72,16,10),mat,0,1.4,0);
-        const eyeMat=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:14});
-        box(group,new THREE.SphereGeometry(.08,8,8),eyeMat,-.18,1.52,-.66);box(group,new THREE.SphereGeometry(.08,8,8),eyeMat,.18,1.52,-.66);
-        box(group,new THREE.TorusGeometry(.28,.055,6,20,Math.PI),eyeMat,0,1.27,-.67,0,Math.PI,0);
-      }
-      group.scale.setScalar(.9+rng.next()*.4);this.game.scene.add(group);this.entities.push({key,type,group,state:"idle",cool:0});
-      if(type==="figure")this.game.triggerFear(.02);
+      this.create(type,new THREE.Vector3(x,0,z),key);
     }
   }
   update(dt){
     const p=this.game.player;
     for(const e of [...this.entities]){
-      const dx=p.position.x-e.group.position.x,dz=p.position.z-e.group.position.z,d=Math.hypot(dx,dz);e.cool-=dt;
-      if(d>50){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
-      if(e.type==="hound"){
+      const dx=p.position.x-e.group.position.x,dz=p.position.z-e.group.position.z,d=Math.hypot(dx,dz)||.001;e.cool-=dt;e.age+=dt;
+      if(d>65&&e.key.startsWith("manual:")){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
+      if(e.type==="bacteria"){
+        if(d<28&&e.state!=="chase"){e.state="chase";this.game.triggerFear(.38);this.game.audio.scare();e.cool=1.2}
+        if(e.state==="chase"){const speed=d<10?2.55:1.55;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
+        if(d<1.15&&!this.game.admin?.god)this.game.die("THE BACTERIA FOUND YOU.");
+        e.group.lookAt(p.position.x,e.group.position.y,p.position.z);
+      }else if(e.type==="hound"){
         const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw)),to=new THREE.Vector3(dx,0,dz).normalize(),looking=forward.dot(to)<-.48;
-        if(d<13&&!looking&&e.state!=="chase"){e.state="chase";this.game.audio.scare();this.game.triggerFear(.45);e.cool=2.7}
+        if(d<13&&!looking)e.state="chase";
         if(d<10&&looking)e.state="intimidated";
-        if(e.state==="chase"&&e.cool<=0){const s=1.45*dt;e.group.position.x+=dx/d*s;e.group.position.z+=dz/d*s}
-        if(e.state==="intimidated"){e.group.position.x-=dx/d*.7*dt;e.group.position.z-=dz/d*.7*dt;if(d>14)e.state="idle"}
-        e.group.lookAt(p.position.x,1,p.position.z);if(d<1.05&&e.state==="chase"){p.health-=dt*38;this.game.audio.hurt()}
-      }else if(e.type==="figure"){
-        const forward=new THREE.Vector3(-Math.sin(p.viewYaw),0,-Math.cos(p.viewYaw)),to=new THREE.Vector3(dx,0,dz).normalize();
-        const looking=forward.dot(to)<-.78;
-        if(d<28&&!looking){
-          e.group.position.x+=dx/d*.32*dt;
-          e.group.position.z+=dz/d*.32*dt;
-          e.group.visible=true;
-        }
-        if(looking&&d<24)e.group.userData.seen=(e.group.userData.seen||0)+dt;
-        else e.group.userData.seen=0;
-        if(e.group.userData.seen>.35){
-          e.group.visible=false;
-          e.group.position.x+=-dx/d*1.8;
-          e.group.position.z+=-dz/d*1.8;
-          e.group.userData.seen=0;
-        }
-        if(d<18)this.game.triggerFear(.07*dt);
-        e.group.lookAt(p.position.x,1.2,p.position.z);
-      }else{
-        const lightOn=p.flashlight;if(lightOn&&d<18){e.group.position.x-=dx/d*dt*2.2;e.group.position.z-=dz/d*dt*2.2}
-        if(!lightOn&&d<15){e.group.position.x+=dx/d*dt*1.4;e.group.position.z+=dz/d*dt*1.4}
-        if(d<1.1&&!this.game.admin?.god){p.health-=dt*42;this.game.audio.hurt()}e.group.lookAt(p.position.x,1,p.position.z);
+        if(e.state==="chase"){const speed=1.75;e.group.position.x+=dx/d*speed*dt;e.group.position.z+=dz/d*speed*dt}
+        if(e.state==="intimidated"){e.group.position.x-=dx/d*.65*dt;e.group.position.z-=dz/d*.65*dt;if(d>14)e.state="idle"}
+        if(d<1.05&&e.state==="chase"&&!this.game.admin?.god)e.game?.die?.("A HOUND GOT YOU.");
+        if(d<1.05&&e.state==="chase"&&!this.game.admin?.god)this.game.die("A HOUND GOT YOU.");
+        e.group.lookAt(p.position.x,.7,p.position.z);
+      }else if(e.type==="skinstealer"){
+        const light=this.game.player.flashlight;
+        if(d<18&&light)e.group.position.x-=dx/d*.55*dt,e.group.position.z-=dz/d*.55*dt;
+        else if(d<18)e.group.position.x+=dx/d*.75*dt,e.group.position.z+=dz/d*.75*dt;
+        if(d<1.0&&!this.game.admin?.god)this.game.die("THE SKIN-STEALER CAUGHT YOU.");
+        e.group.lookAt(p.position.x,e.group.position.y+.9,p.position.z);
+      }else if(e.type==="smiler"){
+        const light=this.game.player.flashlight;
+        if(light&&d<20){e.group.position.x-=dx/d*1.35*dt;e.group.position.z-=dz/d*1.35*dt}
+        else if(!light&&d<16){e.group.position.x+=dx/d*.9*dt;e.group.position.z+=dz/d*.9*dt}
+        if(d<1.1&&!this.game.admin?.god)this.game.die("THE SMILER GOT TOO CLOSE.");
+        e.group.lookAt(p.position.x,p.position.y,e.group.position.z);
       }
     }
     this.spawnForChunks();
