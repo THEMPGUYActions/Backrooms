@@ -321,14 +321,22 @@ export class BackroomsAdmin{
   zone(kind){
     if(!this.ready||!this.game.running||this.game.introActive)return;
     if(this.game.level.id!=="0"){this.game.toast("LEVEL 0 ONLY",1.2);return}
+    const cx=Math.floor((this.game.player.position.x+this.game.world.size/2)/this.game.world.size);
+    const cz=Math.floor((this.game.player.position.z+this.game.world.size/2)/this.game.world.size);
     if(kind==="blackout"){
-      this.game.lightState="BLACKOUT";
-      this.game.lightEventTimer=999999;
+      this.game.world.forceLevel0Zone={type:"blackout",cx,cz};
+      this.game.lightState="ON";
+      this.game.lightEventTimer=20;
+      this.game.world.configure();
+      this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
+      this.game.entityManager.clear();
       this.game.audio.lightsOut();
       this.game.triggerFear(.48);
-      this.game.toast("FORCED BLACKOUT",1.3);
+      this.game.toast("BLACKOUT ZONE LOADED",1.3);
     }else if(kind==="red"){
-      this.game.world.forceLevel0Zone="red";
+      this.game.world.forceLevel0Zone={type:"red",cx,cz};
+      this.game.lightState="ON";
+      this.game.lightEventTimer=20;
       this.game.world.configure();
       this.game.world.ensureAround(this.game.player.position.x,this.game.player.position.z);
       this.game.entityManager.clear();
