@@ -2017,14 +2017,14 @@ class EntityManager{
         if(waypoint){
           if(Math.hypot(waypoint.x-e.group.position.x,waypoint.z-e.group.position.z)<.8)e.pathIndex++;
           const next=e.path?.[e.pathIndex]||predicted;
-          steerAroundWalls(this.game,e,next.clone().sub(e.group.position),dt);
+          steerAroundWalls(this.game,e,new THREE.Vector3(next.x-e.group.position.x,0,next.z-e.group.position.z),dt);
         }else steerAroundWalls(this.game,e,predicted.sub(e.group.position),dt);
       }else if(e.state==="investigate"&&target){
         const waypoint=e.path?.[e.pathIndex];
         if(waypoint){
           if(Math.hypot(waypoint.x-e.group.position.x,waypoint.z-e.group.position.z)<.8)e.pathIndex++;
           const next=e.path?.[e.pathIndex]||target;
-          steerAroundWalls(this.game,e,next.clone().sub(e.group.position),dt);
+          steerAroundWalls(this.game,e,new THREE.Vector3(next.x-e.group.position.x,0,next.z-e.group.position.z),dt);
         }else{
           const desired=target.clone().sub(e.group.position);
           if(desired.length()>1.5)steerAroundWalls(this.game,e,desired,dt);

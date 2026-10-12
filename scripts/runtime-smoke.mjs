@@ -172,6 +172,14 @@ try{
   if(state.mobileDisplay!=="none")throw new Error("Mobile controls appeared on desktop after gameplay start: "+JSON.stringify(state));
   if(state.hud==="none")throw new Error("HUD remained hidden after gameplay start");
 
+  const entityAiResult=await command("Runtime.evaluate",{
+    expression:"(async()=>{const g=window.backrooms;const manager=g.entityManager;if(!manager)return JSON.stringify({error:'Entity manager missing'});const previousLoad=manager.modelLibrary.load;let entity=null;try{manager.modelLibrary.load=async()=>({scene:new manager.entities[manager.entities.length-1].group.constructor(),animations:[],format:'gltf',file:'runtime-smoke-invalid.glb'});const target=g.player.position.clone();const spawn=target.clone();spawn.x+=8;entity=manager.create('hound',spawn,'runtime-smoke-entity-ai');if(!entity)throw new Error('Could not create smoke entity');await Promise.resolve();const proceduralFallback=entity.group.children.length>0&&!entity.group.userData.realModel;entity.lastSeen=target;entity.state='chase';entity.pathTimer=0;manager.update(1/60);return JSON.stringify({pathLength:entity.path?.length||0,proceduralFallback,runtimeFaulted:!!g.runtimeFaulted});}finally{manager.modelLibrary.load=previousLoad;manager.clear();}})()",
+    awaitPromise:true,
+    returnByValue:true
+  });
+  const entityAi=JSON.parse(entityAiResult.result?.result?.value||"{}");
+  if((entityAi.pathLength||0)<2||!entityAi.proceduralFallback||entityAi.runtimeFaulted)throw new Error("Entity AI waypoint smoke failed: "+JSON.stringify(entityAi));
+
   const pauseCheck=await command("Runtime.evaluate",{expression:"(()=>{const g=window.backrooms;g.togglePause(true);const m=document.getElementById('mobile-controls');const p=document.getElementById('pause');return JSON.stringify({paused:g.paused,mobileHidden:m?.classList.contains('hidden'),mobileDisplay:m?getComputedStyle(m).display:null,pauseHidden:p?.classList.contains('hidden'),pausePointer:p?getComputedStyle(p).pointerEvents:null})})()",returnByValue:true});
   const pausedUi=JSON.parse(pauseCheck.result.result.value||"{}");
   if(!pausedUi.paused||!pausedUi.mobileHidden||pausedUi.mobileDisplay!=="none"||pausedUi.pauseHidden||pausedUi.pausePointer==="none")throw new Error("Pause UI did not take control of the touch layer: "+JSON.stringify(pausedUi));
