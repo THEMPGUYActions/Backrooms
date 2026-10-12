@@ -10,6 +10,20 @@ const MODEL_BASE = new URL("../assets/entities/", import.meta.url).href;
 const SUPPORTED_FORMATS = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 
+// GLB assets come from different source projects and use inconsistent authoring
+// scales. These are intentional in-game display heights (world units), audited
+// against each committed model's actual bounds instead of assuming its source units.
+const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
+  bacteria: 6.5,
+  deathmoth: 3.0,
+  duller: 2.2,
+  faceling: 3.2,
+  hound: 1.8,
+  partygoer: 3.0,
+  skinstealer: 3.0,
+  smiler: 2.0
+});
+
 export const ENTITY_MODEL_SOURCES = Object.freeze({
   smiler: { files:["smiler.fbx","smiler.glb","smiler.gltf","smiler.obj","smiler.usdz"], creator:"🇧🇷 Fog 🇧🇷", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/smiler-entity3-backrooms-994d17d347da4806968bb8ed9af5dedd" },
   hound: { files:["hound.fbx","hound.glb","hound.gltf","hound.obj","hound.usdz"], creator:"🇧🇷 Fog 🇧🇷", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/hound-backrooms-b835cbb0440942a0856da6cefd365d38" },
@@ -116,52 +130,87 @@ export class EntityModelLibrary{
     const asset=await this.load(entity.type);
     if(!asset||!entity.group.parent)return false;
 
-    let root,model;
+    let root,container,model;
     try{
       if(!asset.scene?.isObject3D)throw new Error("Loaded asset has no valid Three.js scene");
 
-      // The cache stores the original loaded scene. Clone it per entity so two
-      // entities never re-parent the same model away from each other.
+      // Clone cached content per entity. Never re-parent the one cached scene
+      // shared by every entity of this type.
       root=cloneSkeleton(asset.scene);
       if(!root?.isObject3D)throw new Error("Could not clone the loaded scene");
 
+      const visibleBounds=new THREE.Box3();
       let meshCount=0;
       root.traverse(object=>{
         if(!object.isMesh)return;
-        if((object.geometry?.attributes?.position?.count||0)>0)meshCount++;
+        const position=object.geometry?.attributes?.position;
+        if(!position||position.count===0)return;
+
+        // Ignore hidden helper meshes when calculating presentation scale.
+        let ancestor=object,visible=true;
+        while(ancestor){
+          if(!ancestor.visible){visible=false;break;}
+          if(ancestor===root)break;
+          ancestor=ancestor.parent;
+        }
+        if(!visible)return;
+        const materials=Array.isArray(object.material)?object.material:[object.material];
+        if(materials.length&&materials.every(material=>!material||material.visible===false||(material.opacity??1)<=0))return;
+
+        meshCount++;
         object.castShadow=false;
         object.receiveShadow=true;
         object.frustumCulled=true;
-        if(object.material){
-          const materials=Array.isArray(object.material)?object.material:[object.material];
-          for(const material of materials){
-            if(material.map)material.map.colorSpace=THREE.SRGBColorSpace;
-            material.needsUpdate=true;
-          }
+        for(const material of materials){
+          if(!material)continue;
+          if(material.map)material.map.colorSpace=THREE.SRGBColorSpace;
+          material.needsUpdate=true;
         }
+
+        // Use bounds of actual renderable meshes, not hidden scene/collider
+        // bounds that can dwarf a model's visible body.
+        const meshBounds=new THREE.Box3().setFromObject(object);
+        if(!meshBounds.isEmpty())visibleBounds.union(meshBounds);
       });
-      if(meshCount===0)throw new Error("Loaded model contains no renderable mesh geometry");
+      if(meshCount===0||visibleBounds.isEmpty())throw new Error("Loaded model contains no visible renderable mesh geometry");
 
       root.updateMatrixWorld(true);
-      const box=new THREE.Box3().setFromObject(root);
-      if(box.isEmpty())throw new Error("Loaded model has an empty bounding box");
-      const size=box.getSize(new THREE.Vector3());
-      if(!Number.isFinite(size.y)||size.y<=.001)throw new Error("Loaded model has no usable height");
+      // Refresh after updating world matrices so imported node transforms are
+      // accounted for before selecting the source asset's visible bounds.
+      visibleBounds.makeEmpty();
+      root.traverse(object=>{
+        if(!object.isMesh||!object.geometry?.attributes?.position)return;
+        let ancestor=object,visible=true;
+        while(ancestor){
+          if(!ancestor.visible){visible=false;break;}
+          if(ancestor===root)break;
+          ancestor=ancestor.parent;
+        }
+        if(!visible)return;
+        const materials=Array.isArray(object.material)?object.material:[object.material];
+        if(materials.length&&materials.every(material=>!material||material.visible===false||(material.opacity??1)<=0))return;
+        const meshBounds=new THREE.Box3().setFromObject(object);
+        if(!meshBounds.isEmpty())visibleBounds.union(meshBounds);
+      });
 
-      const targetHeight=Math.max(.55,entity.group.userData.height||1.8);
+      const size=visibleBounds.getSize(new THREE.Vector3());
+      if(!Number.isFinite(size.y)||size.y<=.001)throw new Error("Loaded model has no usable visible height");
+
+      const targetHeight=ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8);
       const scale=targetHeight/size.y;
       if(!Number.isFinite(scale)||scale<=0)throw new Error("Loaded model has an invalid scale");
-      root.scale.multiplyScalar(scale);
-      root.updateMatrixWorld(true);
 
-      const scaledBox=new THREE.Box3().setFromObject(root);
-      if(scaledBox.isEmpty()||!Number.isFinite(scaledBox.min.y))throw new Error("Loaded model has invalid bounds after scaling");
-      root.position.y-=scaledBox.min.y;
-      root.rotation.y=Math.PI;
+      // Keep scale and yaw on a wrapper, not the animated GLB root. Animation
+      // tracks can then animate the model without resetting its normalized size.
+      container=new THREE.Group();
+      container.scale.setScalar(scale);
+      container.position.y=-visibleBounds.min.y*scale;
+      container.rotation.y=Math.PI;
+      container.add(root);
 
       const clips=Array.isArray(asset.animations)?asset.animations:[];
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
-      model={root,mixer,clips,format:asset.format,file:asset.file,actions:new Map(),current:null,ready:true};
+      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,scale,actions:new Map(),current:null,ready:true};
       if(mixer)for(const clip of clips)model.actions.set(clip.name,mixer.clipAction(clip));
     }catch(error){
       // Keep the original procedural children untouched if a GLB is corrupt,
@@ -170,14 +219,15 @@ export class EntityModelLibrary{
       return false;
     }
 
-    // Swap only after parsing, cloning, geometry validation, and animation setup
-    // have all succeeded. A failed model can never erase the built-in entity.
+    // Swap only after cloning, visible-bounds validation, and mixer setup have
+    // all succeeded. A failure never removes the built-in procedural entity.
     for(const child of [...entity.group.children])entity.group.remove(child);
-    entity.group.add(root);
+    entity.group.add(container);
     entity.model=model;
     if(model.mixer)this.play(entity,["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",targetHeight,"units","scale",Number(model.scale.toFixed(5)));
     return true;
   }
 
