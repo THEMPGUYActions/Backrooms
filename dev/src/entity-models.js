@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
+import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import { USDLoader } from "three/addons/loaders/USDLoader.js";
 
 const MODEL_BASE = new URL("../assets/entities/", import.meta.url).href;
@@ -115,9 +116,19 @@ export class EntityModelLibrary{
     const asset=await this.load(entity.type);
     if(!asset||!entity.group.parent)return false;
 
-    const root=asset.scene;
-    root.traverse(object=>{
-      if(object.isMesh){
+    let root,model;
+    try{
+      if(!asset.scene?.isObject3D)throw new Error("Loaded asset has no valid Three.js scene");
+
+      // The cache stores the original loaded scene. Clone it per entity so two
+      // entities never re-parent the same model away from each other.
+      root=cloneSkeleton(asset.scene);
+      if(!root?.isObject3D)throw new Error("Could not clone the loaded scene");
+
+      let meshCount=0;
+      root.traverse(object=>{
+        if(!object.isMesh)return;
+        if((object.geometry?.attributes?.position?.count||0)>0)meshCount++;
         object.castShadow=false;
         object.receiveShadow=true;
         object.frustumCulled=true;
@@ -128,32 +139,43 @@ export class EntityModelLibrary{
             material.needsUpdate=true;
           }
         }
-      }
-    });
+      });
+      if(meshCount===0)throw new Error("Loaded model contains no renderable mesh geometry");
 
-    const targetHeight=Math.max(.55,entity.group.userData.height||1.8);
-    const box=new THREE.Box3().setFromObject(root);
-    const size=box.getSize(new THREE.Vector3());
-    if(size.y>0)root.scale.multiplyScalar(targetHeight/size.y);
+      root.updateMatrixWorld(true);
+      const box=new THREE.Box3().setFromObject(root);
+      if(box.isEmpty())throw new Error("Loaded model has an empty bounding box");
+      const size=box.getSize(new THREE.Vector3());
+      if(!Number.isFinite(size.y)||size.y<=.001)throw new Error("Loaded model has no usable height");
 
-    const scaledBox=new THREE.Box3().setFromObject(root);
-    root.position.y-=scaledBox.min.y;
-    root.rotation.y=Math.PI;
+      const targetHeight=Math.max(.55,entity.group.userData.height||1.8);
+      const scale=targetHeight/size.y;
+      if(!Number.isFinite(scale)||scale<=0)throw new Error("Loaded model has an invalid scale");
+      root.scale.multiplyScalar(scale);
+      root.updateMatrixWorld(true);
 
-    const oldChildren=[...entity.group.children];
-    for(const child of oldChildren)entity.group.remove(child);
-    entity.group.add(root);
+      const scaledBox=new THREE.Box3().setFromObject(root);
+      if(scaledBox.isEmpty()||!Number.isFinite(scaledBox.min.y))throw new Error("Loaded model has invalid bounds after scaling");
+      root.position.y-=scaledBox.min.y;
+      root.rotation.y=Math.PI;
 
-    const clips=asset.animations||[];
-    const mixer=clips.length?new THREE.AnimationMixer(root):null;
-    entity.model={
-      root,mixer,clips,format:asset.format,file:asset.file,
-      actions:new Map(),current:null,ready:true
-    };
-    if(mixer){
-      for(const clip of clips)entity.model.actions.set(clip.name,mixer.clipAction(clip));
-      this.play(entity,["idle","stand","breath"]);
+      const clips=Array.isArray(asset.animations)?asset.animations:[];
+      const mixer=clips.length?new THREE.AnimationMixer(root):null;
+      model={root,mixer,clips,format:asset.format,file:asset.file,actions:new Map(),current:null,ready:true};
+      if(mixer)for(const clip of clips)model.actions.set(clip.name,mixer.clipAction(clip));
+    }catch(error){
+      // Keep the original procedural children untouched if a GLB is corrupt,
+      // empty, unsupported, or otherwise unusable.
+      console.warn("[Backrooms] Entity model unusable; preserving procedural fallback:",entity.type,asset.file,error);
+      return false;
     }
+
+    // Swap only after parsing, cloning, geometry validation, and animation setup
+    // have all succeeded. A failed model can never erase the built-in entity.
+    for(const child of [...entity.group.children])entity.group.remove(child);
+    entity.group.add(root);
+    entity.model=model;
+    if(model.mixer)this.play(entity,["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
     return true;
