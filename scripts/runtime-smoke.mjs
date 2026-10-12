@@ -225,6 +225,14 @@ try{
     throw new Error("Admin did not defer safely until gameplay was active: "+JSON.stringify(adminState));
   }
 
+  const modelAuditResult=await command("Runtime.evaluate",{
+    expression:"(async()=>{const THREE=await import('https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js');const g=window.backrooms;const manager=g.entityManager;const types=['bacteria','deathmoth','duller','faceling','hound','partygoer','skinstealer','smiler'];const round=n=>Number.isFinite(n)?Math.round(n*1000)/1000:null;const rows=[];for(const type of types){try{const asset=await manager.modelLibrary.load(type);if(!asset){rows.push({type,error:'No supported model loaded'});continue;}const root=asset.scene;root.updateMatrixWorld(true);const allBox=new THREE.Box3().setFromObject(root);const allSize=allBox.getSize(new THREE.Vector3());const visibleBox=new THREE.Box3();const meshes=[];root.traverse(o=>{if(!o.isMesh||!o.geometry?.attributes?.position)return;let p=o,visible=true;while(p){if(!p.visible){visible=false;break;}if(p===root)break;p=p.parent;}const b=new THREE.Box3().setFromObject(o);const z=b.getSize(new THREE.Vector3());meshes.push({name:o.name||o.type,visible,verts:o.geometry.attributes.position.count,size:[round(z.x),round(z.y),round(z.z)],scale:[round(o.scale.x),round(o.scale.y),round(o.scale.z)],bboxEmpty:b.isEmpty()});if(visible)visibleBox.union(b);});const v=visibleBox.getSize(new THREE.Vector3());rows.push({type,file:asset.file,format:asset.format,animations:asset.animations?.length||0,meshCount:meshes.length,allSize:[round(allSize.x),round(allSize.y),round(allSize.z)],visibleSize:[round(v.x),round(v.y),round(v.z)],visibleToAllHeight:allSize.y?round(v.y/allSize.y):null,largestMeshes:meshes.sort((a,b)=>(b.size[0]*b.size[1]*b.size[2])-(a.size[0]*a.size[1]*a.size[2])).slice(0,5)});}catch(error){rows.push({type,error:String(error?.stack||error)});}}console.log('ENTITY_MODEL_AUDIT '+JSON.stringify(rows));return JSON.stringify(rows)})()",
+    awaitPromise:true,
+    returnByValue:true
+  });
+  const modelAudit=JSON.parse(modelAuditResult.result?.result?.value||"[]");
+  if(modelAudit.length!==8||modelAudit.some(item=>item.error))throw new Error("Entity GLB audit could not inspect all eight models: "+JSON.stringify(modelAudit));
+  console.log("ENTITY_MODEL_AUDIT "+JSON.stringify(modelAudit));
   console.log("RUNTIME SMOKE PASS");
   console.log(JSON.stringify({desktopUi,state,errors:0}));
 }finally{
