@@ -7,7 +7,7 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
-import { EntityModelLibrary } from "./entity-models.js?v=20260926-entity-models1";
+import { EntityModelLibrary } from "./entity-models.js?v=20261012-entity-size7";
 
 const VHSShader={
   name:"BackroomsVHS",

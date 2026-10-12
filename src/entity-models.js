@@ -214,7 +214,7 @@ export class EntityModelLibrary{
     if(model.mixer)this.play(entity,["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
-    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",targetHeight,"units","scale",Number(model.scale.toFixed(5)));
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"units","scale",Number(model.scale.toFixed(5)));
     return true;
   }
 
