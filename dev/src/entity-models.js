@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 6.5,
+  bacteria: 12.0,
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
