@@ -241,7 +241,12 @@ try{
     awaitPromise:true,
     returnByValue:true
   },90000);
-  const modelAttach=JSON.parse(modelAttachResult.result?.result?.value||"[]");
+  if(modelAttachResult.result?.exceptionDetails){
+    const details=modelAttachResult.result.exceptionDetails;
+    throw new Error("ENTITY_MODEL_ATTACH_SMOKE browser exception: "+(details.text||details.exception?.description||JSON.stringify(details)));
+  }
+  const modelAttachValue=modelAttachResult.result?.result?.value;
+  const modelAttach=typeof modelAttachValue==="string"?JSON.parse(modelAttachValue):modelAttachValue;
   if(modelAttach.length!==2||modelAttach.some(x=>!x.attached))throw new Error("ENTITY_MODEL_ATTACH_SMOKE failed: "+JSON.stringify(modelAttach));
   if(modelAttach.some(x=>Math.abs(x.height-x.targetHeight)>.15))throw new Error("ENTITY_MODEL_ATTACH_SMOKE size mismatch: "+JSON.stringify(modelAttach));
   if(modelAttach.some(x=>x.type==="bacteria"&&x.animations===0))throw new Error("Bacteria animations did not load");
