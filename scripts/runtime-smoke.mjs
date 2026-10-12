@@ -111,14 +111,31 @@ try{
   await command("Runtime.enable");
   await command("Page.enable");
   await command("Runtime.evaluate",{expression:"location.href='http://127.0.0.1:"+port+"/index.html'",returnByValue:true});
-  await delay(2500);
 
-  const readyResult=await command("Runtime.evaluate",{
-    expression:"JSON.stringify({backrooms:!!window.backrooms,mounted:!!window.backrooms?.mounted,canvas:!!document.querySelector('canvas')})",
-    returnByValue:true
-  });
-  const ready=JSON.parse(readyResult.result?.result?.value||"{}");
-  if(!ready.backrooms||!ready.mounted||!ready.canvas)throw new Error("Game bootstrap did not finish: "+JSON.stringify(ready));
+  // Module imports are fetched from the Three.js CDN. Do not treat a slow
+  // first-run network response as a broken bootstrap after one fixed 2.5s wait.
+  let ready={};
+  const bootstrapDeadline=Date.now()+15000;
+  while(Date.now()<bootstrapDeadline){
+    await delay(250);
+    const readyResult=await command("Runtime.evaluate",{
+      expression:"JSON.stringify({backrooms:!!window.backrooms,mounted:!!window.backrooms?.mounted,canvas:!!document.querySelector('canvas')})",
+      returnByValue:true
+    });
+    ready=JSON.parse(readyResult.result?.result?.value||"{}");
+    if(ready.backrooms&&ready.mounted&&ready.canvas)break;
+  }
+  if(!ready.backrooms||!ready.mounted||!ready.canvas){
+    const bootstrapErrors=messages.filter(message=>
+      message.method==="Runtime.exceptionThrown"||
+      (message.method==="Runtime.consoleAPICalled"&&["error","assert"].includes(message.params?.type))
+    );
+    const detail=bootstrapErrors.map(message=>{
+      if(message.method==="Runtime.exceptionThrown")return message.params?.exceptionDetails?.text||message.params?.exceptionDetails?.exception?.description||"Runtime exception";
+      return message.params?.args?.map(arg=>arg.value??arg.description??"").join(" ")||"Console error";
+    }).join("\\n");
+    throw new Error("Game bootstrap did not finish within 15s: "+JSON.stringify(ready)+(detail?"\\nBrowser errors:\\n"+detail:""));
+  }
 
   const desktopUiResult=await command("Runtime.evaluate",{
     expression:"JSON.stringify({touchClass:document.documentElement.classList.contains('touch-device'),mobileDisplay:getComputedStyle(document.getElementById('mobile-controls')).display,pcPrompt:getComputedStyle(document.querySelector('.audio-prompt-pc')).display,mobilePrompt:getComputedStyle(document.querySelector('.audio-prompt-mobile')).display,pcControls:[...document.querySelectorAll('.control-pc')].filter(e=>getComputedStyle(e).display!=='none').length,mobileControls:[...document.querySelectorAll('.control-mobile')].filter(e=>getComputedStyle(e).display!=='none').length,touchOnly:getComputedStyle(document.querySelector('.control-touch-only')).display})",
