@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20261012-entity-model-size7";
+import { BackroomsGame } from "./game.js?v=20261012-entity-model-size8";
 import { installBackroomsFixes } from "./fixes.js?v=20260926-flashlight2";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20260925-entityai2";
