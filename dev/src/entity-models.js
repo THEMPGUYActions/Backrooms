@@ -23,6 +23,9 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   skinstealer: 3.0,
   smiler: 2.0
 });
+const ENTITY_MODEL_YAWS = Object.freeze({
+  smiler: Math.PI / 2
+});
 
 export const ENTITY_MODEL_SOURCES = Object.freeze({
   smiler: { files:["smiler.fbx","smiler.glb","smiler.gltf","smiler.obj","smiler.usdz"], creator:"🇧🇷 Fog 🇧🇷", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/smiler-entity3-backrooms-994d17d347da4806968bb8ed9af5dedd" },
@@ -133,79 +136,63 @@ export class EntityModelLibrary{
     let root,container,model;
     try{
       if(!asset.scene?.isObject3D)throw new Error("Loaded asset has no valid Three.js scene");
-
-      // Clone cached content per entity. Never re-parent the one cached scene
-      // shared by every entity of this type.
+      // Clone cached content per entity. Never re-parent the shared cached scene.
       root=cloneSkeleton(asset.scene);
       if(!root?.isObject3D)throw new Error("Could not clone the loaded scene");
 
-      const visibleBounds=new THREE.Box3();
-      let meshCount=0;
-      root.traverse(object=>{
-        if(!object.isMesh)return;
-        const position=object.geometry?.attributes?.position;
-        if(!position||position.count===0)return;
-
-        // Ignore hidden helper meshes when calculating presentation scale.
-        let ancestor=object,visible=true;
+      const isVisibleRenderableMesh=object=>{
+        if(!object.isMesh||!object.geometry?.attributes?.position?.count)return false;
+        let ancestor=object;
         while(ancestor){
-          if(!ancestor.visible){visible=false;break;}
+          if(!ancestor.visible)return false;
           if(ancestor===root)break;
           ancestor=ancestor.parent;
         }
-        if(!visible)return;
         const materials=Array.isArray(object.material)?object.material:[object.material];
-        if(materials.length&&materials.every(material=>!material||material.visible===false||(material.opacity??1)<=0))return;
+        return !(materials.length&&materials.every(material=>!material||material.visible===false||(material.opacity??1)<=0));
+      };
 
+      let meshCount=0;
+      root.traverse(object=>{
+        if(!isVisibleRenderableMesh(object))return;
         meshCount++;
         object.castShadow=false;
         object.receiveShadow=true;
         object.frustumCulled=true;
+        const materials=Array.isArray(object.material)?object.material:[object.material];
         for(const material of materials){
           if(!material)continue;
           if(material.map)material.map.colorSpace=THREE.SRGBColorSpace;
           material.needsUpdate=true;
         }
-
-        // Use bounds of actual renderable meshes, not hidden scene/collider
-        // bounds that can dwarf a model's visible body.
-        const meshBounds=new THREE.Box3().setFromObject(object);
-        if(!meshBounds.isEmpty())visibleBounds.union(meshBounds);
       });
-      if(meshCount===0||visibleBounds.isEmpty())throw new Error("Loaded model contains no visible renderable mesh geometry");
+      if(meshCount===0)throw new Error("Loaded model contains no visible renderable mesh geometry");
 
+      // Work in the importer's original world transform before choosing a scale.
       root.updateMatrixWorld(true);
-      // Refresh after updating world matrices so imported node transforms are
-      // accounted for before selecting the source asset's visible bounds.
-      visibleBounds.makeEmpty();
+      const visibleBounds=new THREE.Box3();
       root.traverse(object=>{
-        if(!object.isMesh||!object.geometry?.attributes?.position)return;
-        let ancestor=object,visible=true;
-        while(ancestor){
-          if(!ancestor.visible){visible=false;break;}
-          if(ancestor===root)break;
-          ancestor=ancestor.parent;
-        }
-        if(!visible)return;
-        const materials=Array.isArray(object.material)?object.material:[object.material];
-        if(materials.length&&materials.every(material=>!material||material.visible===false||(material.opacity??1)<=0))return;
+        if(!isVisibleRenderableMesh(object))return;
         const meshBounds=new THREE.Box3().setFromObject(object);
         if(!meshBounds.isEmpty())visibleBounds.union(meshBounds);
       });
+      if(visibleBounds.isEmpty())throw new Error("Loaded model has empty visible bounds");
 
       const size=visibleBounds.getSize(new THREE.Vector3());
       if(!Number.isFinite(size.y)||size.y<=.001)throw new Error("Loaded model has no usable visible height");
 
+      // Source models use different authoring scales and sometimes include
+      // long tentacles/wings; set an intentional display height for each entity.
       const targetHeight=ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8);
       const scale=targetHeight/size.y;
       if(!Number.isFinite(scale)||scale<=0)throw new Error("Loaded model has an invalid scale");
 
-      // Keep scale and yaw on a wrapper, not the animated GLB root. Animation
-      // tracks can then animate the model without resetting its normalized size.
+      // Keep normalization and yaw separate from the animated GLB hierarchy so
+      // animation tracks cannot overwrite the entity's display scale.
       container=new THREE.Group();
       container.scale.setScalar(scale);
       container.position.y=-visibleBounds.min.y*scale;
-      container.rotation.y=Math.PI;
+      container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
       container.add(root);
 
       const clips=Array.isArray(asset.animations)?asset.animations:[];
@@ -219,15 +206,15 @@ export class EntityModelLibrary{
       return false;
     }
 
-    // Swap only after cloning, visible-bounds validation, and mixer setup have
-    // all succeeded. A failure never removes the built-in procedural entity.
+    // Swap only after cloning, bounds validation, and mixer setup all succeed.
+    // A failed model can never erase the built-in procedural entity.
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
     entity.model=model;
     if(model.mixer)this.play(entity,["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
-    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",targetHeight,"units","scale",Number(model.scale.toFixed(5)));
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"units","scale",Number(model.scale.toFixed(5)));
     return true;
   }
 
