@@ -1263,7 +1263,7 @@ class WorldStreamer{
       );
       shader.vertexShader=shader.vertexShader.replace(
         "#include <worldpos_vertex>",
-        "#include <worldpos_vertex>\nvBackroomsWorldPosition=worldPosition.xyz;"
+        "#include <worldpos_vertex>\nvBackroomsWorldPosition=(modelMatrix*vec4(transformed,1.0)).xyz;"
       );
       shader.fragmentShader=shader.fragmentShader.replace(
         "#include <common>",
