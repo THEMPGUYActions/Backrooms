@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 3.35, // approximately 11 ft (3.35 m), the commonly cited Lifeform estimate
+  bacteria: 3.35, // Keep the creature inside the low ceiling; fix its origin separately
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
@@ -25,7 +25,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
-  bacteria: 2.55
+  bacteria: 3.25
 });
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
@@ -200,11 +200,16 @@ export class EntityModelLibrary{
       if(!Number.isFinite(horizontalScale)||horizontalScale<=0)throw new Error("Loaded model has an invalid horizontal scale");
 
       // Keep normalization separate from imported animation transforms.
+      const sourceCenter=visibleBounds.getCenter(new THREE.Vector3());
       container=new THREE.Group();
       container.scale.set(horizontalScale,scale,horizontalScale);
-      container.position.y=-visibleBounds.min.y*scale;
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
-      container.add(root);
+      // Normalize X/Z as well as Y. Some imported scenes have an offset origin,
+      // so a correctly scaled model can otherwise appear far away from its entity.
+      const normalizedRoot=new THREE.Group();
+      normalizedRoot.position.set(-sourceCenter.x,-visibleBounds.min.y,-sourceCenter.z);
+      normalizedRoot.add(root);
+      container.add(normalizedRoot);
 
       // A scale track on the common parent of every visible mesh is a model
       // transform, not limb animation, and must not shrink the whole entity.
@@ -242,8 +247,19 @@ export class EntityModelLibrary{
       }).filter(clip=>clip.tracks.length>0);
       if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
-      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,actions:new Map(),current:null,ready:true};
-      if(mixer)for(const clip of clips)model.actions.set(clip.name,mixer.clipAction(clip));
+      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,sourceCenter:sourceCenter.clone(),actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0};
+      if(mixer)for(const clip of clips){
+        const action=mixer.clipAction(clip);
+        if(entity.type==="bacteria"){
+          const clipName=normalizeClipName(clip.name);
+          action.timeScale=clipName.includes("stalkingpose")?0.38:clipName.includes("tposelifeform")?0.30:clipName.includes("jumpscare")?0.68:0.48;
+          if(clipName.includes("jumpscare")||clipName.includes("bendingoverscene")){
+            action.setLoop(THREE.LoopOnce,1);
+            action.clampWhenFinished=true;
+          }
+        }
+        model.actions.set(clip.name,action);
+      }
     }catch(error){
       // Keep the original procedural children untouched if a GLB is corrupt,
       // empty, unsupported, or otherwise unusable.
@@ -256,10 +272,12 @@ export class EntityModelLibrary{
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
     entity.model=model;
-    if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose","TposeLifeform"]:["idle","stand","breath"]);
+    entity.group.userData.height=model.targetHeight;
+    entity.group.userData.modelWidth=model.targetWidth??null;
+    if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
-    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)));
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)),"sourcePivot",model.sourceCenter.toArray().map(v=>Number(v.toFixed(2))));
     return true;
   }
 
@@ -271,8 +289,10 @@ export class EntityModelLibrary{
     if(model.current===model.actions.get(clip.name))return;
     const next=model.actions.get(clip.name);
     if(!next)return;
-    next.reset().fadeIn(.12).play();
-    if(model.current)model.current.fadeOut(.12);
+    const previous=model.current;
+    next.reset();
+    if(previous)next.crossFadeFrom(previous,entity.type==="bacteria"?0.32:0.12,false).play();
+    else next.play();
     model.current=next;
   }
 
@@ -282,12 +302,24 @@ export class EntityModelLibrary{
     if(model.mixer){
       const state=entity.state;
       if(entity.type==="bacteria"){
-        // Use this GLB asset's actual clip labels; generic idle/walk names do not exist in it.
-        if(state==="frenzy")this.play(entity,["JUMPSCARE","chaseSceneEnd","stalkingpose"]);
-        else if(state==="chase")this.play(entity,["chaseSceneEnd","stalkingpose"]);
-        else if(state==="investigate"||state==="alert")this.play(entity,["bendingOverScene","stalkingpose"]);
-        else if(state==="stalk")this.play(entity,["stalkingpose","bendingOverScene"]);
-        else this.play(entity,["stalkingpose","TposeLifeform"]);
+        // AI visibility/noise can change every frame. Debounce cinematic clip changes.
+        let options=["stalkingpose"];
+        if(state==="frenzy")options=["JUMPSCARE","chaseSceneEnd","stalkingpose"];
+        else if(state==="chase")options=["chaseSceneEnd","stalkingpose"];
+        else if(state==="investigate"||state==="alert")options=["bendingOverScene","stalkingpose"];
+        const desired=pickClip(model.clips,options);
+        const desiredAction=desired?model.actions.get(desired.name):null;
+        if(!desiredAction||desiredAction===model.current){
+          model.pendingClip=null;model.pendingTime=0;
+        }else if(model.pendingClip!==desiredAction){
+          model.pendingClip=desiredAction;model.pendingTime=0;
+        }else{
+          model.pendingTime+=dt;
+          const urgent=state==="chase"||state==="frenzy";
+          if(model.pendingTime>=(urgent?0.38:0.62)){
+            this.play(entity,[desired.name]);model.pendingClip=null;model.pendingTime=0;
+          }
+        }
       }else{
         if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
         else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
