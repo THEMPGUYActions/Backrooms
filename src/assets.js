@@ -72,6 +72,80 @@ function tex(canvas,color=true){
   return t;
 }
 
+/**
+ * Original, procedural floral wallpaper for Kane Pixels' Common Backrooms look.
+ * This deliberately avoids bundling the proprietary Quixel wallpaper used as
+ * a visual reference. A small repeating damask/floral motif fits old office
+ * wallpaper better than the chevron texture used by the generic PBR pack.
+ */
+function createKanePixelsWallpaperTexture(){
+  const size=512,cell=128;
+  const canvas=makeCanvas(size,(x,y,d,i)=>{
+    const grain=(noise2d(x,y,0x4b503)-.5)*11;
+    const fiber=(noise2d(x>>2,y>>2,0x4b504)-.5)*3;
+    d[i]=Math.max(0,Math.min(255,177+grain+fiber));
+    d[i+1]=Math.max(0,Math.min(255,171+grain+fiber));
+    d[i+2]=Math.max(0,Math.min(255,124+grain*.78+fiber));
+    d[i+3]=255;
+  });
+  const ctx=canvas.getContext("2d");
+  if(!ctx)return tex(canvas,true);
+  ctx.lineCap="round";
+  ctx.lineJoin="round";
+  for(let gy=0;gy<size;gy+=cell){
+    for(let gx=0;gx<size;gx+=cell){
+      const cx=gx+cell/2,cy=gy+cell/2;
+      const seed=noise2d(gx,gy,0x4b505);
+      const dark=seed>.5?"rgba(91,89,52,.28)":"rgba(104,99,57,.24)";
+      const light="rgba(226,216,161,.34)";
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.strokeStyle=dark;
+      ctx.fillStyle=light;
+      ctx.lineWidth=1.8;
+      // Eight narrow petals form a faded, almost-overprinted flower.
+      for(let petal=0;petal<8;petal++){
+        ctx.save();
+        ctx.rotate(petal*Math.PI/4);
+        ctx.beginPath();
+        ctx.ellipse(0,-19,7.5,14,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.beginPath();
+      ctx.arc(0,0,5.5,0,Math.PI*2);
+      ctx.fillStyle=dark;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-27,-27);ctx.quadraticCurveTo(-17,-12,0,-8);
+      ctx.quadraticCurveTo(17,-12,27,-27);
+      ctx.moveTo(-27,27);ctx.quadraticCurveTo(-17,12,0,8);
+      ctx.quadraticCurveTo(17,12,27,27);
+      ctx.strokeStyle=light;
+      ctx.stroke();
+      // Subtle leaves between the flowers keep the repeat dense without
+      // turning the wall into a bold graphic pattern.
+      for(const side of [-1,1]){
+        ctx.save();
+        ctx.rotate(side*Math.PI/4);
+        ctx.beginPath();
+        ctx.ellipse(0,-42,5.5,12,0,0,Math.PI*2);
+        ctx.fillStyle=dark;
+        ctx.fill();
+        ctx.strokeStyle=light;
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+  }
+  const texture=tex(canvas,true);
+  texture.anisotropy=4;
+  texture.needsUpdate=true;
+  return texture;
+}
+
 function configureTexture(t,{color=false,repeat=1}={}){
   t.wrapS=THREE.RepeatWrapping;
   t.wrapT=THREE.RepeatWrapping;
@@ -161,8 +235,6 @@ export async function applyFoundFootageLevel0Assets(library,level,onProgress=()=
   const loader=new THREE.TextureLoader();loader.setCrossOrigin("anonymous");
   const load=async(url,color=true)=>await new Promise((resolve,reject)=>loader.load(url,t=>{configureTexture(t,{color,repeat:1});resolve(t)},undefined,e=>reject(e)));
   const entries=[
-    [library.wall,FOUND_FOOTAGE_ASSET_SOURCES.wall,true,"Level 0 wall texture"],
-    [library.trim,FOUND_FOOTAGE_ASSET_SOURCES.wallTrim,true,"Level 0 trim texture"],
     [library.light,FOUND_FOOTAGE_ASSET_SOURCES.fluorescent,true,"Level 0 fluorescent texture"],
     [library.pole,FOUND_FOOTAGE_ASSET_SOURCES.pole,true,"Level 0 pole texture"],
     [library.pillar,FOUND_FOOTAGE_ASSET_SOURCES.plastic,true,"Level 0 pillar texture"]
@@ -172,6 +244,21 @@ export async function applyFoundFootageLevel0Assets(library,level,onProgress=()=
     try{const texture=await load(url,color);material.map=texture;material.needsUpdate=true}catch(error){console.warn("[Backrooms] Found Footage asset unavailable:",url,error)}
     done++;onProgress(done/entries.length,"LOADING LOCAL ASSETS",label)
   }
+
+  // Kane's Common Backrooms use a fine floral/damask paper, not the chevron
+  // wallpaper in the generic Backrooms texture pack. Apply one coherent,
+  // original texture to normal, red-zone and rare office walls alike.
+  for(const material of [library.wall,library.redWall,library.manilaWall]){
+    if(material.map?.userData?.backroomsOwned)material.map.dispose();
+    material.map=createKanePixelsWallpaperTexture();
+    material.needsUpdate=true;
+  }
+  library.wall.color.setHex(0xffffff);
+  library.wall.roughness=.96;
+  if(library.trim.map?.userData?.backroomsOwned)library.trim.map.dispose();
+  library.trim.map=null;
+  library.trim.color.setHex(0x8b7650);
+  library.trim.needsUpdate=true;
   return true;
 }
 
@@ -182,20 +269,18 @@ export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
     : {wall:BACKROOMS_PBR_SOURCES.paintedWall,floor:BACKROOMS_PBR_SOURCES.carpet};
   const wallRepeat=level.id==="0"?2.4:3.0,floorRepeat=level.id==="0"?4.8:4.2,ceilingRepeat=1.0;
   const dataMaps=[
-    ["wall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // wallpaper"],
-    ["wall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // wallpaper"],
+    ...(level.id==="0"?[]:[
+      ["wall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // wallpaper"],
+      ["wall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // wallpaper"]
+    ]),
     ["floor","roughnessMap",source.floor.rough,false,floorRepeat,.16,"Roughness // carpet"],
     ["floor","normalMap",source.floor.normal,false,floorRepeat,.16,"Normal // carpet"],
     ["ceiling","roughnessMap",BACKROOMS_PBR_SOURCES.ceiling.rough,false,ceilingRepeat,.25,"Roughness // ceiling"],
     ["ceiling","normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,ceilingRepeat,.25,"Normal // ceiling"]
   ];
   const level0Data=level.id==="0"?[
-    ["redWall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // red wallpaper"],
-    ["redWall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // red wallpaper"],
     ["redFloor","roughnessMap",source.floor.rough,false,floorRepeat,.16,"Roughness // red carpet"],
-    ["redFloor","normalMap",source.floor.normal,false,floorRepeat,.16,"Normal // red carpet"],
-    ["manilaWall","roughnessMap",source.wall.rough,false,wallRepeat,.28,"Roughness // Manila wallpaper"],
-    ["manilaWall","normalMap",source.wall.normal,false,wallRepeat,.28,"Normal // Manila wallpaper"]
+    ["redFloor","normalMap",source.floor.normal,false,floorRepeat,.16,"Normal // red carpet"]
   ]:[];
   if(level.id==="0")library.floor.userData.level0Carpet=true;
   const colorMaps=[
@@ -203,9 +288,9 @@ export async function applyOpenGameArtPBR(library,level,onProgress=()=>{}){
     ["floor","map",source.floor.color,true,floorRepeat,.16,"Color // carpet"],
     ["ceiling","map",BACKROOMS_PBR_SOURCES.ceiling.color,true,ceilingRepeat,.25,"Color // ceiling"]
   ];
-  const level0Colors=level.id==="0"?[
-    ["manilaWall","map",source.wall.color,true,wallRepeat,.28,"Color // Manila wallpaper"]
-  ]:[];
+  // Level 0's three wallpaper materials use the same coherent floral texture
+  // installed above; never overwrite it with the chevron PBR color map.
+  const level0Colors=[];
   const maps=[...dataMaps,...level0Data,...colorMaps,...level0Colors];
   const dataCount=dataMaps.length+level0Data.length,total=maps.length;
   let done=0;
@@ -303,13 +388,16 @@ export function makeLibrary(level){
   const ceiling=createPBRMaterial({base:level.id==="1"?0x767976:level.theme.ceiling,seed:89+Number(level.id),rough:level.id==="1"?.97:.9,scale:level.id==="1"?4:2,normalStrength:level.id==="1"?.22:.24});
   const floor=createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18});
   if(level.id==="0"){
-    floor.emissive=new THREE.Color(0x2a2418);
-    floor.emissiveIntensity=.075;
+    // The color texture is a brown, worn carpet; avoid multiplying it by the
+    // old mustard-brown base tint, which made the entire floor nearly black.
+    floor.color.setHex(0xd2c5a3);
+    floor.emissive=new THREE.Color(0x211c12);
+    floor.emissiveIntensity=.028;
   }
   ceiling.side=THREE.FrontSide;
   ceiling.color.setHex(level.theme.ceiling);
-  ceiling.emissive=new THREE.Color(level.id==="0"?0x776621:0x252725);
-  ceiling.emissiveIntensity=level.id==="0"?.055:level.id==="1"?0:.028;
+  ceiling.emissive=new THREE.Color(level.id==="0"?0x766b3e:0x252725);
+  ceiling.emissiveIntensity=level.id==="0"?.022:level.id==="1"?0:.028;
   const redWall=createPBRMaterial({base:0x8b1717,seed:211,rough:.94,scale:1,normalStrength:.28});
   const redFloor=createPBRMaterial({base:0x4a1212,seed:212,rough:.99,scale:5,normalStrength:.12});
   redWall.color.setHex(0xb51b1b);
@@ -337,8 +425,8 @@ export function makeLibrary(level){
     water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72}),
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
-    trim:new THREE.MeshStandardMaterial({color:0xf4f0e3,roughness:.66,metalness:0}),
-    trimTop:new THREE.MeshStandardMaterial({color:0xe8e5dc,roughness:.72,metalness:0}),
+    trim:new THREE.MeshStandardMaterial({color:level.id==="0"?0x8b7650:0xf4f0e3,roughness:level.id==="0"?.88:.66,metalness:0}),
+    trimTop:new THREE.MeshStandardMaterial({color:level.id==="0"?level.theme.wall:0xe8e5dc,roughness:.82,metalness:0}),
     outlet:new THREE.MeshStandardMaterial({color:0xe7e4dc,roughness:.58,metalness:0}),
     socket:new THREE.MeshStandardMaterial({color:0x2a2824,roughness:.88,metalness:0}),
     intercom:new THREE.MeshStandardMaterial({color:0xcac5b5,roughness:.72,metalness:.12}),
@@ -357,7 +445,7 @@ export function makeLibrary(level){
     manilaWall:createPBRMaterial({base:0x8a7357,seed:213,rough:.9,scale:1.2,normalStrength:.22}),
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
-    light:new THREE.MeshStandardMaterial({color:0xfff5d3,roughness:.34,metalness:0,emissive:0xffcf5b,emissiveIntensity:3.0}),
+    light:new THREE.MeshStandardMaterial({color:level.id==="0"?0xfffbed:0xfff5d3,roughness:.34,metalness:0,emissive:level.id==="0"?0xffe9bf:0xffcf5b,emissiveIntensity:level.id==="0"?3.25:3.0}),
     redLight:new THREE.MeshStandardMaterial({color:0x9a2825,roughness:.42,metalness:0,emissive:0x6e1714,emissiveIntensity:1.5}),
     orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2}),
     battery:new THREE.MeshStandardMaterial({color:0x1c1d1b,roughness:.55,metalness:.35}),
