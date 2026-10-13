@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v28";
+const CACHE_NAME="backrooms-assets-v29";
 const CORE=[
   "index.html",
   "styles.css",
