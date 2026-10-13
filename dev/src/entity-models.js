@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 3.35, // Keep the creature inside the low ceiling; fix its origin separately
+  bacteria: 5.2, // Intentional oversized encounter silhouette; use non-Level-0 spawn space
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
@@ -25,7 +25,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
-  bacteria: 3.25
+  bacteria: 4.8
 });
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
@@ -247,13 +247,17 @@ export class EntityModelLibrary{
       }).filter(clip=>clip.tracks.length>0);
       if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
-      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,sourceCenter:sourceCenter.clone(),actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0};
+      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,sourceCenter:sourceCenter.clone(),actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0,stableMode:"stalk",pendingMode:"stalk",completedClips:new Set()};
+      if(mixer)mixer.addEventListener("finished",event=>{
+        const finishedName=normalizeClipName(event.action?.getClip?.().name);
+        if(["jumpscare","bendingoverscene","chasesceneend"].includes(finishedName))model.completedClips.add(finishedName);
+      });
       if(mixer)for(const clip of clips){
         const action=mixer.clipAction(clip);
         if(entity.type==="bacteria"){
           const clipName=normalizeClipName(clip.name);
           action.timeScale=clipName.includes("stalkingpose")?0.38:clipName.includes("tposelifeform")?0.30:clipName.includes("jumpscare")?0.68:0.48;
-          if(clipName.includes("jumpscare")||clipName.includes("bendingoverscene")){
+          if(clipName.includes("jumpscare")||clipName.includes("bendingoverscene")||clipName.includes("chasesceneend")){
             action.setLoop(THREE.LoopOnce,1);
             action.clampWhenFinished=true;
           }
@@ -302,24 +306,27 @@ export class EntityModelLibrary{
     if(model.mixer){
       const state=entity.state;
       if(entity.type==="bacteria"){
-        // AI visibility/noise can change every frame. Debounce cinematic clip changes.
-        let options=["stalkingpose"];
-        if(state==="frenzy")options=["JUMPSCARE","chaseSceneEnd","stalkingpose"];
-        else if(state==="chase")options=["chaseSceneEnd","stalkingpose"];
-        else if(state==="investigate"||state==="alert")options=["bendingOverScene","stalkingpose"];
-        const desired=pickClip(model.clips,options);
-        const desiredAction=desired?model.actions.get(desired.name):null;
-        if(!desiredAction||desiredAction===model.current){
-          model.pendingClip=null;model.pendingTime=0;
-        }else if(model.pendingClip!==desiredAction){
-          model.pendingClip=desiredAction;model.pendingTime=0;
+        // Line of sight/noise can flicker each frame. Require a stable AI mode before switching clips.
+        const observedMode=state==="frenzy"?"frenzy":state==="chase"?"chase":(state==="investigate"||state==="alert")?"investigate":"stalk";
+        if(observedMode===model.stableMode){
+          model.pendingMode=observedMode;model.pendingTime=0;
+        }else if(observedMode!==model.pendingMode){
+          model.pendingMode=observedMode;model.pendingTime=0;
         }else{
           model.pendingTime+=dt;
-          const urgent=state==="chase"||state==="frenzy";
-          if(model.pendingTime>=(urgent?0.38:0.62)){
-            this.play(entity,[desired.name]);model.pendingClip=null;model.pendingTime=0;
+          const stableFor=(observedMode==="chase"||observedMode==="frenzy")?.9:1.15;
+          if(model.pendingTime>=stableFor){
+            model.stableMode=observedMode;model.pendingTime=0;model.completedClips.clear();
           }
         }
+        // These source clips are cinematic one-shots, not walk cycles. Once each
+        // has finished, return to the continuous stalking pose until the AI mode changes.
+        let desiredName="stalkingpose";
+        if(model.stableMode==="chase"&&!model.completedClips.has("chasesceneend"))desiredName="chaseSceneEnd";
+        else if(model.stableMode==="investigate"&&!model.completedClips.has("bendingoverscene"))desiredName="bendingOverScene";
+        else if(model.stableMode==="frenzy"&&!model.completedClips.has("jumpscare"))desiredName="JUMPSCARE";
+        const desired=pickClip(model.clips,[desiredName])||pickClip(model.clips,["stalkingpose"]);
+        if(desired)this.play(entity,[desired.name]);
       }else{
         if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
         else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
