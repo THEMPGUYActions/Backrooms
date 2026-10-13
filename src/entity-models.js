@@ -233,14 +233,14 @@ export class EntityModelLibrary{
             if(parsed.propertyName!=="scale")return true;
             target=THREE.PropertyBinding.findNode(root,parsed.nodeName);
           }
-          if(!target||!isSharedModelTransform(target))return true;
+          if(!target||(entity.type!=="bacteria"&&!isSharedModelTransform(target)))return true;
           ignoredRootScaleTracks++;
           return false;
         });
         safeClip.resetDuration();
         return safeClip;
       }).filter(clip=>clip.tracks.length>0);
-      if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model-root scale animation tracks:",entity.type,ignoredRootScaleTracks);
+      if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
       model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,actions:new Map(),current:null,ready:true};
       if(mixer)for(const clip of clips)model.actions.set(clip.name,mixer.clipAction(clip));
