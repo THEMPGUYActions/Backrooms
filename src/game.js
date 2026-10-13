@@ -478,7 +478,7 @@ class Chunk{
       const mask=this.walls[this.index(x,z)];
       if(mask&1)buildWallEdge(x,z,"north");if(mask&8)buildWallEdge(x,z,"west");if(z===cells-1&&(mask&4))buildWallEdge(x,z,"south");if(x===cells-1&&(mask&2))buildWallEdge(x,z,"east");
       if(level.id==="0"){
-        const fixtureChance=region==="blackout"?0:region==="red"?.24:.30;
+        const fixtureChance=region==="blackout"?0:region==="red"?.24:.72;
         if(rngBase.next()<fixtureChance){
           const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?1.25:2.7;
           const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
@@ -1205,28 +1205,32 @@ class WorldStreamer{
     const isLevel0=this.game.level.id==="0";
     const surfaces=isLevel0
       ? [
-          {material:this.library?.floor,tileWorld:1.25},
-          {material:this.library?.ceiling,tileWorld:1.0}
+          {material:this.library?.floor,tileWorldX:1.25,tileWorldZ:1.25},
+          // Kane Pixels' Level 0 ceiling tiles are approximately 1.27 m × 1.14 m.
+          {material:this.library?.ceiling,tileWorldX:1.27,tileWorldZ:1.14}
         ]
       : this.game.level.id==="1"
         ? [
-            {material:this.library?.floor,tileWorld:5.4},
-            {material:this.library?.ceiling,tileWorld:5.4}
+            {material:this.library?.floor,tileWorldX:5.4,tileWorldZ:5.4},
+            {material:this.library?.ceiling,tileWorldX:5.4,tileWorldZ:5.4}
           ]
         : [
-            {material:this.library?.floor,tileWorld:3.0},
-            {material:this.library?.ceiling,tileWorld:1.25}
+            {material:this.library?.floor,tileWorldX:3.0,tileWorldZ:3.0},
+            {material:this.library?.ceiling,tileWorldX:1.25,tileWorldZ:1.25}
           ];
 
-    for(const {material,tileWorld} of surfaces){
+    for(const {material,tileWorldX,tileWorldZ} of surfaces){
       if(!material)continue;
-      const repeat=isLevel0?tileWorld:this.surfaceSize/tileWorld;
+      // The surface is a 4096 m plane with UVs spanning 0..1, so repeat the
+      // texture once per real-world tile instead of stretching one image over it.
+      const repeatX=this.surfaceSize/tileWorldX;
+      const repeatZ=this.surfaceSize/tileWorldZ;
       for(const key of ["map","roughnessMap","normalMap"]){
         const texture=material[key];
         if(!texture)continue;
         texture.wrapS=THREE.RepeatWrapping;
         texture.wrapT=THREE.RepeatWrapping;
-        texture.repeat.set(repeat,repeat);
+        texture.repeat.set(repeatX,repeatZ);
         texture.offset.set(0,0);
       }
     }
