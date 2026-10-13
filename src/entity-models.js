@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 7.5, // Tall enough to loom over the tallest 6-unit ceiling in its stalking pose
+  bacteria: 12.5, // Oversized so the animated stalking silhouette still reaches above a 6-unit ceiling
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
@@ -25,7 +25,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
-  bacteria: 6.0
+  bacteria: 8.5
 });
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
