@@ -7,7 +7,7 @@ import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261013-kane-level0";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-bacteria-lighting1";
-import { EntityModelLibrary } from "./entity-models.js?v=20261013-bacteria-lighting1";
+import { EntityModelLibrary } from "./entity-models.js?v=20261013-bacteria-stable3";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1911,7 +1911,10 @@ const ENTITY_TYPES={
 };
 
 function animateEntity(e,dt){
-  const u=e.group.userData,parts=u.parts||{},moving=e.motion||0,state=e.state;
+  const u=e.group.userData;
+  // The GLB owns the pose once attached; ignore detached procedural fallback parts.
+  if(u.realModel)return;
+  const parts=u.parts||{},moving=e.motion||0,state=e.state;
   u.phase=(u.phase||0)+dt*(moving?8:1.2);
   const t=u.phase,run=state==="chase"||state==="frenzy";
   u.anim=run?"run":state==="investigate"?"alert":state==="stalk"?"stalk":"idle";

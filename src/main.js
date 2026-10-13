@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20261013-bacteria-lighting1";
+import { BackroomsGame } from "./game.js?v=20261013-bacteria-stable3";
 import { installBackroomsFixes } from "./fixes.js?v=20260926-flashlight2";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20260925-entityai2";
