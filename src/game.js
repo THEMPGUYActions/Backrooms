@@ -578,7 +578,7 @@ class Chunk{
     };
 
 
-    if(level.id!=="0"||(!this.level0RedRoom&&!this.manilaRoom))for(let i=0;i<Math.min(9,edges.length);i++){
+    if(level.id!=="0"||(!this.level0RedRoom&&!this.manilaRoom))for(let i=0;i<Math.min(12,edges.length);i++){
       const e=edges[(rngBase.int(0,edges.length-1)+i*11)%edges.length];
       if(rngBase.next()<.22){
         const p=wallPoint(e,.105,.58);
@@ -590,7 +590,7 @@ class Chunk{
       }
     }
 
-    if(level.id==="0"&&!this.level0RedRoom&&!this.manilaRoom&&rngBase.next()<.18&&edges.length){
+    if(level.id==="0"&&!this.level0RedRoom&&!this.manilaRoom&&rngBase.next()<.035&&edges.length){
       const e=rngBase.pick(edges),p=wallPoint(e,.108,1.48),group=new THREE.Group();
       group.position.copy(p.position);group.rotation.y=p.rotation;
       box(group,new THREE.BoxGeometry(.46,.3,.07),lib.intercom,0,0,0);
@@ -599,7 +599,7 @@ class Chunk{
       g.add(group);
     }
 
-    if(level.id==="0"&&!this.level0RedRoom&&!this.manilaRoom&&rngBase.next()<.3){
+    if(level.id==="0"&&!this.level0RedRoom&&!this.manilaRoom&&rngBase.next()<.045){
       const camGroup=new THREE.Group();
       camGroup.position.set(this.originX+cell*.5+cell*(cells-1)*rngBase.next(),level.wallHeight-.18,this.originZ+cell*.5+cell*(cells-1)*rngBase.next());
       const dome=new THREE.Mesh(new THREE.SphereGeometry(.17,10,6,0,Math.PI*2,0,Math.PI/2),lib.cameraDome);dome.scale.y=.65;camGroup.add(dome);
@@ -754,15 +754,17 @@ class Chunk{
     }
 
     if(region==="holes"){
-      const hole=5,holeBottom=-5.42,depth=5.42;
-      for(const h of this.hazards.filter(v=>v.cluster)){
-        const p=center(h.x,h.z);
-        box(g,new THREE.BoxGeometry(hole,.08,hole),lib.dark,p.x,holeBottom,p.z);
-        box(g,new THREE.BoxGeometry(hole,depth,.10),lib.dark,p.x,-depth/2,p.z-hole/2);
-        box(g,new THREE.BoxGeometry(hole,depth,.10),lib.dark,p.x,-depth/2,p.z+hole/2);
-        box(g,new THREE.BoxGeometry(.10,depth,hole),lib.dark,p.x-hole/2,-depth/2,p.z);
-        box(g,new THREE.BoxGeometry(.10,depth,hole),lib.dark,p.x+hole/2,-depth/2,p.z);
-      }
+      // A single architectural floor opening, not a grid of black decals.
+      // The shader cuts the continuous streaming floor and these walls descend
+      // into a dark shaft so the hole is visibly open when approached.
+      const hole=5.6,depth=7.5,hx=Math.floor(cells/2),hz=Math.floor(cells/2);
+      const p=center(hx-.5,hz-.5);
+      this.floorPit={x:p.x,z:p.z,halfWidth:hole/2,halfDepth:hole/2};
+      box(g,new THREE.BoxGeometry(hole,.10,hole),lib.dark,p.x,-depth-.05,p.z);
+      box(g,new THREE.BoxGeometry(hole,depth,.12),lib.dark,p.x,-depth/2,p.z-hole/2);
+      box(g,new THREE.BoxGeometry(hole,depth,.12),lib.dark,p.x,-depth/2,p.z+hole/2);
+      box(g,new THREE.BoxGeometry(.12,depth,hole),lib.dark,p.x-hole/2,-depth/2,p.z);
+      box(g,new THREE.BoxGeometry(.12,depth,hole),lib.dark,p.x+hole/2,-depth/2,p.z);
     }
 
     if(region==="blackout"){
@@ -785,6 +787,28 @@ class Chunk{
       const moldRng=new RNG(this.seedKey()^0xa13d);
       for(let i=0;i<5;i++)if(moldRng.next()<.8){const p=center(moldRng.int(0,cells-1),moldRng.int(0,cells-1));const patch=box(g,new THREE.BoxGeometry(.7+.7*moldRng.next(),.5+.45*moldRng.next(),.025),lib.mold,p.x,1,p.z);patch.rotation.y=moldRng.next()<.5?0:Math.PI/2}
       return;
+    }
+
+    if((region==="maze"&&!this.manilaRoom)||region==="pillars"){
+      // Subtle irregular damp/shaded patches in the carpet. The silhouettes
+      // stay low contrast so they read as wear, not decorative circles.
+      const stainRng=new RNG(this.seedKey()^0x4d731);
+      const stainCount=4+stainRng.int(0,3);
+      for(let i=0;i<stainCount;i++){
+        const p=center(stainRng.int(0,cells-1),stainRng.int(0,cells-1));
+        const radius=.22+stainRng.next()*.52,points=8+stainRng.int(0,4),shape=new THREE.Shape();
+        for(let n=0;n<points;n++){
+          const angle=n/points*Math.PI*2,rr=radius*(.55+stainRng.next()*.55);
+          const x=Math.cos(angle)*rr,z=Math.sin(angle)*rr;
+          if(n===0)shape.moveTo(x,z);else shape.lineTo(x,z);
+        }
+        shape.closePath();
+        const patch=new THREE.Mesh(new THREE.ShapeGeometry(shape),lib.dampPatch);
+        patch.rotation.x=-Math.PI/2;
+        patch.rotation.z=stainRng.next()*Math.PI*2;
+        patch.position.set(p.x,.014+stainRng.next()*.004,p.z);
+        g.add(patch);
+      }
     }
 
     if(this.manilaRoom&&region==="maze"){
@@ -837,10 +861,11 @@ class Chunk{
     if(region==="pillars")return;
     const candidates=[];
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){if(x===centerCell&&z===centerCell)continue;const mask=this.walls[this.index(x,z)],closed=(mask&1?1:0)+(mask&2?1:0)+(mask&4?1:0)+(mask&8?1:0);candidates.push({x,z,mask,closed})}
-    if(next()<.25){const dead=candidates.filter(c=>c.closed===3),room=dead.length?dead[Math.floor(next()*dead.length)]:null;if(room){const p=center(room.x,room.z),open=!(room.mask&1)?"north":!(room.mask&2)?"east":!(room.mask&4)?"south":"west";const t=new THREE.Mesh(new THREE.TorusGeometry(cell*.19,.11,8,18,Math.PI),lib.wall);t.position.set(p.x,2.1,p.z);t.rotation.y=open==="east"||open==="west"?Math.PI/2:0;g.add(t)}}
+    // Keep the ordinary spaces architectural and empty. Anomalous props are
+    // represented by rare impossible rooms and light events, not floating rings.
     if(this.level0Blackout)return;
-    const propRng=new RNG(this.seedKey()^0x71a4);
-    for(let i=0;i<2;i++){const room=candidates[propRng.int(0,Math.max(0,candidates.length-1))];if(!room)continue;const p=center(room.x,room.z);if(propRng.next()<.35){const mat=lib.light.clone();mat.emissiveIntensity=2.5;const f=box(g,new THREE.BoxGeometry(1.65,.055,.46),mat,p.x,level.wallHeight-.08,p.z,0,propRng.next()<.5?0:Math.PI/2,0);f.userData.light=true;f.userData.baseEmissive=2.5;this.fixtures.push(f);this.lightSources.push({position:new THREE.Vector3(p.x,level.wallHeight-.25,p.z),color:level.theme.light,baseIntensity:165,intensity:165,distance:0,decay:2,fixture:f})}}
+    // Fluorescent fixtures are placed with the ceiling grid in buildGeometry().
+    // Avoid creating a second, unaligned set of lights in every chunk.
   }
   buildLevel1Set(level,lib,rng){
     const g=this.group,cell=level.cellSize,cells=this.gridSize(),size=this.world.size;
@@ -1162,6 +1187,7 @@ class WorldStreamer{
     this.size=this.game.level.cellSize*(this.game.level.gridSize||CELLS);
     this.surfaceSize=4096;
     this.library=makeLibrary(this.game.level);
+    if(this.game.level.id==="0")this.configureLevel0FloorHoles(this.library.floor);
 
     {
       this.floorSurface=new THREE.Mesh(
@@ -1222,6 +1248,48 @@ class WorldStreamer{
     return true;
   }
 
+  configureLevel0FloorHoles(material){
+    const uniforms={
+      count:{value:0},
+      pits:{value:Array.from({length:8},()=>new THREE.Vector4(0,0,0,0))}
+    };
+    material.userData.level0PitUniforms=uniforms;
+    material.onBeforeCompile=shader=>{
+      shader.uniforms.uBackroomsPitCount=uniforms.count;
+      shader.uniforms.uBackroomsPits=uniforms.pits;
+      shader.vertexShader=shader.vertexShader.replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vBackroomsWorldPosition;"
+      );
+      shader.vertexShader=shader.vertexShader.replace(
+        "#include <worldpos_vertex>",
+        "#include <worldpos_vertex>\nvBackroomsWorldPosition=worldPosition.xyz;"
+      );
+      shader.fragmentShader=shader.fragmentShader.replace(
+        "#include <common>",
+        "#include <common>\nuniform int uBackroomsPitCount;\nuniform vec4 uBackroomsPits[8];\nvarying vec3 vBackroomsWorldPosition;"
+      );
+      shader.fragmentShader=shader.fragmentShader.replace(
+        "#include <clipping_planes_fragment>",
+        "#include <clipping_planes_fragment>\nfor(int i=0;i<8;i++){if(i<uBackroomsPitCount){vec4 pit=uBackroomsPits[i];vec2 delta=abs(vBackroomsWorldPosition.xz-pit.xy);if(delta.x<pit.z&&delta.y<pit.w)discard;}}"
+      );
+    };
+    material.customProgramCacheKey=()=>"backrooms-level0-floor-holes-v1";
+    material.needsUpdate=true;
+  }
+
+  refreshFloorPits(){
+    const uniforms=this.library?.floor?.userData?.level0PitUniforms;
+    if(!uniforms)return;
+    const pits=[...this.chunks.values()].map(chunk=>chunk.floorPit).filter(Boolean).slice(0,8);
+    uniforms.count.value=pits.length;
+    for(let i=0;i<uniforms.pits.value.length;i++){
+      const target=uniforms.pits.value[i],pit=pits[i];
+      if(pit)target.set(pit.x,pit.z,pit.halfWidth,pit.halfDepth);
+      else target.set(0,0,0,0);
+    }
+  }
+
   updateWallTextureTiling(){
     if(this.game.level.id!=="0"||!this.library?.wall)return;
     for(const key of ["map","roughnessMap","normalMap"]){
@@ -1279,17 +1347,19 @@ class WorldStreamer{
   ensureAround(x,z){
     const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    let changed=false;
     for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
       if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
       const k=this.key(cx+dx,cz+dz);
       if(!this.chunks.has(k)){
-        const c=new Chunk(this,cx+dx,cz+dz);this.chunks.set(k,c);this.game.scene.add(c.group);
+        const c=new Chunk(this,cx+dx,cz+dz);this.chunks.set(k,c);this.game.scene.add(c.group);changed=true;
         if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<.055)c.entitySpawn=true;
       }
     }
     for(const [k,c] of this.chunks){
-      if(Math.hypot(c.cx-cx,c.cz-cz)>this.radius+1){this.game.scene.remove(c.group);this.chunks.delete(k)}
+      if(Math.hypot(c.cx-cx,c.cz-cz)>this.radius+1){this.game.scene.remove(c.group);this.chunks.delete(k);changed=true}
     }
+    if(changed)this.refreshFloorPits();
   }
   setLevel0AllRed(enabled=true){
     this.forceLevel0AllRed=!!enabled;
@@ -1448,7 +1518,11 @@ class WorldStreamer{
   }
   hazardAt(x,z){
     const c=this.chunkAt(x,z);if(!c)return false;const cell=this.game.level.cellSize;
-    for(const h of c.hazards){const hx=c.originX+h.x*cell+cell/2,hz=c.originZ+h.z*cell+cell/2;if((x-hx)*(x-hx)+(z-hz)*(z-hz)<(cell*.26)**2)return true}
+    for(const h of c.hazards){
+      const hx=c.originX+h.x*cell+cell/2,hz=c.originZ+h.z*cell+cell/2;
+      const radius=cell*(h.cluster?.76:.26);
+      if((x-hx)*(x-hx)+(z-hz)*(z-hz)<radius*radius)return true;
+    }
     return false;
   }
   exitAt(x,z){
