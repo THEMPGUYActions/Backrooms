@@ -256,7 +256,7 @@ export class EntityModelLibrary{
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
     entity.model=model;
-    if(model.mixer)this.play(entity,["idle","stand","breath"]);
+    if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose","TposeLifeform"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
     console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)));
@@ -281,10 +281,19 @@ export class EntityModelLibrary{
     if(!model)return;
     if(model.mixer){
       const state=entity.state;
-      if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
-      else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
-      else if(state==="stalk")this.play(entity,["walk","creep","idle"]);
-      else this.play(entity,["idle","stand","breath","walk"]);
+      if(entity.type==="bacteria"){
+        // Use this GLB asset's actual clip labels; generic idle/walk names do not exist in it.
+        if(state==="frenzy")this.play(entity,["JUMPSCARE","chaseSceneEnd","stalkingpose"]);
+        else if(state==="chase")this.play(entity,["chaseSceneEnd","stalkingpose"]);
+        else if(state==="investigate"||state==="alert")this.play(entity,["bendingOverScene","stalkingpose"]);
+        else if(state==="stalk")this.play(entity,["stalkingpose","bendingOverScene"]);
+        else this.play(entity,["stalkingpose","TposeLifeform"]);
+      }else{
+        if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
+        else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
+        else if(state==="stalk")this.play(entity,["walk","creep","idle"]);
+        else this.play(entity,["idle","stand","breath","walk"]);
+      }
       model.mixer.update(dt);
     }
   }
