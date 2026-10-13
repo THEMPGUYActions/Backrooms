@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 12.0,
+  bacteria: 3.35, // approximately 11 ft (3.35 m), the commonly cited Lifeform estimate
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
@@ -173,7 +173,8 @@ export class EntityModelLibrary{
       const visibleBounds=new THREE.Box3();
       root.traverse(object=>{
         if(!isVisibleRenderableMesh(object))return;
-        const meshBounds=new THREE.Box3().setFromObject(object);
+        // Skinned meshes need precise vertex bounds; their bind-pose box can badly misrepresent the animated creature.
+        const meshBounds=new THREE.Box3().setFromObject(object,object.isSkinnedMesh===true);
         if(!meshBounds.isEmpty())visibleBounds.union(meshBounds);
       });
       if(visibleBounds.isEmpty())throw new Error("Loaded model has empty visible bounds");
@@ -195,7 +196,30 @@ export class EntityModelLibrary{
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
       container.add(root);
 
-      const clips=Array.isArray(asset.animations)?asset.animations:[];
+      const sourceClips=Array.isArray(asset.animations)?asset.animations:[];
+      let ignoredRootScaleTracks=0;
+      // The container owns the model's normalized world scale. Some imported
+      // clips also animate the scene/armature root scale, which can shrink an
+      // otherwise correctly normalized creature to a tiny figure.
+      const clips=sourceClips.map(clip=>{
+        const safeClip=clip.clone();
+        safeClip.tracks=safeClip.tracks.filter(track=>{
+          if(track.name!=="scale"&&!track.name.endsWith(".scale"))return true;
+          let target=root;
+          if(track.name!=="scale"){
+            let parsed;
+            try{parsed=THREE.PropertyBinding.parseTrackName(track.name)}catch{return true}
+            if(parsed.propertyName!=="scale")return true;
+            target=THREE.PropertyBinding.findNode(root,parsed.nodeName);
+          }
+          if(!target||(target!==root&&target.parent!==root))return true;
+          ignoredRootScaleTracks++;
+          return false;
+        });
+        safeClip.resetDuration();
+        return safeClip;
+      }).filter(clip=>clip.tracks.length>0);
+      if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model-root scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
       model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,scale,actions:new Map(),current:null,ready:true};
       if(mixer)for(const clip of clips)model.actions.set(clip.name,mixer.clipAction(clip));
