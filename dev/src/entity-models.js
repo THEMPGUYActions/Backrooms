@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 5.2, // Intentional oversized encounter silhouette; use non-Level-0 spawn space
+  bacteria: 12.5, // Oversized so the animated stalking silhouette still reaches above a 6-unit ceiling
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
@@ -25,7 +25,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
-  bacteria: 4.8
+  bacteria: 8.5
 });
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
@@ -192,22 +192,26 @@ export class EntityModelLibrary{
       // (for Bacteria) the horizontal footprint independently.
       const targetHeight=ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8);
       const targetWidth=ENTITY_MODEL_TARGET_WIDTHS[entity.type]||null;
-      const scale=targetHeight/size.y;
+      const heightScale=targetHeight/size.y;
       const sourceHorizontalSize=Math.max(size.x,size.z);
-      if(!Number.isFinite(scale)||scale<=0)throw new Error("Loaded model has an invalid height scale");
+      if(!Number.isFinite(heightScale)||heightScale<=0)throw new Error("Loaded model has an invalid height scale");
       if(!Number.isFinite(sourceHorizontalSize)||sourceHorizontalSize<=.001)throw new Error("Loaded model has no usable horizontal bounds");
-      const horizontalScale=targetWidth?Math.max(scale,targetWidth/sourceHorizontalSize):scale;
+      const horizontalScale=targetWidth?Math.max(heightScale,targetWidth/sourceHorizontalSize):heightScale;
       if(!Number.isFinite(horizontalScale)||horizontalScale<=0)throw new Error("Loaded model has an invalid horizontal scale");
+      const displayScaleXZ=horizontalScale*sourceHorizontalSize;
+      if(!Number.isFinite(displayScaleXZ)||displayScaleXZ<=0)throw new Error("Loaded model has an invalid display scale");
 
-      // Keep normalization separate from imported animation transforms.
+      // Normalize the imported asset to unit dimensions, then apply the intended
+      // in-game display dimensions on the outer container. This keeps displayed
+      // scale values meaningful instead of exposing a tiny correction factor
+      // caused by the source GLB being authored in unusually large units.
       const sourceCenter=visibleBounds.getCenter(new THREE.Vector3());
       container=new THREE.Group();
-      container.scale.set(horizontalScale,scale,horizontalScale);
+      container.scale.set(displayScaleXZ,targetHeight,displayScaleXZ);
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
-      // Normalize X/Z as well as Y. Some imported scenes have an offset origin,
-      // so a correctly scaled model can otherwise appear far away from its entity.
       const normalizedRoot=new THREE.Group();
-      normalizedRoot.position.set(-sourceCenter.x,-visibleBounds.min.y,-sourceCenter.z);
+      normalizedRoot.scale.set(1/sourceHorizontalSize,1/size.y,1/sourceHorizontalSize);
+      normalizedRoot.position.set(-sourceCenter.x/sourceHorizontalSize,-visibleBounds.min.y/size.y,-sourceCenter.z/sourceHorizontalSize);
       normalizedRoot.add(root);
       container.add(normalizedRoot);
 
@@ -238,7 +242,10 @@ export class EntityModelLibrary{
             if(parsed.propertyName!=="scale")return true;
             target=THREE.PropertyBinding.findNode(root,parsed.nodeName);
           }
-          if(!target||(entity.type!=="bacteria"&&!isSharedModelTransform(target)))return true;
+          // Keep bone-local scale animation; only strip scale keys on a node that
+          // is a common transform for every visible mesh, since that key can shrink
+          // the entire creature and defeat the display normalization.
+          if(!target||!isSharedModelTransform(target))return true;
           ignoredRootScaleTracks++;
           return false;
         });
@@ -247,7 +254,7 @@ export class EntityModelLibrary{
       }).filter(clip=>clip.tracks.length>0);
       if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
-      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,sourceCenter:sourceCenter.clone(),actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0,stableMode:"stalk",pendingMode:"stalk",completedClips:new Set()};
+      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale:targetHeight,horizontalScale:displayScaleXZ,sourceCenter:sourceCenter.clone(),sourceHeight:size.y,sourceHorizontalSize,actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0,stableMode:"stalk",pendingMode:"stalk",completedClips:new Set()};
       if(mixer)mixer.addEventListener("finished",event=>{
         const finishedName=normalizeClipName(event.action?.getClip?.().name);
         if(["jumpscare","bendingoverscene","chasesceneend"].includes(finishedName))model.completedClips.add(finishedName);
@@ -281,7 +288,7 @@ export class EntityModelLibrary{
     if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
-    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)),"sourcePivot",model.sourceCenter.toArray().map(v=>Number(v.toFixed(2))));
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.container.scale.y.toFixed(3)),"scaleXZ",Number(model.container.scale.x.toFixed(3)),"sourcePivot",model.sourceCenter.toArray().map(v=>Number(v.toFixed(2))));
     return true;
   }
 
