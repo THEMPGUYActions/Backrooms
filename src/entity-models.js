@@ -272,8 +272,8 @@ export class EntityModelLibrary{
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
     entity.model=model;
-    entity.group.userData.height=targetHeight;
-    entity.group.userData.modelWidth=targetWidth??Math.max(size.x,size.z)*scale;
+    entity.group.userData.height=model.targetHeight;
+    entity.group.userData.modelWidth=model.targetWidth??null;
     if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
