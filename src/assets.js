@@ -446,7 +446,7 @@ export function makeLibrary(level){
     manilaWall:createPBRMaterial({base:0x8a7357,seed:213,rough:.9,scale:1.2,normalStrength:.22}),
     mold:new THREE.MeshStandardMaterial({color:0x4e5437,roughness:1,metalness:0}),
     exit:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.38,metalness:.1,emissive:level.theme.accent,emissiveIntensity:1.2}),
-    light:new THREE.MeshStandardMaterial({color:level.id==="0"?0xfffbed:0xfff5d3,roughness:.34,metalness:0,emissive:level.id==="0"?0xffe9bf:0xffcf5b,emissiveIntensity:level.id==="0"?3.25:3.0}),
+    light:new THREE.MeshStandardMaterial({color:level.id==="0"?0xfffbed:0xfff5d3,roughness:.34,metalness:0,emissive:level.id==="0"?0xffe9bf:0xffcf5b,emissiveIntensity:level.id==="0"?1.05:3.0}),
     redLight:new THREE.MeshStandardMaterial({color:0x9a2825,roughness:.42,metalness:0,emissive:0x6e1714,emissiveIntensity:1.5}),
     orangeLight:new THREE.MeshStandardMaterial({color:0xffe0b6,roughness:.34,metalness:0,emissive:0xff9b52,emissiveIntensity:2.2}),
     battery:new THREE.MeshStandardMaterial({color:0x1c1d1b,roughness:.55,metalness:.35}),
