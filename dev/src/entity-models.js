@@ -23,6 +23,10 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   skinstealer: 3.0,
   smiler: 2.0
 });
+const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
+  // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
+  bacteria: 2.55
+});
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
 });
@@ -153,9 +157,11 @@ export class EntityModelLibrary{
       };
 
       let meshCount=0;
+      const visibleRenderableMeshes=[];
       root.traverse(object=>{
         if(!isVisibleRenderableMesh(object))return;
         meshCount++;
+        visibleRenderableMeshes.push(object);
         object.castShadow=false;
         object.receiveShadow=true;
         object.frustumCulled=true;
@@ -182,19 +188,34 @@ export class EntityModelLibrary{
       const size=visibleBounds.getSize(new THREE.Vector3());
       if(!Number.isFinite(size.y)||size.y<=.001)throw new Error("Loaded model has no usable visible height");
 
-      // Source models use different authoring scales and sometimes include
-      // long tentacles/wings; set an intentional display height for each entity.
+      // Source models use inconsistent authoring scales. Normalize height and
+      // (for Bacteria) the horizontal footprint independently.
       const targetHeight=ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8);
+      const targetWidth=ENTITY_MODEL_TARGET_WIDTHS[entity.type]||null;
       const scale=targetHeight/size.y;
-      if(!Number.isFinite(scale)||scale<=0)throw new Error("Loaded model has an invalid scale");
+      const sourceHorizontalSize=Math.max(size.x,size.z);
+      if(!Number.isFinite(scale)||scale<=0)throw new Error("Loaded model has an invalid height scale");
+      if(!Number.isFinite(sourceHorizontalSize)||sourceHorizontalSize<=.001)throw new Error("Loaded model has no usable horizontal bounds");
+      const horizontalScale=targetWidth?Math.max(scale,targetWidth/sourceHorizontalSize):scale;
+      if(!Number.isFinite(horizontalScale)||horizontalScale<=0)throw new Error("Loaded model has an invalid horizontal scale");
 
-      // Keep normalization and yaw separate from the animated GLB hierarchy so
-      // animation tracks cannot overwrite the entity's display scale.
+      // Keep normalization separate from imported animation transforms.
       container=new THREE.Group();
-      container.scale.setScalar(scale);
+      container.scale.set(horizontalScale,scale,horizontalScale);
       container.position.y=-visibleBounds.min.y*scale;
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
       container.add(root);
+
+      // A scale track on the common parent of every visible mesh is a model
+      // transform, not limb animation, and must not shrink the whole entity.
+      const isSharedModelTransform=target=>!!target&&visibleRenderableMeshes.every(mesh=>{
+        let ancestor=mesh;
+        while(ancestor){
+          if(ancestor===target)return true;
+          ancestor=ancestor.parent;
+        }
+        return false;
+      });
 
       const sourceClips=Array.isArray(asset.animations)?asset.animations:[];
       let ignoredRootScaleTracks=0;
@@ -212,16 +233,16 @@ export class EntityModelLibrary{
             if(parsed.propertyName!=="scale")return true;
             target=THREE.PropertyBinding.findNode(root,parsed.nodeName);
           }
-          if(!target||(target!==root&&target.parent!==root))return true;
+          if(!target||(entity.type!=="bacteria"&&!isSharedModelTransform(target)))return true;
           ignoredRootScaleTracks++;
           return false;
         });
         safeClip.resetDuration();
         return safeClip;
       }).filter(clip=>clip.tracks.length>0);
-      if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model-root scale animation tracks:",entity.type,ignoredRootScaleTracks);
+      if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
-      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,scale,actions:new Map(),current:null,ready:true};
+      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,actions:new Map(),current:null,ready:true};
       if(mixer)for(const clip of clips)model.actions.set(clip.name,mixer.clipAction(clip));
     }catch(error){
       // Keep the original procedural children untouched if a GLB is corrupt,
@@ -235,10 +256,10 @@ export class EntityModelLibrary{
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
     entity.model=model;
-    if(model.mixer)this.play(entity,["idle","stand","breath"]);
+    if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose","TposeLifeform"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
-    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"units","scale",Number(model.scale.toFixed(5)));
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)));
     return true;
   }
 
@@ -260,10 +281,19 @@ export class EntityModelLibrary{
     if(!model)return;
     if(model.mixer){
       const state=entity.state;
-      if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
-      else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
-      else if(state==="stalk")this.play(entity,["walk","creep","idle"]);
-      else this.play(entity,["idle","stand","breath","walk"]);
+      if(entity.type==="bacteria"){
+        // Use this GLB asset's actual clip labels; generic idle/walk names do not exist in it.
+        if(state==="frenzy")this.play(entity,["JUMPSCARE","chaseSceneEnd","stalkingpose"]);
+        else if(state==="chase")this.play(entity,["chaseSceneEnd","stalkingpose"]);
+        else if(state==="investigate"||state==="alert")this.play(entity,["bendingOverScene","stalkingpose"]);
+        else if(state==="stalk")this.play(entity,["stalkingpose","bendingOverScene"]);
+        else this.play(entity,["stalkingpose","TposeLifeform"]);
+      }else{
+        if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
+        else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
+        else if(state==="stalk")this.play(entity,["walk","creep","idle"]);
+        else this.play(entity,["idle","stand","breath","walk"]);
+      }
       model.mixer.update(dt);
     }
   }

@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261013-kane-level0";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-kane-level0";
-import { EntityModelLibrary } from "./entity-models.js?v=20261012-entity-size8";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-bacteria-lighting1";
+import { EntityModelLibrary } from "./entity-models.js?v=20261013-bacteria-lighting1";
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -502,9 +502,9 @@ class Chunk{
       const mask=this.walls[this.index(x,z)];
       if(mask&1)buildWallEdge(x,z,"north");if(mask&8)buildWallEdge(x,z,"west");if(z===cells-1&&(mask&4))buildWallEdge(x,z,"south");if(x===cells-1&&(mask&2))buildWallEdge(x,z,"east");
       if(level.id==="0"){
-        const fixtureChance=region==="blackout"?0:region==="red"?.34:.78;
+        const fixtureChance=region==="blackout"?0:region==="red"?.34:.58;
         if(rngBase.next()<fixtureChance){
-          const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?1.1:3.1;
+          const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?.85:1.05;
           const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
           // Four-by-two tile texture sheet: fluorescent trays sit across
           // several tiles and repeat at consistent ceiling-grid positions.
@@ -512,8 +512,8 @@ class Chunk{
           const fixtureX=snap(px,1.27),fixtureZ=snap(pz,1.14);
           const fixture=box(g,new THREE.BoxGeometry(1.18,.035,.56),mat,fixtureX,level.wallHeight-.05,fixtureZ,0,rotation,0);
           fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
-          const intensity=region==="red"?58:135;
-          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?16:15,decay:2,fixture});
+          const intensity=region==="red"?20:30;
+          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
         }
       }else if(level.id!=="1"&&rngBase.next()<.13){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
@@ -853,7 +853,7 @@ class Chunk{
       box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
       box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
       if(!this.level0Blackout){
-        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.userData.light=true;fixture.userData.baseEmissive=1.5;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffc46a,baseIntensity:70,intensity:70,distance:10,decay:2,fixture});
+        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.material.emissiveIntensity=.95;fixture.userData.light=true;fixture.userData.baseEmissive=.95;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffedc8,baseIntensity:24,intensity:24,distance:7.5,decay:2,fixture});
       }
       return;
     }
@@ -1790,15 +1790,19 @@ function limb(group,material,position,length=.65,radius=.09){
 }
 
 function makeBacteria(group){
-  const mat=entityMat(0x030303,1),wire=new THREE.LineBasicMaterial({color:0x030303,transparent:true,opacity:.94});
-  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.43,1),mat);core.scale.set(1,1.3,.8);core.position.y=2.25;group.add(core);
+  const mat=entityMat(0x030303,1),wire=new THREE.LineBasicMaterial({color:0x050505,transparent:true,opacity:.96});
+  // Make the fallback readable at corridor distance: a broad skull and splayed limbs.
+  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.45,1),mat);
+  core.scale.set(1.2,1.35,.95);core.position.y=2.72;group.add(core);
   const parts={legs:[],arms:[],head:core};
   for(const side of [-1,1]){
-    const leg=limb(group,wire,new THREE.Vector3(side*.22,.78,0),1.15,.055);leg.rotation.z=side*.3;parts.legs.push(leg);
-    const arm=limb(group,wire,new THREE.Vector3(side*.48,1.65,0),1.25,.055);arm.rotation.z=-side*.28;parts.arms.push(arm);
+    const leg=limb(group,wire,new THREE.Vector3(side*.28,.78,0),1.2,.065);
+    leg.rotation.z=side*.18;parts.legs.push(leg);
+    const arm=limb(group,wire,new THREE.Vector3(side*.75,2.0,0),1.8,.078);
+    arm.rotation.z=-side*.52;parts.arms.push(arm);
   }
-  const neck=limb(group,wire,new THREE.Vector3(0,1.72,0),.65,.05);parts.neck=neck;
-  group.userData={height:3.25,parts,anim:"idle",phase:Math.random()*6.28};
+  const neck=limb(group,wire,new THREE.Vector3(0,2.15,0),.62,.07);parts.neck=neck;
+  group.userData={height:3.35,parts,anim:"idle",phase:Math.random()*6.28};
 }
 
 function makeHound(group){
