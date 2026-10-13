@@ -14,7 +14,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 8.5, // scaled up so the creature reads at first-person distance
+  bacteria: 3.35, // Keep the creature inside the low ceiling; fix its origin separately
   deathmoth: 3.0,
   duller: 2.2,
   faceling: 3.2,
@@ -25,7 +25,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
-  bacteria: 6.5
+  bacteria: 3.25
 });
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
@@ -200,11 +200,16 @@ export class EntityModelLibrary{
       if(!Number.isFinite(horizontalScale)||horizontalScale<=0)throw new Error("Loaded model has an invalid horizontal scale");
 
       // Keep normalization separate from imported animation transforms.
+      const sourceCenter=visibleBounds.getCenter(new THREE.Vector3());
       container=new THREE.Group();
       container.scale.set(horizontalScale,scale,horizontalScale);
-      container.position.y=-visibleBounds.min.y*scale;
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
-      container.add(root);
+      // Normalize X/Z as well as Y. Some imported scenes have an offset origin,
+      // so a correctly scaled model can otherwise appear far away from its entity.
+      const normalizedRoot=new THREE.Group();
+      normalizedRoot.position.set(-sourceCenter.x,-visibleBounds.min.y,-sourceCenter.z);
+      normalizedRoot.add(root);
+      container.add(normalizedRoot);
 
       // A scale track on the common parent of every visible mesh is a model
       // transform, not limb animation, and must not shrink the whole entity.
@@ -242,7 +247,7 @@ export class EntityModelLibrary{
       }).filter(clip=>clip.tracks.length>0);
       if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
-      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0};
+      model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale,horizontalScale,sourceCenter:sourceCenter.clone(),actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0};
       if(mixer)for(const clip of clips){
         const action=mixer.clipAction(clip);
         if(entity.type==="bacteria"){
@@ -272,7 +277,7 @@ export class EntityModelLibrary{
     if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
-    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)));
+    console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.scale.toFixed(5)),"scaleXZ",Number(model.horizontalScale.toFixed(5)),"sourcePivot",model.sourceCenter.toArray().map(v=>Number(v.toFixed(2))));
     return true;
   }
 
