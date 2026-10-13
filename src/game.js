@@ -1271,7 +1271,7 @@ class WorldStreamer{
       );
       shader.fragmentShader=shader.fragmentShader.replace(
         "#include <clipping_planes_fragment>",
-        "#include <clipping_planes_fragment>\nfor(int i=0;i<16;i++){if(i<uBackroomsPitCount){vec4 pit=uBackroomsPits[i];vec2 delta=abs(vBackroomsWorldPosition.xz-pit.xy);if(delta.x<pit.z&&delta.y<pit.w)discard;}}"
+        "#include <clipping_planes_fragment>\nif(uBackroomsPitCount>0){for(int i=0;i<16;i++){if(i<uBackroomsPitCount){vec4 pit=uBackroomsPits[i];vec2 delta=abs(vBackroomsWorldPosition.xz-pit.xy);if(delta.x<pit.z&&delta.y<pit.w)discard;}}}"
       );
     };
     material.customProgramCacheKey=()=>"backrooms-level0-floor-holes-v1";
