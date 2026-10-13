@@ -31,7 +31,7 @@ export const LEVELS = {
     pipeChance: 0,
     entity: "figure",
     exitStyle: "mixed",
-    exitAfterChunks: 3,
+    exitAfterChunks: 6,
     batteryChance: 0.075,
     objective: "Find a way out. Not every door is real.",
     safe: true

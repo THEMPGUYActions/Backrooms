@@ -508,9 +508,9 @@ class Chunk{
           const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
           // Four-by-two tile texture sheet: fluorescent trays sit across
           // several tiles and repeat at consistent ceiling-grid positions.
-          const snap=(value,step)=>Math.round(value/step)*step;
-          const fixtureX=snap(px,5.08),fixtureZ=snap(pz,2.28);
-          const fixture=box(g,new THREE.BoxGeometry(1.18,.035,.56),mat,fixtureX,level.wallHeight-.032,fixtureZ,0,rotation,0);
+          const snap=(value,step)=>Math.round((value-step/2)/step)*step+step/2;
+          const fixtureX=snap(px,1.27),fixtureZ=snap(pz,1.14);
+          const fixture=box(g,new THREE.BoxGeometry(1.18,.035,.56),mat,fixtureX,level.wallHeight-.05,fixtureZ,0,rotation,0);
           fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
           const intensity=region==="red"?58:135;
           this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?16:15,decay:2,fixture});
@@ -805,7 +805,7 @@ class Chunk{
         shape.closePath();
         const patch=new THREE.Mesh(new THREE.ShapeGeometry(shape),lib.dampPatch);
         patch.rotation.x=-Math.PI/2;
-        patch.rotation.z=stainRng.next()*Math.PI*2;
+        patch.rotateZ(stainRng.next()*Math.PI*2);
         patch.position.set(p.x,.014+stainRng.next()*.004,p.z);
         g.add(patch);
       }
@@ -1251,7 +1251,7 @@ class WorldStreamer{
   configureLevel0FloorHoles(material){
     const uniforms={
       count:{value:0},
-      pits:{value:Array.from({length:8},()=>new THREE.Vector4(0,0,0,0))}
+      pits:{value:Array.from({length:16},()=>new THREE.Vector4(0,0,0,0))}
     };
     material.userData.level0PitUniforms=uniforms;
     material.onBeforeCompile=shader=>{
@@ -1263,15 +1263,15 @@ class WorldStreamer{
       );
       shader.vertexShader=shader.vertexShader.replace(
         "#include <worldpos_vertex>",
-        "#include <worldpos_vertex>\nvBackroomsWorldPosition=worldPosition.xyz;"
+        "#include <worldpos_vertex>\nvBackroomsWorldPosition=(modelMatrix*vec4(transformed,1.0)).xyz;"
       );
       shader.fragmentShader=shader.fragmentShader.replace(
         "#include <common>",
-        "#include <common>\nuniform int uBackroomsPitCount;\nuniform vec4 uBackroomsPits[8];\nvarying vec3 vBackroomsWorldPosition;"
+        "#include <common>\nuniform int uBackroomsPitCount;\nuniform vec4 uBackroomsPits[16];\nvarying vec3 vBackroomsWorldPosition;"
       );
       shader.fragmentShader=shader.fragmentShader.replace(
         "#include <clipping_planes_fragment>",
-        "#include <clipping_planes_fragment>\nfor(int i=0;i<8;i++){if(i<uBackroomsPitCount){vec4 pit=uBackroomsPits[i];vec2 delta=abs(vBackroomsWorldPosition.xz-pit.xy);if(delta.x<pit.z&&delta.y<pit.w)discard;}}"
+        "#include <clipping_planes_fragment>\nfor(int i=0;i<16;i++){if(i<uBackroomsPitCount){vec4 pit=uBackroomsPits[i];vec2 delta=abs(vBackroomsWorldPosition.xz-pit.xy);if(delta.x<pit.z&&delta.y<pit.w)discard;}}"
       );
     };
     material.customProgramCacheKey=()=>"backrooms-level0-floor-holes-v1";
@@ -1281,7 +1281,7 @@ class WorldStreamer{
   refreshFloorPits(){
     const uniforms=this.library?.floor?.userData?.level0PitUniforms;
     if(!uniforms)return;
-    const pits=[...this.chunks.values()].map(chunk=>chunk.floorPit).filter(Boolean).slice(0,8);
+    const pits=[...this.chunks.values()].map(chunk=>chunk.floorPit).filter(Boolean).slice(0,16);
     uniforms.count.value=pits.length;
     for(let i=0;i<uniforms.pits.value.length;i++){
       const target=uniforms.pits.value[i],pit=pits[i];
@@ -1518,10 +1518,13 @@ class WorldStreamer{
   }
   hazardAt(x,z){
     const c=this.chunkAt(x,z);if(!c)return false;const cell=this.game.level.cellSize;
+    // Cluster hazards mark the actual cut-out rectangle; the carpet rim around
+    // a pit remains walkable instead of killing the player several metres early.
+    if(c.floorPit&&Math.abs(x-c.floorPit.x)<=c.floorPit.halfWidth&&Math.abs(z-c.floorPit.z)<=c.floorPit.halfDepth)return true;
     for(const h of c.hazards){
+      if(h.cluster)continue;
       const hx=c.originX+h.x*cell+cell/2,hz=c.originZ+h.z*cell+cell/2;
-      const radius=cell*(h.cluster?.76:.26);
-      if((x-hx)*(x-hx)+(z-hz)*(z-hz)<radius*radius)return true;
+      if((x-hx)*(x-hx)+(z-hz)*(z-hz)<(cell*.26)**2)return true;
     }
     return false;
   }
