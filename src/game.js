@@ -5,8 +5,8 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20260926-level0ceiling3";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20260926-level0carpet1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261013-kane-level0";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-kane-level0";
 import { EntityModelLibrary } from "./entity-models.js?v=20261012-entity-size8";
 
 const VHSShader={
@@ -140,8 +140,9 @@ function level0AddBoundaryInterval(map,key,start,end){
 
 const LEVEL0_REGION_CHUNKS=20;
 const LEVEL0_RED_SIZE=3;
-const LEVEL0_HOLE_SIZE=6;
-const LEVEL0_BLACKOUT_SIZE=4;
+const LEVEL0_HOLE_SIZE=1;
+const LEVEL0_BLACKOUT_SIZE=3;
+const LEVEL0_PILLAR_SIZE=5;
 
 function positiveMod(n,d){return ((n%d)+d)%d}
 function level0RegionAt(cx,cz,seed){
@@ -150,9 +151,9 @@ function level0RegionAt(cx,cz,seed){
   const lx=positiveMod(cx,LEVEL0_REGION_CHUNKS),lz=positiveMod(cz,LEVEL0_REGION_CHUNKS);
   const roll=cycleHash(seed^0x6c3000,macroX,macroZ,0x51);
   if(roll<.022&&lx>=3&&lx<3+LEVEL0_RED_SIZE&&lz>=3&&lz<3+LEVEL0_RED_SIZE)return {type:"red",id:"red:"+macroX+":"+macroZ};
-  if(roll>=.022&&roll<.055&&lx>=2&&lx<2+LEVEL0_HOLE_SIZE&&lz>=2&&lz<2+LEVEL0_HOLE_SIZE)return {type:"holes",id:"holes:"+macroX+":"+macroZ};
-  if(roll>=.055&&roll<.085&&lx>=3&&lx<3+LEVEL0_BLACKOUT_SIZE&&lz>=3&&lz<3+LEVEL0_BLACKOUT_SIZE)return {type:"blackout",id:"blackout:"+macroX+":"+macroZ};
-  if(roll>=.085&&roll<.15)return {type:"pillars",id:"pillars:"+macroX+":"+macroZ};
+  if(roll>=.022&&roll<.04&&lx===9&&lz===9)return {type:"holes",id:"holes:"+macroX+":"+macroZ};
+  if(roll>=.04&&roll<.075&&lx>=3&&lx<3+LEVEL0_BLACKOUT_SIZE&&lz>=3&&lz<3+LEVEL0_BLACKOUT_SIZE)return {type:"blackout",id:"blackout:"+macroX+":"+macroZ};
+  if(roll>=.075&&roll<.15&&lx>=7&&lx<7+LEVEL0_PILLAR_SIZE&&lz>=7&&lz<7+LEVEL0_PILLAR_SIZE)return {type:"pillars",id:"pillars:"+macroX+":"+macroZ};
   return {type:"maze",id:"maze"};
 }
 function level0RegionSame(a,b){return a.type!=="maze"&&a.type===b.type&&a.id===b.id}
@@ -182,7 +183,7 @@ function level0ManilaAt(cx,cz,seed){
   const macroX=Math.floor(cx/LEVEL0_REGION_CHUNKS),macroZ=Math.floor(cz/LEVEL0_REGION_CHUNKS);
   const lx=positiveMod(cx,LEVEL0_REGION_CHUNKS),lz=positiveMod(cz,LEVEL0_REGION_CHUNKS);
   if(lx<1||lx>8||lz<1||lz>8)return null;
-  if(cycleHash(seed^0x6d6e,macroX,macroZ,0x41)>.045)return null;
+  if(cycleHash(seed^0x6d6e,macroX,macroZ,0x41)>.012)return null;
   const tx=1+Math.floor(cycleHash(seed^0x6d6f,macroX,macroZ,0x42)*8),tz=1+Math.floor(cycleHash(seed^0x6d70,macroX,macroZ,0x43)*8);
   if(lx!==tx||lz!==tz)return null;
   return {
@@ -209,7 +210,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
   }
@@ -345,7 +346,7 @@ class Chunk{
       this.level0PoleArea=this.level0PillarArea;
       this.manilaRoom=this.level0Region.type==="maze"?level0ManilaAt(this.cx,this.cz,this.game.seed):null;
 
-      if(this.level0Region.type==="pillars"||this.level0Region.type==="holes"){
+      if(this.level0Region.type==="pillars"){
         this.walls.fill(0);
       }else{
         const visited=new Uint8Array(cells*cells);
@@ -359,13 +360,41 @@ class Chunk{
           const [nx,nz,b,ob]=rng.pick(options);
           this.walls[this.index(x,z)]&=~b;this.walls[this.index(nx,nz)]&=~ob;visited[this.index(nx,nz)]=1;stack.push([nx,nz]);
         }
-        // Keep the maze spatially tight so each 8m cell corresponds to one
-        // 8m roof panel. Only a small amount of room merging is allowed;
-        // broad multi-cell openings made the floor feel disconnected from
-        // the ceiling grid and too much like a warehouse.
+
+        // The source is an irregular maze of office partitions, not a perfect
+        // grid of tiny rooms. Carve a few broad, crooked sightline rooms into
+        // each chunk while keeping the initial spawn cell surrounded enough
+        // to preserve the disorienting first reveal.
+        const roomAttempts=2+rng.int(0,2),rooms=[];
+        for(let attempt=0;attempt<roomAttempts;attempt++){
+          const rw=rng.int(2,4),rh=rng.int(2,3);
+          const rx=rng.int(1,Math.max(1,cells-rw-1)),rz=rng.int(1,Math.max(1,cells-rh-1));
+          const candidate={x:rx,z:rz,w:rw,h:rh};
+          if(this.cx===0&&this.cz===0&&rx<=cells/2+1&&rx+rw>cells/2-1&&rz<=cells/2+1&&rz+rh>cells/2-1)continue;
+          if(rooms.some(room=>candidate.x<room.x+room.w+1&&candidate.x+candidate.w+1>room.x&&candidate.z<room.z+room.h+1&&candidate.z+candidate.h+1>room.z))continue;
+          rooms.push(candidate);
+          for(let z=rz;z<rz+rh;z++)for(let x=rx;x<rx+rw;x++){
+            if(x<rx+rw-1)this.setEdge(x,z,"east",true);
+            if(z<rz+rh-1)this.setEdge(x,z,"south",true);
+          }
+          const entrySide=rng.pick(["north","east","south","west"]);
+          const entryX=entrySide==="east"?rx+rw-1:entrySide==="west"?rx:rx+rng.int(0,rw-1);
+          const entryZ=entrySide==="south"?rz+rh-1:entrySide==="north"?rz:rz+rng.int(0,rh-1);
+          this.setEdge(entryX,entryZ,entrySide,true);
+        }
+
+        // A few opportunistic breaches create angled, offset passage links.
         for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if(x<cells-1&&rng.next()<.025)this.setEdge(x,z,"east",true);
-          if(z<cells-1&&rng.next()<.025)this.setEdge(x,z,"south",true);
+          if(x<cells-1&&rng.next()<.085)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&rng.next()<.085)this.setEdge(x,z,"south",true);
+        }
+        if(this.level0Region.type==="holes"){
+          const hx=Math.floor(cells/2),hz=Math.floor(cells/2);
+          for(let z=hz-1;z<=hz;z++)for(let x=hx-1;x<=hx;x++){
+            if(x<cells-1)this.setEdge(x,z,"east",true);
+            if(z<cells-1)this.setEdge(x,z,"south",true);
+            this.hazards.push({x,z,cluster:true});
+          }
         }
       }
 
@@ -391,12 +420,6 @@ class Chunk{
       if(this.cx===0&&this.cz===0){const s=Math.floor(cells/2);for(const side of ["north","east","south","west"])this.setEdge(s,s,side,true)}
       if(this.manilaRoom)this.setEdge(this.manilaRoom.cellX,this.manilaRoom.cellZ,this.manilaRoom.entrySide,true);
 
-      if(this.level0Region.type==="holes"){
-        const holeRng=new RNG(this.seedKey()^0x481e);
-        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-          if((x===Math.floor(cells/2)&&z===Math.floor(cells/2))||holeRng.next()<.72)this.hazards.push({x,z,cluster:true});
-        }
-      }
     }
 
     if(level.id!=="1"&&level.id!=="0"){
@@ -454,11 +477,12 @@ class Chunk{
   buildGeometry(){
     const cells=this.gridSize();
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
-    const wallThickness=.18;
-    const safeWallHeight=level.wallHeight-.04;
-    const safeWallY=safeWallHeight/2+.02;
+    const wallThickness=level.id==="0"?.12:.18;
+    const safeWallHeight=level.wallHeight-.025;
+    const safeWallY=safeWallHeight/2+.0125;
     const hGeom=new THREE.BoxGeometry(cell,safeWallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,safeWallHeight,cell);
-    const trimHGeom=new THREE.BoxGeometry(cell,.11,.12),trimVGeom=new THREE.BoxGeometry(.12,.11,cell);
+    const trimHGeom=level.id==="0"?new THREE.BoxGeometry(cell,.055,.035):new THREE.BoxGeometry(cell,.11,.12);
+    const trimVGeom=level.id==="0"?new THREE.BoxGeometry(.035,.055,cell):new THREE.BoxGeometry(.12,.11,cell);
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
     const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
     const region=level.id==="0"?(this.level0Region?.type||"maze"):"";
@@ -478,12 +502,18 @@ class Chunk{
       const mask=this.walls[this.index(x,z)];
       if(mask&1)buildWallEdge(x,z,"north");if(mask&8)buildWallEdge(x,z,"west");if(z===cells-1&&(mask&4))buildWallEdge(x,z,"south");if(x===cells-1&&(mask&2))buildWallEdge(x,z,"east");
       if(level.id==="0"){
-        const fixtureChance=region==="blackout"?0:region==="red"?.24:.72;
+        const fixtureChance=region==="blackout"?0:region==="red"?.34:.78;
         if(rngBase.next()<fixtureChance){
-          const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?1.25:2.7;
+          const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?1.1:3.1;
           const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-          const fixture=box(g,new THREE.BoxGeometry(1.55,.055,.46),mat,px,level.wallHeight-.08,pz,0,rotation,0);fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
-          const intensity=region==="red"?72:175;this.lightSources.push({position:new THREE.Vector3(px,level.wallHeight-.24,pz),color:region==="red"?0x761712:level.theme.light,baseIntensity:intensity,intensity,distance:region==="red"?18:0,decay:2,fixture});
+          // Four-by-two tile texture sheet: fluorescent trays sit across
+          // several tiles and repeat at consistent ceiling-grid positions.
+          const snap=(value,step)=>Math.round(value/step)*step;
+          const fixtureX=snap(px,5.08),fixtureZ=snap(pz,2.28);
+          const fixture=box(g,new THREE.BoxGeometry(1.18,.035,.56),mat,fixtureX,level.wallHeight-.032,fixtureZ,0,rotation,0);
+          fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
+          const intensity=region==="red"?58:135;
+          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?16:15,decay:2,fixture});
         }
       }else if(level.id!=="1"&&rngBase.next()<.13){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
@@ -501,7 +531,11 @@ class Chunk{
       redFloor.renderOrder=1;
       g.add(redFloor);
     }
-    if(level.id!=="1"){addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);addInstanced(topHGeom,lib.trimTop,topH);addInstanced(topVGeom,lib.trimTop,topV)}
+    if(level.id==="0"){
+      // The source has a small, aged skirting board but no bright white cap
+      // stripe at eye level. Leave the top edge as plain wallpaper.
+      addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);
+    }else if(level.id!=="1"){addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);addInstanced(topHGeom,lib.trimTop,topH);addInstanced(topVGeom,lib.trimTop,topV)}
 
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
     else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
@@ -575,7 +609,7 @@ class Chunk{
 
     const buildDoor=(entry,exitDoor)=>{
       const doorHeight=Math.min(2.75,level.wallHeight-.16);
-      const doorWidth=Math.min(3.1,cell-.9);
+      const doorWidth=level.id==="0"?.96:Math.min(3.1,cell-.9);
       const frameWidth=Math.min(3.35,doorWidth+.24);
       const p=wallPoint(entry,.105,doorHeight/2),group=new THREE.Group();
       group.position.copy(p.position);group.rotation.y=p.rotation;
@@ -1206,8 +1240,10 @@ class WorldStreamer{
     const surfaces=isLevel0
       ? [
           {material:this.library?.floor,tileWorldX:1.25,tileWorldZ:1.25},
-          // Kane Pixels' Level 0 ceiling tiles are approximately 1.27 m × 1.14 m.
-          {material:this.library?.ceiling,tileWorldX:1.27,tileWorldZ:1.14}
+          // The authored color map is a sheet of four columns by two rows.
+          // Each source panel is about 1.27 × 1.14 m, so repeat the whole sheet
+          // at 5.08 × 2.28 m to keep the rendered tiles at life size.
+          {material:this.library?.ceiling,tileWorldX:5.08,tileWorldZ:2.28}
         ]
       : this.game.level.id==="1"
         ? [
@@ -2435,8 +2471,8 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
-    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.027:this.level.id==="1"?.024:.058);
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x020303);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.032:.052;
+    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.014:this.level.id==="1"?.024:.058);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x080704);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.044:.052;
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
@@ -2661,9 +2697,8 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      // SpacePotatoee/MinecraftFoundFootage uses 20 ticks for the generic blackout event.
-      // Minecraft runs at 20 ticks per second, so this is exactly 1 second here.
-      this.lightEventTimer=this.level.id==="0"?120+Math.random()*240:30;
+      // Short unstable-ballast outages, not multi-minute total darkness.
+      this.lightEventTimer=this.level.id==="0"?1.2+Math.random()*2.2:30;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
