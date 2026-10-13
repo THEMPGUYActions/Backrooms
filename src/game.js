@@ -512,8 +512,8 @@ class Chunk{
           const fixtureX=snap(px,1.27),fixtureZ=snap(pz,1.14);
           const fixture=box(g,new THREE.BoxGeometry(1.18,.035,.56),mat,fixtureX,level.wallHeight-.05,fixtureZ,0,rotation,0);
           fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
-          const intensity=region==="red"?28:42;
-          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?10.5:9.5,decay:2,fixture});
+          const intensity=region==="red"?20:30;
+          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
         }
       }else if(level.id!=="1"&&rngBase.next()<.13){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
@@ -853,7 +853,7 @@ class Chunk{
       box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
       box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
       if(!this.level0Blackout){
-        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.material.emissiveIntensity=.95;fixture.userData.light=true;fixture.userData.baseEmissive=.95;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffedc8,baseIntensity:28,intensity:28,distance:8.5,decay:2,fixture});
+        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.material.emissiveIntensity=.95;fixture.userData.light=true;fixture.userData.baseEmissive=.95;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffedc8,baseIntensity:24,intensity:24,distance:7.5,decay:2,fixture});
       }
       return;
     }
