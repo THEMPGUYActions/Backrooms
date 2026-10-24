@@ -18,7 +18,7 @@ Current researched CC BY 4.0 model sources:
   https://sketchfab.com/3d-models/backrooms-faceling-ps1psx-style-76ff872b6d12402ba6d363c6d16f64c7
 - `partygoer.glb` - bigdowsey
   https://sketchfab.com/3d-models/the-partygoer-backrooms-entity-0593ef4788b146e4b2f820b10245a948
-- `bacteria.glb` - Unschooling with Fin
+- `bacteria-roof-v2.glb` - Unschooling with Fin
   https://sketchfab.com/3d-models/accurate-backrooms-bacteria-v2-with-animations-c067bae794c14fc1969fe22605cdd837
   The committed source GLB identifies itself as “Accurate Backrooms Bacteria v2 with Animations” and includes five animation clips. The committed runtime copy is Meshopt-compressed from 11.73 MB to about 2.73 MB; retain the original source file when reprocessing it.
 

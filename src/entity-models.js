@@ -37,7 +37,7 @@ export const ENTITY_MODEL_SOURCES = Object.freeze({
   deathmoth: { files:["deathmoth.fbx","deathmoth.glb","deathmoth.gltf","deathmoth.obj","deathmoth.usdz"], creator:"Bittergiggle Playz [OFFICIAL]", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/deathmoth-backrooms-6101e3e3991545d6a8cce026fb2a51b2" },
   faceling: { files:["faceling.fbx","faceling.glb","faceling.gltf","faceling.obj","faceling.usdz"], creator:"TacoModels / original model by AlanH1213", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/backrooms-faceling-ps1psx-style-76ff872b6d12402ba6d363c6d16f64c7" },
   partygoer: { files:["partygoer.fbx","partygoer.glb","partygoer.gltf","partygoer.obj","partygoer.usdz"], creator:"bigdowsey", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/the-partygoer-backrooms-entity-0593ef4788b146e4b2f820b10245a948" },
-  bacteria: { files:["bacteria.fbx","bacteria.glb","bacteria.gltf","bacteria.obj","bacteria.usdz"], creator:"Unschooling with Fin", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/accurate-backrooms-bacteria-v2-with-animations-c067bae794c14fc1969fe22605cdd837" }
+  bacteria: { files:["bacteria.fbx","bacteria-roof-v2.glb","bacteria.gltf","bacteria.obj","bacteria.usdz"], creator:"Unschooling with Fin", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/accurate-backrooms-bacteria-v2-with-animations-c067bae794c14fc1969fe22605cdd837" }
 });
 
 function normalizeClipName(name){ return String(name||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
