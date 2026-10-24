@@ -21,7 +21,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   hound: 2.7,
   partygoer: 3.4,
   skinstealer: 3.4,
-  smiler: 2.8
+  smiler: 2.0
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
