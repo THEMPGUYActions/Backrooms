@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
@@ -14,7 +15,7 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // scales. These are intentional in-game display heights (world units), audited
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
-  bacteria: 12.5, // Oversized so the animated stalking silhouette still reaches above a 6-unit ceiling
+  bacteria: 3.0, // Fallback for a standard Level 0 room; runtime fits Bacteria to the active ceiling
   deathmoth: 3.6,
   duller: 2.8,
   faceling: 3.2,
@@ -23,10 +24,7 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   skinstealer: 3.4,
   smiler: 2.0
 });
-const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
-  // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
-  bacteria: 8.5
-});
+const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({});
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
 });
@@ -39,7 +37,7 @@ export const ENTITY_MODEL_SOURCES = Object.freeze({
   deathmoth: { files:["deathmoth.fbx","deathmoth.glb","deathmoth.gltf","deathmoth.obj","deathmoth.usdz"], creator:"Bittergiggle Playz [OFFICIAL]", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/deathmoth-backrooms-6101e3e3991545d6a8cce026fb2a51b2" },
   faceling: { files:["faceling.fbx","faceling.glb","faceling.gltf","faceling.obj","faceling.usdz"], creator:"TacoModels / original model by AlanH1213", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/backrooms-faceling-ps1psx-style-76ff872b6d12402ba6d363c6d16f64c7" },
   partygoer: { files:["partygoer.fbx","partygoer.glb","partygoer.gltf","partygoer.obj","partygoer.usdz"], creator:"bigdowsey", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/the-partygoer-backrooms-entity-0593ef4788b146e4b2f820b10245a948" },
-  bacteria: { files:["bacteria.fbx","bacteria.glb","bacteria.gltf","bacteria.obj","bacteria.usdz"], creator:"DocoDummy", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/backrooms-custom-bacteria-lifeform-fb79a5140b144362abdaca43c0effb5c" }
+  bacteria: { files:["bacteria.fbx","bacteria.glb","bacteria.gltf","bacteria.obj","bacteria.usdz"], creator:"Unschooling with Fin", license:"CC BY 4.0", source:"https://sketchfab.com/3d-models/accurate-backrooms-bacteria-v2-with-animations-c067bae794c14fc1969fe22605cdd837" }
 });
 
 function normalizeClipName(name){ return String(name||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
@@ -62,6 +60,7 @@ export class EntityModelLibrary{
   constructor(game){
     this.game=game;
     this.gltfLoader=new GLTFLoader();
+    this.gltfLoader.setMeshoptDecoder(MeshoptDecoder);
     this.fbxLoader=new FBXLoader();
     this.objLoader=new OBJLoader();
     this.mtlLoader=new MTLLoader();
@@ -144,6 +143,26 @@ export class EntityModelLibrary{
       root=cloneSkeleton(asset.scene);
       if(!root?.isObject3D)throw new Error("Could not clone the loaded scene");
 
+      // The source Bacteria GLB contains a detached Cube.016 mesh whose local Y
+      // coordinates are around 225-237 while the actual rig is around -8 to 19.
+      // It is a stray export artifact, not part of the creature; including it in
+      // bounds normalization makes the visible monster look tiny. Hide it before
+      // calculating bounds and rendering, with a coordinate-based fallback in case
+      // a repacked GLB changes the generated node/geometry name.
+      if(entity.type==="bacteria"){
+        root.traverse(object=>{
+          if(!object.isMesh||!object.geometry)return;
+          const name=String(object.geometry.name||"")+" "+String(object.name||"");
+          if(name.includes("Cube.016_Material.002_0")){
+            object.visible=false;
+            return;
+          }
+          if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();
+          const bounds=object.geometry.boundingBox;
+          if(bounds&&[bounds.min.x,bounds.min.y,bounds.min.z,bounds.max.x,bounds.max.y,bounds.max.z].some(value=>Math.abs(value)>100))object.visible=false;
+        });
+      }
+
       const isVisibleRenderableMesh=object=>{
         if(!object.isMesh||!object.geometry?.attributes?.position?.count)return false;
         let ancestor=object;
@@ -188,9 +207,10 @@ export class EntityModelLibrary{
       const size=visibleBounds.getSize(new THREE.Vector3());
       if(!Number.isFinite(size.y)||size.y<=.001)throw new Error("Loaded model has no usable visible height");
 
-      // Source models use inconsistent authoring scales. Normalize height and
-      // (for Bacteria) the horizontal footprint independently.
-      const targetHeight=ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8);
+      // Source models use inconsistent authoring scales. Normalize height and any
+      // explicit horizontal footprint independently.
+      const levelRoofHeight=this.game.level?.wallHeight;
+      const targetHeight=entity.type==="bacteria"&&Number.isFinite(levelRoofHeight)?Math.max(.55,(levelRoofHeight-.05)*2.08):(ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8));
       const targetWidth=ENTITY_MODEL_TARGET_WIDTHS[entity.type]||null;
       const heightScale=targetHeight/size.y;
       const sourceHorizontalSize=Math.max(size.x,size.z);
