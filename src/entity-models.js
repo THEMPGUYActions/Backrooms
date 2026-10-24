@@ -210,7 +210,7 @@ export class EntityModelLibrary{
       // Source models use inconsistent authoring scales. Normalize height and any
       // explicit horizontal footprint independently.
       const levelRoofHeight=this.game.level?.wallHeight;
-      const targetHeight=entity.type==="bacteria"&&Number.isFinite(levelRoofHeight)?Math.max(.55,(levelRoofHeight-.05)*2.08):(ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8));
+      const targetHeight=entity.type==="bacteria"&&Number.isFinite(levelRoofHeight)?Math.max(.55,(levelRoofHeight-.05)*3.0):(ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8));
       const targetWidth=ENTITY_MODEL_TARGET_WIDTHS[entity.type]||null;
       const heightScale=targetHeight/size.y;
       const sourceHorizontalSize=Math.max(size.x,size.z);
@@ -302,6 +302,20 @@ export class EntityModelLibrary{
     // A failed model can never erase the built-in procedural entity.
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
+    // The original Bacteria rig has a large offset between its bind-pose mesh
+    // bounds and the animated stalking pose. Re-evaluate the actual skinned
+    // pose after starting its first clip and lift the normalized rig so the
+    // lowest visible vertex sits on the floor instead of below it.
+    if(entity.type==="bacteria"&&model.mixer){
+      model.mixer.update(0);
+      entity.group.updateMatrixWorld(true);
+      const posedBounds=new THREE.Box3().setFromObject(root,true);
+      if(!posedBounds.isEmpty()&&Number.isFinite(posedBounds.min.y)&&posedBounds.min.y<0){
+        normalizedRoot.position.y+=(-posedBounds.min.y)/Math.max(.001,container.scale.y);
+        normalizedRoot.updateMatrix();
+        entity.group.updateMatrixWorld(true);
+      }
+    }
     entity.model=model;
     entity.group.userData.height=model.targetHeight;
     entity.group.userData.modelWidth=model.targetWidth??null;
