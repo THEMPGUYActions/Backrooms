@@ -15,13 +15,13 @@ const DEFAULT_FILE_ORDER = Object.freeze(["fbx","glb","gltf","obj","usdz"]);
 // against each committed model's actual bounds instead of assuming its source units.
 const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   bacteria: 12.5, // Oversized so the animated stalking silhouette still reaches above a 6-unit ceiling
-  deathmoth: 3.0,
-  duller: 2.2,
+  deathmoth: 3.6,
+  duller: 2.8,
   faceling: 3.2,
-  hound: 1.8,
-  partygoer: 3.0,
-  skinstealer: 3.0,
-  smiler: 2.0
+  hound: 2.7,
+  partygoer: 3.4,
+  skinstealer: 3.4,
+  smiler: 2.8
 });
 const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   // This Bacteria asset has a narrow skeletal silhouette; normalize its footprint too.
