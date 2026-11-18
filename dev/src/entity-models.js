@@ -28,7 +28,15 @@ const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
   bacteria: 1.15
 });
 const ENTITY_MODEL_YAWS = Object.freeze({
-  smiler: Math.PI / 2
+  smiler: Math.PI / 2,
+  // Source Skin-Stealer GLB faces -Z; default Math.PI makes it walk backwards.
+  skinstealer: 0,
+  hound: Math.PI,          // keep current if already correct; override if needed
+  deathmoth: Math.PI,
+  faceling: Math.PI,
+  partygoer: Math.PI,
+  duller: Math.PI,
+  bacteria: Math.PI
 });
 
 export const ENTITY_MODEL_SOURCES = Object.freeze({
@@ -409,12 +417,28 @@ export class EntityModelLibrary{
         if(chaseLike) model.container.rotation.x = -0.06 + Math.sin(model.phase * 0.5) * 0.02;
         else model.container.rotation.x = 0;
       }else{
-        if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
+        // Prefer real clips when the GLB has them; otherwise fall through to procedural motion.
+        if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk","idle"]);
         else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);
         else if(state==="stalk")this.play(entity,["walk","creep","idle"]);
         else this.play(entity,["idle","stand","breath","walk"]);
       }
       model.mixer.update(dt);
+    }
+    // Procedural locomotion for every entity (especially static GLBs with no usable clips).
+    // Gives weight and life even when the source model is a single T-pose or idle pose.
+    const state = entity.state || "idle";
+    const moving = state === "chase" || state === "frenzy" || state === "investigate" || state === "alert" || state === "stalk";
+    const chaseLike = state === "chase" || state === "frenzy";
+    model.phase = (model.phase || 0) + dt * (chaseLike ? 9.5 : moving ? 4.2 : 1.1);
+    const ampY = chaseLike ? 0.048 : moving ? 0.028 : 0.012;
+    const ampZ = chaseLike ? 0.038 : moving ? 0.022 : 0.01;
+    if (model.container) {
+      model.container.position.y = Math.sin(model.phase) * ampY;
+      model.container.rotation.z = Math.sin(model.phase * 0.71) * ampZ;
+      if (chaseLike) model.container.rotation.x = -0.05 + Math.sin(model.phase * 0.48) * 0.018;
+      else if (moving) model.container.rotation.x = -0.02;
+      else model.container.rotation.x = 0;
     }
   }
 }
