@@ -384,7 +384,7 @@ export class EntityModelLibrary{
           model.pendingMode=observedMode;model.pendingTime=0;
         }else{
           model.pendingTime+=dt;
-          const stableFor=(observedMode==="chase"||observedMode==="frenzy")?.9:1.15;
+          const stableFor=(observedMode==="chase"||observedMode==="frenzy")?.35:0.85;
           if(model.pendingTime>=stableFor){
             model.stableMode=observedMode;model.pendingTime=0;model.completedClips.clear();
           }
@@ -396,10 +396,18 @@ export class EntityModelLibrary{
         else if(model.stableMode==="frenzy"&&!model.completedClips.has("jumpscare"))desiredName="JUMPSCARE";
         const desired=pickClip(model.clips,[desiredName])||pickClip(model.clips,["bendingOverScene"]);
         if(desired)this.play(entity,[desired.name]);
-        if(model.current&&normalizeClipName(model.current.getClip().name).includes("bendingoverscene"))model.current.timeScale=state==="chase"||state==="frenzy"?.52:.24;
-        model.phase=(model.phase||0)+dt*(state==="chase"||state==="frenzy"?7:1.4);
-        model.container.position.y=Math.sin(model.phase)*((state==="chase"||state==="frenzy")?.035:.018);
-        model.container.rotation.z=Math.sin(model.phase*.63)*((state==="chase"||state==="frenzy")?.028:.018);
+        if(model.current&&normalizeClipName(model.current.getClip().name).includes("bendingoverscene")){
+          // No dedicated run cycle in the source GLB; drive the continuous pose harder while chasing
+          // so the creature reads as running instead of sliding.
+          model.current.timeScale = state==="frenzy" ? 0.92 : state==="chase" ? 0.78 : 0.24;
+        }
+        const chaseLike = state==="chase" || state==="frenzy";
+        model.phase = (model.phase||0) + dt * (chaseLike ? 11.5 : 1.4);
+        // Stronger vertical bob + slight forward lean to sell running motion.
+        model.container.position.y = Math.sin(model.phase) * (chaseLike ? 0.055 : 0.018);
+        model.container.rotation.z = Math.sin(model.phase * 0.63) * (chaseLike ? 0.045 : 0.018);
+        if(chaseLike) model.container.rotation.x = -0.06 + Math.sin(model.phase * 0.5) * 0.02;
+        else model.container.rotation.x = 0;
       }else{
         if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
         else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);

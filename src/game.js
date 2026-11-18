@@ -2634,14 +2634,21 @@ class EntityManager{
       if(e.state==="chase"&&e.cool<=0){this.game.triggerFear(.035);e.cool=.8}
       this.modelLibrary.update(e,dt);
       if(e.soundTimer<=0){
+        const pan=Math.sin(Math.atan2(dx,dz)-p.viewYaw);
         if(e.state==="chase"||e.state==="frenzy"){
-          const pan=Math.sin(Math.atan2(dx,dz)-p.viewYaw);
           this.game.audio.entityCue?.(e.type,e.state,d,pan);
-        }else if(e.state==="investigate"&&Math.random()<.45){
-          const pan=Math.sin(Math.atan2(dx,dz)-p.viewYaw);
-          this.game.audio.entityCue?.(e.type,"alert",d,pan);
+          // Closer = more urgent cadence.
+          e.soundTimer = d < 6 ? 0.9 + Math.random()*0.7 : d < 14 ? 1.6 + Math.random()*1.1 : 2.4 + Math.random()*1.8;
+        }else if(e.state==="investigate"||e.state==="alert"){
+          if(Math.random() < (d < 10 ? 0.7 : 0.4)) this.game.audio.entityCue?.(e.type,"alert",d,pan);
+          e.soundTimer = 3.2 + Math.random()*3.5;
+        }else if(e.state==="stalk" && d < 22){
+          // Subtle attention cue so the player hears approach before visual contact.
+          if(Math.random() < 0.55) this.game.audio.entityCue?.(e.type,"stalk",d,pan);
+          e.soundTimer = 4.5 + Math.random()*5.5;
+        }else{
+          e.soundTimer = 6 + Math.random()*8;
         }
-        e.soundTimer=e.state==="chase"||e.state==="frenzy"?2.6+Math.random()*2.2:5+Math.random()*7;
       }else e.soundTimer-=dt;
       animateEntity(e,dt);
       e.lastPlayerX=p.position.x;e.lastPlayerZ=p.position.z;
@@ -2701,7 +2708,7 @@ export class BackroomsGame{
     if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
     this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:queryFlag("admin"),god:false,noclip:false};
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.deathSequenceDuration=3.35;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
     this.redZoneFontTimer=0;
     this.redZoneAudioToken=0;
@@ -3012,7 +3019,7 @@ export class BackroomsGame{
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
     this.seed=(Math.random()*2147483647)|0;this.levelId="0";this.setLevel("0");this.player.reset();const spawn=this.world.level0SpawnPoint();this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
-    this.running=true;this.paused=false;this.dead=false;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
+    this.running=true;this.paused=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
     const mobileControls=document.getElementById("mobile-controls");
     if(this.isTouchLayout()){
       mobileControls?.classList.remove("hidden");
@@ -3056,7 +3063,44 @@ export class BackroomsGame{
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
   ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
-  die(copy){this.lightState="BLACKOUT";this.dead=true;this.paused=true;this.running=false;this.triggerFear(1);document.getElementById("hud").classList.add("hidden");document.getElementById("death-copy").textContent=copy;document.getElementById("death").classList.remove("hidden");document.exitPointerLock?.();this.audio.scare()}
+  die(copy){
+    // Horror death sequence: jumpscare + analog tape death, no generic text menu.
+    if(this.dead||this.deathSequenceActive)return;
+    this.deathSequenceActive=true;
+    this.deathSequenceTime=0;
+    this.deathSequenceDuration=3.35;
+    this.lightState="BLACKOUT";
+    this.dead=true;
+    this.paused=true;
+    this.running=false;
+    this.triggerFear(1);
+    document.getElementById("hud")?.classList.add("hidden");
+    document.getElementById("death")?.classList.add("hidden"); // never show the old text panel
+    document.exitPointerLock?.();
+    this.audio.scare();
+    // Force nearest bacteria into attack presentation if present.
+    try{
+      const entities=this.entityManager?.entities||[];
+      let best=null,bestD=1e9;
+      for(const e of entities){
+        if(e.type!=="bacteria"||!e.group)continue;
+        const d=e.group.position.distanceTo(this.player.position);
+        if(d<bestD){bestD=d;best=e}
+      }
+      if(best){
+        best.state="frenzy";
+        if(this.entityManager?.modelLibrary){
+          this.entityManager.modelLibrary.update(best,0);
+        }
+      }
+    }catch(err){console.warn("[Backrooms] death jumpscare prep failed",err)}
+    // Spike VHS hard for the tape-end feel.
+    if(this.vhsPass){
+      this.vhsPass.uniforms.intensity.value=1.55;
+      this.vhsPass.uniforms.tracking.value=1.25;
+      this.vhsPass.uniforms.fear.value=1;
+    }
+  }
   togglePause(force){
     if(!this.running||this.dead||this.introPlaying)return;
     this.paused=force!==undefined?force:!this.paused;
@@ -3396,6 +3440,32 @@ export class BackroomsGame{
 
   update(dt){
     this.gameTime+=dt;this.argTimer-=dt;this.scareTimer-=dt;
+    // Death sequence: analog tape end then soft respawn. No text death menu.
+    if(this.deathSequenceActive){
+      this.deathSequenceTime+=dt;
+      const t=this.deathSequenceTime;
+      const d=this.deathSequenceDuration||3.35;
+      const u=Math.min(1,t/d);
+      if(this.vhsPass){
+        this.vhsPass.uniforms.time.value=this.gameTime;
+        this.vhsPass.uniforms.intensity.value=1.55+Math.sin(t*18)*0.18+u*0.35;
+        this.vhsPass.uniforms.tracking.value=1.1+Math.sin(t*9.5)*0.35+u*0.55;
+        this.vhsPass.uniforms.fear.value=1;
+      }
+      // Keep entities updating so the jumpscare clip can finish posing.
+      try{this.entityManager?.update?.(dt)}catch(_){}
+      if(t>=d){
+        this.deathSequenceActive=false;
+        this.deathSequenceTime=0;
+        if(this.vhsPass){
+          this.vhsPass.uniforms.intensity.value=.72;
+          this.vhsPass.uniforms.tracking.value=.28;
+          this.vhsPass.uniforms.fear.value=0;
+        }
+        this.restart();
+      }
+      return;
+    }
     this.vhsPass.uniforms.time.value=this.gameTime;
     this.vhsPass.uniforms.fear.value=this.horror;
     this.player.update(dt);this.world.update(dt);this.updateRedZone(dt);this.collectBatteryPickups();this.updateLocalLights();this.entityManager.update(dt);this.quality.update(dt);
