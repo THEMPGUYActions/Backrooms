@@ -136,7 +136,7 @@ export class EntityModelLibrary{
     const asset=await this.load(entity.type);
     if(!asset||!entity.group.parent)return false;
 
-    let root,container,model;
+    let root,container,model,normalizedRoot;
     try{
       if(!asset.scene?.isObject3D)throw new Error("Loaded asset has no valid Three.js scene");
       // Clone cached content per entity. Never re-parent the shared cached scene.
@@ -239,7 +239,7 @@ export class EntityModelLibrary{
       container=new THREE.Group();
       container.scale.set(displayScaleXZ,targetHeight,displayScaleXZ);
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
-      const normalizedRoot=new THREE.Group();
+      normalizedRoot=new THREE.Group();
       normalizedRoot.scale.set(1/sourceHorizontalSize,1/size.y,1/sourceHorizontalSize);
       normalizedRoot.position.set(-sourceCenter.x/sourceHorizontalSize,-visibleBounds.min.y/size.y,-sourceCenter.z/sourceHorizontalSize);
       normalizedRoot.add(root);

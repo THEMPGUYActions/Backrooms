@@ -427,7 +427,11 @@ class Chunk{
       // The old generator only punched occasional chunk-edge doors, leaving
       // every interior cell surrounded by four fallback walls. Build a seeded
       // spanning network first, then add level-specific loops and room pockets.
-      if(level.id==="7"){
+      if(level.id==="2"||level.id==="3"){
+        // Industrial levels use authored corridor geometry, not the old
+        // cell-by-cell maze wall fallback.
+        this.walls.fill(0);
+      }else if(level.id==="7"){
         // The ocean is intentionally open. Its boundaries are water, not walls.
         this.walls.fill(0);
       }else if(level.id==="9"){
@@ -506,7 +510,7 @@ class Chunk{
         }
       }
 
-      const boundaryChance=({"2":.2,"3":.28,"6":.08,"7":0,"9":0,"10":0})[level.id]??.19;
+      const boundaryChance=({"2":0,"3":0,"6":.08,"7":0,"9":0,"10":0})[level.id]??.19;
       for(let x=0;x<cells;x++){
         const gx=this.cx*cells+x;
         if(boundaryChance>0&&canonicalOpen(this.game.seed,gx,this.cz*cells,"h",boundaryChance))this.setEdge(x,0,"north",true);
@@ -785,15 +789,43 @@ class Chunk{
 
     if(level.id==="2"){
       const rng=new RNG(this.seedKey()^0x72ea),pipeMat=lib.metal,rustMat=lib.rustMetal;
+      const addUtilityWall=(x1,z1,x2,z2,height=2.95,material=lib.wall)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+        if(length<.3)return;
+        box(g,new THREE.BoxGeometry(length,height,.18),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        this.collisionSegments.push({x1,z1,x2,z2});
+      };
+      const cx=this.originX+size/2,cz=this.originZ+size/2,door=1.5,offset=1.85;
+      // Two continuous service corridors meet at a cross-junction. Wall runs
+      // are split into real door openings so neighboring streamed chunks join.
+      for(const side of [-1,1]){
+        const x=cx+side*offset,z=cz+side*offset;
+        addUtilityWall(x,this.originZ,x,cz-door/2);
+        addUtilityWall(x,cz+door/2,x,this.originZ+size);
+        addUtilityWall(this.originX,z,cx-door/2,z);
+        addUtilityWall(cx+door/2,z,this.originX+size,z);
+      }
+      // Offset maintenance bays and diagonal returns replace the old repeated
+      // square-cell partitions with a readable, irregular utility-hall layout.
+      for(const sideX of [-1,1])for(const sideZ of [-1,1]){
+        const bx=cx+sideX*size*.29,bz=cz+sideZ*size*.29,w=3.6,h=3.1;
+        const openX=bx-sideX*w/2,backX=bx+sideX*w/2;
+        const openZ=bz-sideZ*h/2,backZ=bz+sideZ*h/2;
+        addUtilityWall(openX,openZ,backX,openZ);
+        addUtilityWall(backX,openZ,backX,backZ);
+        addUtilityWall(backX,backZ,openX,backZ);
+        addUtilityWall(openX,backZ,openX,bz+sideZ*.35);
+        const returnX=bx+sideX*(w/2+1.1),returnZ=bz+sideZ*(h/2+1.1);
+        addUtilityWall(backX,backZ,returnX,returnZ,2.65,lib.rustMetal);
+      }
       const pipeGeometry=new THREE.CylinderGeometry(.11,.11,cell*.72,8);
       const cleanPipes=new THREE.InstancedMesh(pipeGeometry,pipeMat,cells*cells);
       const rustPipes=new THREE.InstancedMesh(pipeGeometry,rustMat,cells*cells);
       const pipeDummy=new THREE.Object3D();let cleanCount=0,rustCount=0;
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(rng.next()>.12)continue;
-        const cx=this.originX+(x+.5)*cell,cz=this.originZ+(z+.5)*cell;
-        const alongX=rng.next()<.5;
-        pipeDummy.position.set(cx,2.52+rng.next()*.34,cz);
+        if(rng.next()>.16)continue;
+        const px=this.originX+(x+.5)*cell,pz=this.originZ+(z+.5)*cell,alongX=rng.next()<.5;
+        pipeDummy.position.set(px,2.52+rng.next()*.34,pz);
         pipeDummy.rotation.set(alongX?0:Math.PI/2,0,alongX?Math.PI/2:0);
         pipeDummy.scale.set(1,1,1);pipeDummy.updateMatrix();
         if(rng.next()<.48)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
@@ -801,83 +833,93 @@ class Chunk{
       }
       cleanPipes.count=cleanCount;rustPipes.count=rustCount;
       cleanPipes.instanceMatrix.needsUpdate=true;rustPipes.instanceMatrix.needsUpdate=true;g.add(cleanPipes,rustPipes);
-      for(let i=0;i<5;i++)if(rng.next()<.58){
+      // Valve wheels, pressure gauges and low service vents sit in the bays.
+      for(let i=0;i<8;i++){
         const x=this.originX+cell*(1+rng.next()*Math.max(1,cells-2)),z=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
-        const valve=new THREE.Mesh(new THREE.TorusGeometry(.19,.035,6,14),lib.handle);
-        valve.position.set(x,2.12+rng.next()*.32,z);valve.rotation.x=Math.PI/2;g.add(valve);
-      }
-      for(let z=1;z<cells-1;z++)for(let x=1;x<cells-1;x++)if(rng.next()<.11){
-        const cx=this.originX+(x+.5)*cell,cz=this.originZ+(z+.5)*cell,angle=Math.PI/4,length=cell*.24;
-        for(const offset of [-.58,.58]){
-          const px=cx+offset,pz=cz+offset;
-          const panel=new THREE.Mesh(new THREE.BoxGeometry(length,level.wallHeight,.13),lib.wall);
-          panel.rotation.y=angle;panel.position.set(px,level.wallHeight/2,pz);g.add(panel);
-          const dx=Math.cos(angle)*length/2,dz=Math.sin(angle)*length/2;
-          this.collisionSegments.push({x1:px-dx,z1:pz-dz,x2:px+dx,z2:pz+dz});
+        if(i<5){
+          const valve=new THREE.Mesh(new THREE.TorusGeometry(.19,.035,6,14),lib.handle);
+          valve.position.set(x,2.12+rng.next()*.32,z);valve.rotation.x=Math.PI/2;g.add(valve);
+          const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.055,12),lib.dark);
+          gauge.position.set(x+.24,2.35,z);gauge.rotation.x=Math.PI/2;g.add(gauge);
+        }else{
+          const vent=new THREE.Group();vent.position.set(x,0,z);
+          box(vent,new THREE.BoxGeometry(.92,.12,.72),lib.rustMetal,0,.12,0);
+          const riser=new THREE.Mesh(new THREE.CylinderGeometry(.16,.19,.62,10),lib.metal);riser.position.y=.48;vent.add(riser);
+          const cap=new THREE.Mesh(new THREE.CylinderGeometry(.24,.18,.12,10),lib.rustMetal);cap.position.y=.85;vent.add(cap);g.add(vent);
+          const half=.46;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
         }
       }
-      for(let i=0;i<3;i++){
-        const x=this.originX+cell*(1+rng.next()*Math.max(1,cells-2)),z=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
-        const vent=new THREE.Group();vent.position.set(x,0,z);
-        box(vent,new THREE.BoxGeometry(.78,.12,.78),lib.rustMetal,0,.12,0);
-        const half=.39;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
-        const riser=new THREE.Mesh(new THREE.CylinderGeometry(.16,.19,.62,10),lib.metal);riser.position.y=.48;vent.add(riser);
-        const cap=new THREE.Mesh(new THREE.CylinderGeometry(.24,.18,.12,10),lib.rustMetal);cap.position.y=.85;vent.add(cap);
-        g.add(vent);
+      // Floor drains and painted service markings make the corridors read as
+      // maintained infrastructure instead of an empty maze with pipes.
+      for(let i=0;i<6;i++){
+        const x=this.originX+size*(.12+i*.145),z=cz+(i%2?1:-1)*2.55;
+        box(g,new THREE.BoxGeometry(1.25,.025,.34),lib.dark,x,.025,z);
+        for(let stripe=0;stripe<4;stripe++)box(g,new THREE.BoxGeometry(.16,.018,.36),lib.orangeLight,x-.48+stripe*.32,.043,z);
       }
     }else if(level.id==="3"){
       const rng=new RNG(this.seedKey()^0x31e1);
-      for(let z=1;z<cells-1;z++)for(let x=1;x<cells-1;x++){
-        const cx=this.originX+(x+.5)*cell,cz=this.originZ+(z+.5)*cell;
-        if(rng.next()<.06){
-          const side=rng.pick([-1,1]),cabinet=new THREE.Group();
-          cabinet.position.set(cx+side*(cell*.31),0,cz);
-          box(cabinet,new THREE.BoxGeometry(1.12,2.05,.88),lib.officePlastic,0,1.04,0);
-          box(cabinet,new THREE.BoxGeometry(.94,1.72,.06),lib.rustMetal,0,1.06,-.48);
-          for(let row=0;row<3;row++){
-            box(cabinet,new THREE.BoxGeometry(.42,.035,.035),lib.handle,0,.55+row*.31,-.525);
-            const lamp=box(cabinet,new THREE.BoxGeometry(.09,.09,.045),row%2?lib.indicator:lib.orangeLight,.34,.55+row*.31,-.53);
-            lamp.userData.light=true;
-          }
-          g.add(cabinet);
-          const hx=.56,hz=.44,bx=cabinet.position.x,bz=cabinet.position.z;
-          this.collisionSegments.push({x1:bx-hx,z1:bz-hz,x2:bx+hx,z2:bz-hz},{x1:bx+hx,z1:bz-hz,x2:bx+hx,z2:bz+hz},{x1:bx+hx,z1:bz+hz,x2:bx-hx,z2:bz+hz},{x1:bx-hx,z1:bz+hz,x2:bx-hx,z2:bz-hz});
-          this.lightSources.push({position:new THREE.Vector3(cabinet.position.x,1.8,cabinet.position.z-.62),color:0xff9d5b,baseIntensity:2.4,intensity:2.4,distance:5,decay:2});
-        }
-        if(rng.next()<.12){
-          const axisX=rng.next()<.5,length=cell*.72,radius=.045+rng.next()*.045;
-          const cableTray=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,8),lib.metal);
-          if(axisX)cableTray.rotation.z=Math.PI/2;else cableTray.rotation.x=Math.PI/2;
-          cableTray.position.set(cx,level.wallHeight-.62,cz);g.add(cableTray);
-        }
-        if(rng.next()<.05){
-          const insulator=new THREE.Mesh(new THREE.CylinderGeometry(.16,.23,.52,8),lib.rustMetal);
-          insulator.position.set(cx,level.wallHeight-.38,cz);g.add(insulator);
-          const cap=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.16,8),lib.handle);cap.position.set(cx,level.wallHeight-.04,cz);g.add(cap);
+      const addStationWall=(x1,z1,x2,z2,height=3.45,material=lib.rustMetal)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+        if(length<.3)return;
+        box(g,new THREE.BoxGeometry(length,height,.2),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        this.collisionSegments.push({x1,z1,x2,z2});
+      };
+      const cx=this.originX+size/2,cz=this.originZ+size/2;
+      // The station is a single tall machinery hall. These short partitions
+      // form switchgear galleries without rebuilding the abandoned square maze.
+      for(const side of [-1,1]){
+        const z=cz+side*size*.28;
+        addStationWall(this.originX+size*.12,z,cx-3,z,3.15,lib.officePlastic);
+        addStationWall(cx+3,z,this.originX+size*.88,z,3.15,lib.officePlastic);
+        for(const x of [.22,.78]){
+          const px=this.originX+size*x;
+          addStationWall(px,z+side*2.2,px,z+side*5.2,2.9,lib.rustMetal);
         }
       }
-      // A heavy transformer housing anchors the wide central electrical spine.
-      for(let i=0;i<1;i++){
-        const bx=this.originX+size*(i?.72:.28),bz=this.originZ+size*.5,unit=new THREE.Group();unit.position.set(bx,0,bz);
-        box(unit,new THREE.BoxGeometry(2.25,2.6,1.7),lib.rustMetal,0,1.3,0);
-        for(let fin=0;fin<7;fin++)box(unit,new THREE.BoxGeometry(.09,1.9,.95),lib.metal,-.82+fin*.27,1.3,-.92);
-        box(unit,new THREE.BoxGeometry(.55,.42,.08),lib.dark,0,1.72,-.9);
-        box(unit,new THREE.BoxGeometry(.12,.12,.08),lib.orangeLight,.18,1.72,-.96);
+      // Switchgear cabinets are arranged as two banks with walkable aisles.
+      for(let bank=0;bank<2;bank++)for(let i=0;i<4;i++){
+        const px=this.originX+size*(bank?.76:.24),pz=this.originZ+size*(.18+i*.2),cabinet=new THREE.Group();
+        cabinet.position.set(px,0,pz);
+        box(cabinet,new THREE.BoxGeometry(1.25,2.35,.98),lib.officePlastic,0,1.18,0);
+        box(cabinet,new THREE.BoxGeometry(1.08,2.02,.07),lib.rustMetal,0,1.18,-.54);
+        for(let row=0;row<4;row++){
+          box(cabinet,new THREE.BoxGeometry(.52,.04,.04),lib.handle,0,.55+row*.37,-.59);
+          const lamp=box(cabinet,new THREE.BoxGeometry(.1,.1,.05),row%2?lib.indicator:lib.orangeLight,.39,.55+row*.37,-.6);
+          lamp.userData.light=true;
+        }
+        g.add(cabinet);
+        const hx=.63,hz=.49;this.collisionSegments.push({x1:px-hx,z1:pz-hz,x2:px+hx,z2:pz-hz},{x1:px+hx,z1:pz-hz,x2:px+hx,z2:pz+hz},{x1:px+hx,z1:pz+hz,x2:px-hx,z2:pz+hz},{x1:px-hx,z1:pz+hz,x2:px-hx,z2:pz-hz});
+        this.lightSources.push({position:new THREE.Vector3(px,1.9,pz-.72),color:0xff9d5b,baseIntensity:2.2,intensity:2.2,distance:5,decay:2});
+      }
+      // Transformer banks and bus bars occupy the rear service aisles.
+      for(const px of [.36,.64]){
+        const bx=this.originX+size*px,bz=this.originZ+size*.48,unit=new THREE.Group();unit.position.set(bx,0,bz);
+        box(unit,new THREE.BoxGeometry(2.7,2.9,2.0),lib.rustMetal,0,1.45,0);
+        for(let fin=0;fin<9;fin++)box(unit,new THREE.BoxGeometry(.1,2.2,1.12),lib.metal,-1.12+fin*.28,1.45,-1.08);
+        box(unit,new THREE.BoxGeometry(.72,.5,.08),lib.dark,0,1.9,-1.04);
+        for(let lamp=0;lamp<3;lamp++)box(unit,new THREE.BoxGeometry(.12,.12,.07),lamp===1?lib.orangeLight:lib.indicator,-.22+lamp*.22,1.9,-1.1);
         g.add(unit);
-        this.collisionSegments.push({x1:bx-1.125,z1:bz-.85,x2:bx+1.125,z2:bz-.85},{x1:bx+1.125,z1:bz-.85,x2:bx+1.125,z2:bz+.85},{x1:bx+1.125,z1:bz+.85,x2:bx-1.125,z2:bz+.85},{x1:bx-1.125,z1:bz+.85,x2:bx-1.125,z2:bz-.85});
-        this.lightSources.push({position:new THREE.Vector3(bx,2,bz-1.15),color:0xffa15b,baseIntensity:3.8,intensity:3.8,distance:8,decay:2});
+        this.collisionSegments.push({x1:bx-1.35,z1:bz-1,x2:bx+1.35,z2:bz-1},{x1:bx+1.35,z1:bz-1,x2:bx+1.35,z2:bz+1},{x1:bx+1.35,z1:bz+1,x2:bx-1.35,z2:bz+1},{x1:bx-1.35,z1:bz+1,x2:bx-1.35,z2:bz-1});
+        this.lightSources.push({position:new THREE.Vector3(bx,2.15,bz-1.2),color:0xffa15b,baseIntensity:4.2,intensity:4.2,distance:9,decay:2});
       }
-      for(let i=0;i<1;i++){
-        const x=this.originX+size*(.32+i*.36),z=this.originZ+size*.72,belt=new THREE.Group();belt.position.set(x,0,z);
-        box(belt,new THREE.BoxGeometry(5.4,.22,1.25),lib.metal,0,.62,0);
-        box(belt,new THREE.BoxGeometry(5.15,.08,.92),lib.dark,0,.78,0);
-        for(let roller=0;roller<9;roller++){
-          const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,1.1,8),lib.handle);
-          wheel.rotation.z=Math.PI/2;wheel.position.set(-2.4+roller*.6,.48,0);belt.add(wheel);
-        }
-        g.add(belt);
-        const hx=2.7,hz=.625;this.collisionSegments.push({x1:x-hx,z1:z-hz,x2:x+hx,z2:z-hz},{x1:x+hx,z1:z-hz,x2:x+hx,z2:z+hz},{x1:x+hx,z1:z+hz,x2:x-hx,z2:z+hz},{x1:x-hx,z1:z+hz,x2:x-hx,z2:z-hz});
+      // Overhead busbars, cable ladders and warning-yellow floor lanes.
+      for(let row=0;row<3;row++){
+        const z=this.originZ+size*(.24+row*.26);
+        const bus=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,size*.78,8),lib.metal);
+        bus.rotation.z=Math.PI/2;bus.position.set(cx,level.wallHeight-.72,z);g.add(bus);
+        for(let x=0;x<7;x++)box(g,new THREE.BoxGeometry(.1,.09,.16),lib.rustMetal,this.originX+size*(.12+x*.125),level.wallHeight-.88,z);
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(size*.78,.035,.11),lib.orangeLight,cx,.035,z+side*1.75);
       }
+      // A slow conveyor occupies one side bay, not the central walking aisle.
+      const beltX=this.originX+size*.5,beltZ=this.originZ+size*.84,belt=new THREE.Group();belt.position.set(beltX,0,beltZ);
+      box(belt,new THREE.BoxGeometry(7.2,.22,1.35),lib.metal,0,.62,0);
+      box(belt,new THREE.BoxGeometry(6.95,.08,1.02),lib.dark,0,.78,0);
+      for(let roller=0;roller<11;roller++){
+        const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,1.2,8),lib.handle);
+        wheel.rotation.z=Math.PI/2;wheel.position.set(-3.2+roller*.64,.48,0);belt.add(wheel);
+      }
+      g.add(belt);
+      const beltHalfX=3.6,beltHalfZ=.675;this.collisionSegments.push({x1:beltX-beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ-beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX-beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ-beltHalfZ});
     }else if(level.id==="4"){
       const rng=new RNG(this.seedKey()^0x44aa);
       for(let i=0;i<3;i++){

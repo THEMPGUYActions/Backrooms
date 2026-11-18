@@ -132,7 +132,7 @@ export class AudioDirector{
   }
   startLevelAmbience(){
     if(!this.ready||!this.ctx)return;
-    const key=this.levelId==="2"?"level2_machinery":this.levelId==="7"?"ocean_waves":this.levelId==="10"?"field_wind":"";
+    const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":this.levelId==="7"?"ocean_waves":this.levelId==="10"?"field_wind":"";
     if(key===this.levelAmbienceKey&&this.levelAmbienceSource){this.startFieldRain();return}
     if(this.levelAmbienceSource){try{this.levelAmbienceSource.stop()}catch{}this.levelAmbienceSource.disconnect();this.levelAmbienceSource=null}
     if(this.levelRainSource){try{this.levelRainSource.stop()}catch{}this.levelRainSource.disconnect();this.levelRainSource=null}
@@ -142,8 +142,8 @@ export class AudioDirector{
     if(key){
       const buffer=this.buffers.get(key);if(!buffer)return;
       const source=this.ctx.createBufferSource();source.buffer=buffer;source.loop=true;
-      const filter=this.ctx.createBiquadFilter();filter.type="lowpass";filter.frequency.value=this.levelId==="7"?680:this.levelId==="10"?980:1150;filter.Q.value=.45;
-      const gain=this.ctx.createGain();gain.gain.value=this.levelId==="7"?.145:this.levelId==="10"?.12:.105;
+      const filter=this.ctx.createBiquadFilter();filter.type="lowpass";filter.frequency.value=this.levelId==="7"?680:this.levelId==="10"?980:this.levelId==="3"?1450:1150;filter.Q.value=.45;
+      const gain=this.ctx.createGain();gain.gain.value=this.levelId==="7"?.145:this.levelId==="10"?.12:this.levelId==="3"?.075:.105;
       source.connect(filter).connect(gain);this.connectFx(gain,.11,.045);source.start();
       this.levelAmbienceSource=source;this.levelAmbienceGain=gain;
       this.startFieldRain();
