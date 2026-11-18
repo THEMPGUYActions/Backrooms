@@ -138,7 +138,7 @@ export class EntityModelLibrary{
     const asset=await this.load(entity.type);
     if(!asset||!entity.group.parent)return false;
 
-    let root,container,model,normalizedRoot;
+    let root,container,model,normalizedRoot,visibleRenderableMeshes=[];
     try{
       if(!asset.scene?.isObject3D)throw new Error("Loaded asset has no valid Three.js scene");
       // Clone cached content per entity. Never re-parent the shared cached scene.
@@ -188,7 +188,7 @@ export class EntityModelLibrary{
       };
 
       let meshCount=0;
-      const visibleRenderableMeshes=[];
+      visibleRenderableMeshes=[];
       root.traverse(object=>{
         if(!isVisibleRenderableMesh(object))return;
         meshCount++;
