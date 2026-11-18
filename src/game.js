@@ -1606,7 +1606,7 @@ class WorldStreamer{
       this.ceilingSurface.matrixAutoUpdate=false;
       this.ceilingSurface.frustumCulled=false;
       this.ceilingSurface.renderOrder=-2;
-      this.ceilingSurface.visible=!(["9","10"].includes(this.game.level.id));
+      this.ceilingSurface.visible=!( ["9","10"].includes(String(this.game.level.id)) );
     }
     if(this.game.level.id==="7"){
       this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
@@ -3032,7 +3032,9 @@ export class BackroomsGame{
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x555039:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
-    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
+    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["9","10"].includes(String(this.level.id)) );
+    this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
     const objective=document.getElementById("objective");if(objective)objective.textContent=this.level.objective;
