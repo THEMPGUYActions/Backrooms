@@ -137,7 +137,7 @@ function installRoof(game){
     }
     world.__level0RoofSignature="";
     const result=await originalConfigure(...args);
-    if(game.level?.id!=="0"&&world.ceilingSurface)world.ceilingSurface.visible=true;
+    if(!["0","9","10"].includes(String(game.level?.id))&&world.ceilingSurface)world.ceilingSurface.visible=true;
     return result;
   };
 
@@ -152,7 +152,7 @@ function installRoof(game){
   game.setLevel=(id)=>{
     const result=originalSetLevel(id);
     world.__level0RoofSignature="";
-    if(game.level?.id!=="0"&&world.ceilingSurface)world.ceilingSurface.visible=true;
+    if(!["0","9","10"].includes(String(game.level?.id))&&world.ceilingSurface)world.ceilingSurface.visible=true;
     if(game.level?.id==="0")queueMicrotask(rebuild);
     return result;
   };
