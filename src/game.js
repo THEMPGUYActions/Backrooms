@@ -954,114 +954,106 @@ class Chunk{
       g.add(belt);
       const beltHalfX=3.6,beltHalfZ=.675;this.collisionSegments.push({x1:beltX-beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ-beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX-beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ-beltHalfZ});
     }else if(level.id==="4"){
-      // Abandoned office: open floor plate with structural columns, desks,
-      // chairs, cabinets — not a yellow maze of sealed cells.
+      // Level 4 canon (wiki + Escape the Backrooms reference):
+      // empty commercial office — white columns, grey carpet, drop-ceiling
+      // fluorescents, sparse desks. Open sightlines. NOT a yellow maze.
       const rng=new RNG(this.seedKey()^0x44aa);
-      // Structural columns on a grid (reference: open white office with pillars)
-      const colStep=Math.max(2,Math.floor(cells/3));
-      for(let cz=1;cz<cells-1;cz+=colStep)for(let cx=1;cx<cells-1;cx+=colStep){
-        const px=this.originX+(cx+.5)*cell,pz=this.originZ+(cz+.5)*cell;
-        const col=new THREE.Group();col.position.set(px,0,pz);
-        box(col,new THREE.BoxGeometry(.85,level.wallHeight,.85),lib.officePlastic,0,level.wallHeight/2,0);
-        box(col,new THREE.BoxGeometry(1.05,.12,1.05),lib.officePlastic,0,.06,0);
-        box(col,new THREE.BoxGeometry(1.05,.12,1.05),lib.officePlastic,0,level.wallHeight-.06,0);
-        g.add(col);
-        const hr=.48;this.collisionSegments.push({x1:px-hr,z1:pz-hr,x2:px+hr,z2:pz-hr},{x1:px+hr,z1:pz-hr,x2:px+hr,z2:pz+hr},{x1:px+hr,z1:pz+hr,x2:px-hr,z2:pz+hr},{x1:px-hr,z1:pz+hr,x2:px-hr,z2:pz-hr});
-      }
-      // Occasional full-height partition runs (not a full maze)
-      for(let i=0;i<2;i++){
-        const alongX=rng.next()<.5;
-        const a=this.originX+cell*(1.5+rng.next()*(cells-3));
-        const b=this.originZ+cell*(1.5+rng.next()*(cells-3));
-        const len=cell*(1.2+rng.next()*1.8);
-        if(alongX){
-          box(g,new THREE.BoxGeometry(len,level.wallHeight*.92,.12),lib.officePlastic,a,level.wallHeight*.46,b);
-          this.collisionSegments.push({x1:a-len/2,z1:b,x2:a+len/2,z2:b});
-        }else{
-          box(g,new THREE.BoxGeometry(.12,level.wallHeight*.92,len),lib.officePlastic,a,level.wallHeight*.46,b);
-          this.collisionSegments.push({x1:a,z1:b-len/2,x2:a,z2:b+len/2});
+      const colMat=lib.officeColumn||lib.pillar||lib.officePlastic;
+      const wallMat=lib.officePlastic;
+      const door=1.4;
+      const cx=this.originX+size/2,cz=this.originZ+size/2;
+
+      const addOfficeWall=(x1,z1,x2,z2,height=level.wallHeight,material=wallMat)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+        if(length<.25)return;
+        box(g,new THREE.BoxGeometry(length,height,.14),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        this.collisionSegments.push({x1,z1,x2,z2});
+      };
+
+      // Perimeter with door gaps so streamed chunks connect
+      const o0x=this.originX+.2,o0z=this.originZ+.2,o1x=this.originX+size-.2,o1z=this.originZ+size-.2;
+      addOfficeWall(o0x,o0z,cx-door/2,o0z);
+      addOfficeWall(cx+door/2,o0z,o1x,o0z);
+      addOfficeWall(o0x,o1z,cx-door/2,o1z);
+      addOfficeWall(cx+door/2,o1z,o1x,o1z);
+      addOfficeWall(o0x,o0z,o0x,cz-door/2);
+      addOfficeWall(o0x,cz+door/2,o0x,o1z);
+      addOfficeWall(o1x,o0z,o1x,cz-door/2);
+      addOfficeWall(o1x,cz+door/2,o1x,o1z);
+
+      // Structural columns on a regular grid
+      const spacing=Math.max(5.0,cell*.5);
+      for(let z=this.originZ+spacing;z<this.originZ+size-spacing*.45;z+=spacing){
+        for(let x=this.originX+spacing;x<this.originX+size-spacing*.45;x+=spacing){
+          const col=new THREE.Group();col.position.set(x,0,z);
+          box(col,new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,0,level.wallHeight/2,0);
+          box(col,new THREE.BoxGeometry(.95,.1,.95),colMat,0,.05,0);
+          box(col,new THREE.BoxGeometry(.95,.1,.95),colMat,0,level.wallHeight-.05,0);
+          g.add(col);
+          const hr=.42;this.collisionSegments.push(
+            {x1:x-hr,z1:z-hr,x2:x+hr,z2:z-hr},{x1:x+hr,z1:z-hr,x2:x+hr,z2:z+hr},
+            {x1:x+hr,z1:z+hr,x2:x-hr,z2:z+hr},{x1:x-hr,z1:z+hr,x2:x-hr,z2:z-hr}
+          );
         }
       }
-      const deskCount=6+rng.int(0,4);
-      for(let i=0;i<deskCount;i++){
-        const ox=this.originX+cell*(1.1+rng.next()*Math.max(.8,cells-2.2));
-        const oz=this.originZ+cell*(1.1+rng.next()*Math.max(.8,cells-2.2));
-        const yaw=(rng.next()<.5?0:Math.PI/2)+rng.next()*.08;
-        const desk=new THREE.Group();
-        desk.position.set(ox,0,oz);
-        desk.rotation.y=yaw;
-        box(desk,new THREE.BoxGeometry(1.55,.12,.75),lib.officeWood,0,.78,0);
-        for(const [lx,lz] of [[-.62,-.27],[.62,-.27],[-.62,.27],[.62,.27]])
-          box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,lx,.39,lz);
-        // Dead CRT / monitor
-        box(desk,new THREE.BoxGeometry(.52,.42,.38),lib.officePlastic,0,1.12,-.05);
-        box(desk,new THREE.BoxGeometry(.46,.34,.03),lib.dark,0,1.12,-.26);
-        // Keyboard + papers
-        box(desk,new THREE.BoxGeometry(.48,.03,.18),lib.officePlastic,0,.85,.22);
-        box(desk,new THREE.BoxGeometry(.22,.02,.28),lib.trim,.42,.86,.05);
+
+      // Dense fluorescent panel grid (drop ceiling)
+      for(let z=this.originZ+2.2;z<this.originZ+size-1.5;z+=3.0){
+        for(let x=this.originX+2.2;x<this.originX+size-1.5;x+=3.0){
+          if(rng.next()>.82)continue;
+          const mat=lib.light.clone();mat.emissiveIntensity=2.6;
+          const fixture=box(g,new THREE.BoxGeometry(1.4,.04,.58),mat,x,level.wallHeight-.06,z,0,rng.next()<.5?0:Math.PI/2,0);
+          fixture.userData.light=true;fixture.userData.baseEmissive=2.6;this.fixtures.push(fixture);
+          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.18,z),color:0xf4f6fa,baseIntensity:110,intensity:110,distance:16,decay:2,fixture});
+        }
+      }
+
+      // Sparse workroom alcoves with desks (furniture is rare in large areas)
+      for(let i=0;i<2;i++){
+        const ax=this.originX+size*(.2+i*.4),az=this.originZ+size*.8;
+        addOfficeWall(ax-2.5,az-2.3,ax+2.5,az-2.3,level.wallHeight*.95);
+        addOfficeWall(ax-2.5,az-2.3,ax-2.5,az+2.1,level.wallHeight*.95);
+        addOfficeWall(ax+2.5,az-2.3,ax+2.5,az+2.1,level.wallHeight*.95);
+        const desk=new THREE.Group();desk.position.set(ax,0,az-.4);
+        box(desk,new THREE.BoxGeometry(1.5,.1,.7),lib.officeWood,0,.76,0);
+        for(const [lx,lz] of [[-.6,-.25],[.6,-.25],[-.6,.25],[.6,.25]])box(desk,new THREE.BoxGeometry(.07,.76,.07),lib.officeWood,lx,.38,lz);
+        box(desk,new THREE.BoxGeometry(.48,.4,.35),lib.dark,0,1.05,-.05);
         g.add(desk);
-        // Chair facing the desk
-        const chair=new THREE.Group();
-        chair.position.set(ox+Math.sin(yaw)*1.05,0,oz+Math.cos(yaw)*1.05);
-        chair.rotation.y=yaw+Math.PI;
-        box(chair,new THREE.BoxGeometry(.58,.08,.58),lib.officePlastic,0,.48,0);
-        box(chair,new THREE.BoxGeometry(.58,.55,.08),lib.officePlastic,0,.8,-.25);
-        for(const [cx,cz] of [[-.22,-.22],[.22,-.22],[-.22,.22],[.22,.22]])
-          box(chair,new THREE.BoxGeometry(.07,.48,.07),lib.officePlastic,cx,.24,cz);
+        const chair=new THREE.Group();chair.position.set(ax,0,az+.75);
+        box(chair,new THREE.BoxGeometry(.55,.08,.55),lib.officeWood,0,.46,0);
+        box(chair,new THREE.BoxGeometry(.55,.5,.08),lib.officeWood,0,.75,-.22);
         g.add(chair);
-        // Soft collision so player cannot walk through desks
-        const half=1.0;
-        this.collisionSegments.push(
-          {x1:ox-half,z1:oz-half,x2:ox+half,z2:oz-half},
-          {x1:ox+half,z1:oz-half,x2:ox+half,z2:oz+half},
-          {x1:ox+half,z1:oz+half,x2:ox-half,z2:oz+half},
-          {x1:ox-half,z1:oz+half,x2:ox-half,z2:oz-half}
+      }
+
+      // 1-3 free desks on the open plate
+      for(let i=0;i<1+rng.int(0,2);i++){
+        const ox=this.originX+size*(.28+rng.next()*.45),oz=this.originZ+size*(.28+rng.next()*.3);
+        const desk=new THREE.Group();desk.position.set(ox,0,oz);desk.rotation.y=rng.next()<.5?0:Math.PI/2;
+        box(desk,new THREE.BoxGeometry(1.4,.1,.65),lib.officeWood,0,.76,0);
+        for(const [lx,lz] of [[-.55,-.22],[.55,-.22],[-.55,.22],[.55,.22]])box(desk,new THREE.BoxGeometry(.07,.76,.07),lib.officeWood,lx,.38,lz);
+        g.add(desk);
+        const half=.85;this.collisionSegments.push(
+          {x1:ox-half,z1:oz-half,x2:ox+half,z2:oz-half},{x1:ox+half,z1:oz-half,x2:ox+half,z2:oz+half},
+          {x1:ox+half,z1:oz+half,x2:ox-half,z2:oz+half},{x1:ox-half,z1:oz+half,x2:ox-half,z2:oz-half}
         );
       }
-      // Filing cabinets along walls / aisles
-      for(let i=0;i<4+rng.int(0,3);i++){
-        const fx=this.originX+cell*(.8+rng.next()*(cells-1.6));
-        const fz=this.originZ+cell*(.8+rng.next()*(cells-1.6));
-        const cab=new THREE.Group();
-        cab.position.set(fx,0,fz);
-        cab.rotation.y=rng.next()<.5?0:Math.PI/2;
-        box(cab,new THREE.BoxGeometry(.72,1.65,.48),lib.officePlastic,0,.82,0);
-        for(let d=0;d<3;d++){
-          box(cab,new THREE.BoxGeometry(.64,.04,.04),lib.handle,0,.35+d*.42,-.26);
-        }
-        g.add(cab);
+
+      // Blacked-out windows (canon traps)
+      for(const [wx,wz,rot] of [[cx,this.originZ+.25,0],[cx,this.originZ+size-.25,0],[this.originX+.25,cz,Math.PI/2],[this.originX+size-.25,cz,Math.PI/2]]){
+        const wg=new THREE.Group();wg.position.set(wx,2.05,wz);wg.rotation.y=rot;
+        box(wg,new THREE.BoxGeometry(2.8,1.4,.04),lib.windowDark,0,0,0);
+        box(wg,new THREE.BoxGeometry(2.9,.08,.06),lib.trim,0,.72,0);
+        box(wg,new THREE.BoxGeometry(2.9,.08,.06),lib.trim,0,-.72,0);
+        g.add(wg);
       }
-      // Low cubicle partitions
-      for(let i=0;i<3+rng.int(0,2);i++){
-        const px=this.originX+cell*(1.2+rng.next()*(cells-2.4));
-        const pz=this.originZ+cell*(1.2+rng.next()*(cells-2.4));
-        const part=new THREE.Group();
-        part.position.set(px,0,pz);
-        part.rotation.y=rng.next()<.5?0:Math.PI/2;
-        box(part,new THREE.BoxGeometry(2.4,1.35,.06),lib.officePlastic,0,.68,0);
-        box(part,new THREE.BoxGeometry(2.4,.08,.08),lib.trim,0,1.36,0);
-        g.add(part);
+
+      // Water cooler
+      if(rng.next()<.75){
+        const vx=this.originX+size*.14,vz=this.originZ+size*.38;
+        box(g,new THREE.BoxGeometry(.55,1.35,.45),lib.officePlastic,vx,.68,vz);
+        box(g,new THREE.BoxGeometry(.32,.32,.32),lib.water,vx,1.55,vz);
       }
-      // Dark windows / frosted glass on edges
-      for(let i=0;i<Math.min(5,edges.length);i++){
-        const e=edges[(rng.int(0,edges.length-1)+i*7)%edges.length];
-        const p=wallPoint(e,.112,2.25);
-        const windowGroup=new THREE.Group();
-        windowGroup.position.copy(p.position);windowGroup.rotation.y=p.rotation;
-        box(windowGroup,new THREE.BoxGeometry(2.9,1.2,.035),lib.windowDark,0,0,0);
-        box(windowGroup,new THREE.BoxGeometry(.045,1.28,.05),lib.trim,0,0,0);
-        g.add(windowGroup);
-      }
-      // Occasional toppled chair / trash for environmental storytelling
-      if(rng.next()<.55){
-        const tx=this.originX+cell*(1.5+rng.next()*(cells-3));
-        const tz=this.originZ+cell*(1.5+rng.next()*(cells-3));
-        const trash=new THREE.Group();trash.position.set(tx,0,tz);
-        box(trash,new THREE.BoxGeometry(.35,.42,.35),lib.officePlastic,0,.21,0);
-        box(trash,new THREE.BoxGeometry(.28,.08,.28),lib.trim,0,.45,0);
-        g.add(trash);
-      }
-    }else if(level.id==="5"){
+        }else if(level.id==="5"){
       const rng=new RNG(this.seedKey()^0x5a11);
       // 1930s hotel: more tables, lamps, lobby chairs, and side cabinets.
       for(let i=0;i<3+rng.int(0,2);i++){
@@ -1777,6 +1769,11 @@ class WorldStreamer{
         else if(this.game.level.id==="0"){
           await applyFoundFootageLevel0Assets(this.library,this.game.level,onProgress);
           await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+        }else if(this.game.level.id==="4"){
+          // Painted white office + grey carpet; never Level-0 yellow wallpaper packs.
+          if(this.library.wall){this.library.wall.map=null;this.library.wall.normalMap=null;this.library.wall.roughnessMap=null;this.library.wall.color.setHex(0xe6e6e2);this.library.wall.needsUpdate=true;}
+          if(this.library.floor){this.library.floor.map=null;this.library.floor.normalMap=null;this.library.floor.roughnessMap=null;this.library.floor.color.setHex(0x6e7074);this.library.floor.needsUpdate=true;}
+          if(this.library.ceiling){this.library.ceiling.map=null;this.library.ceiling.normalMap=null;this.library.ceiling.roughnessMap=null;this.library.ceiling.color.setHex(0xecece8);this.library.ceiling.needsUpdate=true;}
         }else await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
       }catch(error){
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
