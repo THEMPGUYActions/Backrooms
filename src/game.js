@@ -3051,6 +3051,7 @@ export class BackroomsGame{
       this.player.position.set(0,this.player.eyeY,0);
     }
     this.world.ensureAround(this.player.position.x,this.player.position.z);
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["9","10"].includes(String(this.level.id)) );
     this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
