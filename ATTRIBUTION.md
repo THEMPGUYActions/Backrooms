@@ -46,6 +46,97 @@ Used in this game:
 - unstable lighting and blackout gameplay
 - entity and hazard concepts inspired by the source
 
+### Level 3 - "Electrical Station"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-3
+
+The source page credits original author u/M654z and rewrite author Natedagreat563.
+
+Used in this game:
+- old electrical-facility setting
+- generator-room and assembly-line motifs
+- switchgear, exposed wiring, dangerous machinery and hostile encounters
+
+### Level 4 - "Abandoned Office"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-4
+
+The current source page and its contributors are credited on the page.
+
+### Level 5 - "Terror Hotel"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-5
+
+The source page credits original author Discord13, rewrite author Stretchsterz and additional contributions by ratscrapz.
+
+Used in this game:
+- 1930s hotel styling and early-20th-century furnishings
+- Main Hall, Beverly Room-inspired hub and Boiler Room motifs
+- Deathmoth, Hound, Skin-Stealer and Death Rat encounters
+
+### Level 6 - "Lights Out"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-6
+
+The source page credits original authors u/ThePizzaEater1000 and u/Mileisbored, with rewrite credits listed on the page.
+
+Used in this game:
+- silent, lightless concrete corridors
+- isolation and auditory-hallucination themes
+- no hostile entity spawns
+
+### Level 7 - "Thalassophobia"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-7
+
+The source page credits original authors u/Bart0nius and u/M654z and rewrite author Bart0nius. The page currently marks itself as outdated.
+
+Used in this game:
+- vast ocean chamber beneath a concrete ceiling
+- waterline, rock formations and submerged route
+- original game-specific aquatic creature
+
+### Level 8 - "Cave Systems"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-8
+
+The source page credits original authors Bart0nius and u/avolded, with rewrites by Stretchsterz, C-Graph and Kai4C.
+
+Used in this game:
+- cold, dark subterranean cave network
+- jagged rock formations and cave hazards
+- hostile cave encounters
+
+### Level 9 - "The Suburbs"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-9
+
+The source page credits original author u/Bart0nius and rewrite author Stretchsterz.
+
+Used in this game:
+- midnight suburban streets and houses
+- unpowered street lamps and isolated homes
+- hostile encounters
+
+### Level 10 - "Bumper Crop"
+
+Source:
+https://backrooms-wiki.wikidot.com/level-10
+
+The source page credits original author u/Hertz3241, current page authors scutoid studios and egglord, and previous rewrite author Stretchsterz.
+
+Used in this game:
+- overcast wheat and barley fields
+- tree lines, ponds, sheds and barns
+- no hostile entity spawns
+
 ## Entity attribution
 
 The game currently uses original simplified representations of Hounds and Smilers for gameplay. The relevant source pages are:
@@ -107,3 +198,8 @@ Selected assets:
 - stair texture
 
 These remain third-party assets and are not relicensed under THEMPGUY's project license. See the upstream repository's license and notices for the applicable terms.
+
+
+## Additional asset credits
+
+See ASSET_CREDITS.md for the bundled CC0 ambientCG PBR maps and BigSoundBank sound recordings, including exact asset names, creators, source pages and license metadata.

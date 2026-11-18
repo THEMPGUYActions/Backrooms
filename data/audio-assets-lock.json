@@ -49,6 +49,160 @@
       "source": "https://opengameart.org/content/footsteps-0",
       "author": "GboxMikeFozzy",
       "license": "CC0"
+    },
+    "level2_machinery.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1538.wav",
+      "source": "https://bigsoundbank.com/sawmill-3-s1538.html",
+      "author": "Joseph SARDIN",
+      "title": "Sawmill #3",
+      "provider": "BigSoundBank",
+      "source_id": 1538,
+      "duration_seconds": 216,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "transformer_hum.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/2118.wav",
+      "source": "https://bigsoundbank.com/neon-or-transformer-1-s2118.html",
+      "author": "Joseph SARDIN",
+      "title": "Neon or transformer #1",
+      "provider": "BigSoundBank",
+      "source_id": 2118,
+      "duration_seconds": 10,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "industrial_switch.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/3062.wav",
+      "source": "https://bigsoundbank.com/industrial-switch-2-s3062.html",
+      "author": "Joseph SARDIN",
+      "title": "Industrial switch #2",
+      "provider": "BigSoundBank",
+      "source_id": 3062,
+      "duration_seconds": 3,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "steam_hiss.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/0227.wav",
+      "source": "https://bigsoundbank.com/hiss-of-steam-train-1-s0227.html",
+      "author": "GlaneurDeSons",
+      "title": "Hiss of steam train #1",
+      "provider": "BigSoundBank",
+      "source_id": 227,
+      "duration_seconds": 5,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "door_creak.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/3211.wav",
+      "source": "https://bigsoundbank.com/creaking-door-8-s3211.html",
+      "author": "Joseph SARDIN & Axeline T.",
+      "title": "Creaking Door #8",
+      "provider": "BigSoundBank",
+      "source_id": 3211,
+      "duration_seconds": 3,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "entity_growl.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/2112.wav",
+      "source": "https://bigsoundbank.com/zombie-7-s2112.html",
+      "author": "Joseph SARDIN",
+      "title": "Zombie #7",
+      "provider": "BigSoundBank",
+      "source_id": 2112,
+      "duration_seconds": 3,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "hound_bark.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/0682.wav",
+      "source": "https://bigsoundbank.com/barking-of-a-spitz-s0682.html",
+      "author": "Joseph SARDIN",
+      "title": "Barking of a Spitz",
+      "provider": "BigSoundBank",
+      "source_id": 682,
+      "duration_seconds": 2,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "deathmoth_wings.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1833.wav",
+      "source": "https://bigsoundbank.com/flying-melolonthinae-s1833.html",
+      "author": "Joseph SARDIN",
+      "title": "Flying Melolonthinae",
+      "provider": "BigSoundBank",
+      "source_id": 1833,
+      "duration_seconds": 5,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "partygoer_laugh.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/0475.wav",
+      "source": "https://bigsoundbank.com/laugh-s0475.html",
+      "author": "anonyme",
+      "title": "Horrible Laugh #1",
+      "provider": "BigSoundBank",
+      "source_id": 475,
+      "duration_seconds": 5,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "skinstealer_sigh.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1405.wav",
+      "source": "https://bigsoundbank.com/sigh-by-the-mouth-s1405.html",
+      "author": "Joseph SARDIN",
+      "title": "Sigh by the Mouth",
+      "provider": "BigSoundBank",
+      "source_id": 1405,
+      "duration_seconds": 6,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "wretch_howl.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1662.wav",
+      "source": "https://bigsoundbank.com/howling-of-a-girl-1-s1662.html",
+      "author": "Joseph SARDIN",
+      "title": "Howling of a Girl #1",
+      "provider": "BigSoundBank",
+      "source_id": 1662,
+      "duration_seconds": 3,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "ocean_waves.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/0698.wav",
+      "source": "https://bigsoundbank.com/sea-waves-s0698.html",
+      "author": "Joseph SARDIN",
+      "title": "Sea Waves",
+      "provider": "BigSoundBank",
+      "source_id": 698,
+      "duration_seconds": 167,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "field_wind.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1097.wav",
+      "source": "https://bigsoundbank.com/wind-in-a-cornfield-s1097.html",
+      "author": "Joseph SARDIN",
+      "title": "Wind in a cornfield",
+      "provider": "BigSoundBank",
+      "source_id": 1097,
+      "duration_seconds": 205,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
+    },
+    "field_rain.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1019.wav",
+      "source": "https://bigsoundbank.com/summer-rain-on-terrace-s1019.html",
+      "author": "Joseph SARDIN",
+      "title": "Summer Rain on Terrace",
+      "provider": "BigSoundBank",
+      "source_id": 1019,
+      "duration_seconds": 157,
+      "license": "CC0",
+      "license_id": "CC0-1.0"
     }
   }
 }

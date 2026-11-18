@@ -6,11 +6,13 @@ import { gunzipSync } from "node:zlib";
 const root = process.cwd();
 const dist = join(root, "dist");
 const pbrDir = join(dist, "assets", "pbr");
+const industrialPbrDir = join(pbrDir, "industrial");
 const audioDir = join(dist, "assets", "audio");
 const ffDir = join(dist, "assets", "found-footage");
 const entityDir = join(dist, "assets", "entities");
 const LOCK_PATH = join(root, "data", "pbr-assets-lock.json");
 const AUDIO_LOCK_PATH = join(root, "data", "audio-assets-lock.json");
+const INDUSTRIAL_LOCK_PATH = join(root, "data", "industrial-pbr-assets-lock.json");
 const MAX_ASSET_BYTES = 6 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const MAX_SPB_BYTES = 30 * 1024 * 1024;
@@ -38,8 +40,10 @@ const SPB_FILES = [
 
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
 const audioLock = JSON.parse(await readFile(AUDIO_LOCK_PATH, "utf8"));
+const industrialLock = JSON.parse(await readFile(INDUSTRIAL_LOCK_PATH, "utf8"));
 if (lock.license !== "CC0") throw new Error("PBR asset lock must be CC0.");
 if (audioLock.license !== "CC0") throw new Error("Audio asset lock must be CC0.");
+if (industrialLock.license !== "CC0-1.0") throw new Error("Industrial PBR asset lock must be CC0-1.0.");
 if (lock.author !== "methodical pixel") throw new Error("PBR asset lock author does not match the OpenGameArt pack.");
 if (lock.source !== "https://opengameart.org/content/backrooms-pbr-texture-pack") throw new Error("PBR asset lock source is unexpected.");
 
@@ -49,6 +53,7 @@ if (PBR_FILES.length !== 12) throw new Error("Expected exactly 12 locked PBR map
 async function copyLocalAssets(){
   const localPbr=join(root,"assets","pbr");
   const localAudio=join(root,"assets","audio");
+  const localIndustrialPbr=join(localPbr,"industrial");
   const localFoundFootage=join(root,"assets","found-footage");
 
   const requiredPbr=Object.keys(lock.files);
@@ -57,6 +62,16 @@ async function copyLocalAssets(){
     const info=await stat(source).catch(()=>null);
     if(!info?.isFile())throw new Error("Missing committed PBR asset: "+filename);
     await cp(source,join(pbrDir,filename));
+  }
+
+  for(const [filename,entry] of Object.entries(industrialLock.files||{})){
+    const source=join(localIndustrialPbr,filename);
+    const info=await stat(source).catch(()=>null);
+    if(!info?.isFile())throw new Error("Missing committed industrial PBR asset: "+filename);
+    const data=await readFile(source);
+    const sha256=createHash("sha256").update(data).digest("hex");
+    if(data.length!==entry.bytes||sha256!==entry.sha256)throw new Error("Industrial PBR asset checksum mismatch: "+filename);
+    await cp(source,join(industrialPbrDir,filename));
   }
 
   for(const filename of Object.keys(audioLock.files)){
@@ -75,6 +90,7 @@ async function copyLocalAssets(){
   }
 
   await cp(join(localPbr,"manifest.json"),join(pbrDir,"manifest.json"));
+  await cp(join(localIndustrialPbr,"manifest.json"),join(industrialPbrDir,"manifest.json"));
   await cp(join(localAudio,"manifest.json"),join(audioDir,"manifest.json"));
   await cp(join(localFoundFootage,"manifest.json"),join(ffDir,"manifest.json"));
 }
@@ -82,6 +98,7 @@ async function copyLocalAssets(){
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 await mkdir(pbrDir,{recursive:true});
+await mkdir(industrialPbrDir,{recursive:true});
 await mkdir(audioDir,{recursive:true});
 await mkdir(ffDir,{recursive:true});
 await mkdir(entityDir,{recursive:true});
@@ -128,7 +145,8 @@ if(productionBuild){
 await writeFile(join(dist,".nojekyll"),"","utf8");
 
 console.log("Copied "+PBR_FILES.length+" committed CC0 OpenGameArt PBR maps.");
-console.log("Copied "+Object.keys(audioLock.files).length+" committed CC0 OpenGameArt audio assets.");
+console.log("Copied "+Object.keys(industrialLock.files).length+" committed ambientCG CC0 industrial PBR maps.");
+console.log("Copied "+Object.keys(audioLock.files).length+" committed CC0 audio assets.");
 console.log("Copied "+SPB_FILES.length+" committed Found Footage assets.");
 console.log("PBR manifest size: " + (await stat(join(pbrDir, "manifest.json"))).size + " bytes.");
 console.log("Built static site in dist/");

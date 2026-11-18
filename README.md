@@ -13,7 +13,7 @@ The current game build includes:
 - Seeded world generation
 - Streaming chunk loading and unloading
 - Instanced wall rendering for repeated geometry
-- PBR materials using the OpenGameArt Backrooms PBR texture pack, with procedural fallbacks
+- PBR materials using the OpenGameArt Backrooms pack plus bundled ambientCG industrial concrete and metal maps
 - Three.js r186
 - ACES filmic tone mapping
 - Adaptive resolution for weaker devices
@@ -22,14 +22,17 @@ The current game build includes:
 - Mobile joystick and touch-look controls
 - Flashlight with dynamic cone lighting
 - Procedural Web Audio ambience and effects with echo/reverb
+- Bundled CC0 industrial, ocean, field-wind and entity one-shot audio
+- Level-aware ambience, distance falloff and stereo entity panning
 - Cinematic audio-gated intro and noclip reveal
 - Footsteps, lighting faults, damage, distant knocks and exit audio
 - ARG-style camera telemetry, signal faults and hidden messages
 - Health, stamina, hydration and sanity systems
 - Hazards and deaths
 - Data-driven level definitions
-- Level 0, Level 1 and Level 2 gameplay
-- Hound and Smiler gameplay representations
+- Playable campaign progression from Level 0 through Level 10
+- Distinct utility halls, electrical station, office, hotel, lights-out maze, ocean, cave, suburb and wheat-field environments
+- Hound, Smiler, Deathmoth, Skin-Stealer, Wretch, Crawler, Leviathan and Tiny gameplay representations
 - Local settings persistence
 - No backend, database or server required
 
@@ -53,12 +56,68 @@ https://backrooms-wiki.wikidot.com/level-1
 
 ### Level 2 - "Abandoned Utility Halls"
 
-Tighter utility corridors with concrete, pipes, unstable lighting and a heavier industrial atmosphere.
+Five-metre maintenance cells, diagonal 45-degree partitions, chalky concrete, exposed pipes, valves, wiring and unstable industrial lighting.
 
 Source:
 https://backrooms-wiki.wikidot.com/level-2
 
-More levels can be added without rewriting the renderer. Level metadata lives in src/levels.js and data/levels.json.
+### Level 3 - "Electrical Station"
+
+A dangerous electrical facility with connected service corridors, switchgear, transformers, conveyor machinery, exposed cables and generator-room set pieces.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-3
+
+### Level 4 - "Abandoned Office"
+
+A quieter office environment with desks, storage and sparse supplies.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-4
+
+### Level 5 - "Terror Hotel"
+
+A 1930s hotel with a furnished Main Hall, a chandelier-lit ballroom-inspired hub and occasional boiler-room machinery.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-5
+
+### Level 6 - "Lights Out"
+
+A tight, silent concrete maze with rare auditory hallucinations and no hostile entity spawns.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-6
+
+### Level 7 - "Thalassophobia"
+
+A vast ocean chamber beneath a low concrete ceiling, with a waterline, submerged rock formations and a deep hatch.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-7
+
+### Level 8 - "Cave Systems"
+
+Cold, dark cave passages with jagged rock formations and hostile creatures.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-8
+
+### Level 9 - "The Suburbs"
+
+An unpowered suburban street at midnight, with hollow houses, broken street lamps and open road intersections.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-9
+
+### Level 10 - "Bumper Crop"
+
+Overcast wheat and barley plots divided by tree lines, ponds, sheds and barns.
+
+Source:
+https://backrooms-wiki.wikidot.com/level-10
+
+Level metadata and source licensing live in src/levels.js and data/levels.json. The current campaign includes Levels 0-10; the procedural generator streams each environment from a deterministic seed.
 
 ## Controls
 
@@ -90,7 +149,7 @@ The production build bundles the required CC0 PBR maps into its generated static
 
 ## Procedural assets
 
-The build uses the Backrooms PBR texture pack by methodical pixel from OpenGameArt.org for the environmental materials. The build downloads the CC0 maps into dist/assets/pbr/ so the deployed game serves them from the same site origin rather than depending on runtime cross-origin requests.
+The build uses the Backrooms PBR texture pack by methodical pixel from OpenGameArt.org for the original environment materials, plus CC0 ambientCG Concrete 046, Concrete 013, Metal 064 and Metal 063 for Levels 2 and 3. All maps are bundled into dist/assets/pbr/ and served from the same site origin.
 
 Used material sets include:
 
@@ -107,7 +166,7 @@ See assets/README.md.
 
 ## Audio
 
-The core ambience and sound effects are synthesised with the Web Audio API. This keeps the project completely static and avoids shipping large audio binaries.
+The audio layer combines procedural Web Audio synthesis with bundled CC0 recordings from OpenGameArt and BigSoundBank. Level 2 has machinery and steam, Level 3 has transformer hum, Level 7 has ocean waves, Level 10 has field wind and light rain, and creature types have distinct one-shot cues. All source URLs, authors, licenses, sizes and hashes are tracked in data/audio-assets-lock.json and assets/audio/manifest.json.
 
 The game starts audio after a user gesture, which is required by modern browser autoplay policies.
 
@@ -164,6 +223,7 @@ This project uses Backrooms Wiki-derived material for identifiable levels and en
 See:
 
 - ATTRIBUTION.md
+- ASSET_CREDITS.md
 - GAME-CONTENT-LICENSE.md
 - LICENSE
 

@@ -4,3 +4,4 @@ assets/pbr/*.png filter=lfs diff=lfs merge=lfs -text
 assets/audio/*.ogg filter=lfs diff=lfs merge=lfs -text
 assets/found-footage/**/*.png filter=lfs diff=lfs merge=lfs -text
 assets/RedZone.ogg filter=lfs diff=lfs merge=lfs -text
+assets/pbr/industrial/*.jpg filter=lfs diff=lfs merge=lfs -text

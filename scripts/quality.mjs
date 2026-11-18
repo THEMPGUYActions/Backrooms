@@ -3,6 +3,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, join, posix, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { LEVELS } from "../src/levels.js";
 
 const exec = promisify(execFile);
 const root = process.cwd();
@@ -326,6 +327,30 @@ async function checkSpacePotatoAssets(){
   }catch(e){fail("SpacePotato asset manifest invalid or missing: "+e.message)}
 }
 
+async function checkIndustrialPbrAssets(){
+  let lock;
+  try{lock=JSON.parse(await readFile(join(root,"data/industrial-pbr-assets-lock.json"),"utf8"))}
+  catch(e){fail("data/industrial-pbr-assets-lock.json is missing or invalid: "+e.message);return}
+  if(lock.license!=="CC0-1.0")fail("Industrial PBR lock must be CC0-1.0");
+  const entries=Object.entries(lock.files||{});
+  if(entries.length!==14)fail("Industrial PBR lock must contain 14 verified maps");
+  try{
+    const manifest=JSON.parse(await readFile(join(root,"dist/assets/pbr/industrial/manifest.json"),"utf8"));
+    if(manifest.license!==lock.license)fail("Industrial PBR manifest license mismatch");
+    for(const [filename,expected] of entries){
+      const entry=manifest.files?.[filename];
+      if(!entry){fail("Industrial PBR manifest missing: "+filename);continue}
+      for(const key of ["url","source","asset","author","license","bytes","sha256"]){if(entry[key]!==expected[key])fail("Industrial PBR manifest metadata mismatch: "+filename+" "+key)}
+      try{
+        const data=await readFile(join(root,"dist/assets/pbr/industrial",filename));
+        const sha=createHash("sha256").update(data).digest("hex");
+        if(data.length!==expected.bytes||sha!==expected.sha256)fail("Industrial PBR checksum mismatch: "+filename);
+        if(data.length<4||data[0]!==0xff||data[1]!==0xd8||data[2]!==0xff)fail("Industrial PBR asset is not JPEG: "+filename);
+      }catch{fail("Industrial PBR asset missing: "+filename)}
+    }
+  }catch(e){fail("Industrial PBR manifest invalid or missing: "+e.message)}
+}
+
 async function checkAudioAssets(){
   let lock;
   try{lock=JSON.parse(await readFile(join(root,"data/audio-assets-lock.json"),"utf8"))}catch(e){fail("data/audio-assets-lock.json is missing or invalid: "+e.message);return}
@@ -334,7 +359,7 @@ async function checkAudioAssets(){
   if(entries.length<8)fail("Audio asset lock must contain at least eight assets");
   for(const [filename,entry] of entries){
     if(!/^[a-z0-9_-]+\.ogg$/.test(filename))fail("Audio asset filename is unexpected: "+filename);
-    if(!entry?.url?.startsWith("https://opengameart.org/sites/default/files/"))fail("Audio asset source URL is unexpected: "+filename);
+    if(!entry?.url?.startsWith("https://opengameart.org/sites/default/files/")&&!entry?.url?.startsWith("https://bigsoundbank.com/UPLOAD/bwf-en/"))fail("Audio asset source URL is unexpected: "+filename);
     if(entry.license!=="CC0")fail("Audio asset is not CC0: "+filename);
     await assertFile(join(root,"dist/assets/audio",filename),"dist audio asset");
   }
@@ -345,6 +370,9 @@ async function checkAudioAssets(){
       const built=manifest.files?.[filename];
       if(!built){fail("dist audio manifest missing asset: "+filename);continue}
       if(built.url!==entry.url||built.license!==entry.license||built.author!==entry.author)fail("dist audio manifest metadata mismatch: "+filename);
+      if(entry.source&&built.source!==entry.source)fail("dist audio source page mismatch: "+filename);
+      if(entry.provider&&built.provider!==entry.provider)fail("dist audio provider mismatch: "+filename);
+      if(entry.source_id&&built.source_id!==entry.source_id)fail("dist audio source ID mismatch: "+filename);
       if(!Number.isInteger(built.bytes)||built.bytes<=0||!/^[a-f0-9]{64}$/.test(built.sha256||""))fail("dist audio manifest checksum metadata invalid: "+filename);
     }
   }catch(e){fail("dist audio manifest invalid or missing: "+e.message)}
@@ -432,9 +460,37 @@ async function checkData() {
     if (sourceUrls.length !== dataUrls.length || sourceUrls.some((url, i) => url !== dataUrls[i])) {
       fail("src/levels.js and data/levels.json source URLs do not match");
     }
+    const levelIds=Object.keys(LEVELS).sort((a,b)=>Number(a)-Number(b));
+    if(levelIds.length!==11||levelIds.some((id,index)=>id!==String(index)))fail("The campaign must contain contiguous levels 0 through 10");
+    for(let index=0;index<=10;index++){
+      const id=String(index),current=LEVELS[id],metadata=levels.find(entry=>entry.id===id),expectedNext=index<10?String(index+1):null;
+      if(!current||current.next!==expectedNext)fail("src/levels.js progression is broken at Level "+id);
+      if(!metadata||metadata.next!==expectedNext)fail("data/levels.json progression is broken at Level "+id);
+      if(metadata&&current&&metadata.name!==current.name)fail("Level name metadata mismatch at Level "+id);
+    }
   } catch (e) {
     fail("src/levels.js could not be checked: " + e.message);
   }
+}
+
+async function checkBacteriaModel(){
+  const modelPath=join(root,"assets/entities/bacteria-roof-v2.glb");
+  const bytes=await readFile(modelPath);
+  if(bytes.toString("ascii",0,4)!=="glTF"||bytes.readUInt32LE(4)!==2)fail("Bacteria GLB is missing or invalid");
+  const jsonLength=bytes.readUInt32LE(12);
+  const gltf=JSON.parse(bytes.toString("utf8",20,20+jsonLength).trim());
+  const artifact=gltf.nodes?.find(node=>node.name==="Object_166");
+  if(!artifact||!Number.isInteger(artifact.mesh))fail("Bacteria export-artifact node Object_166 is missing; re-audit model bounds before changing its scale");
+  const clips=gltf.animations||[];
+  for(const name of ["bendingOverScene","chaseSceneEnd","JUMPSCARE"]){
+    const clip=clips.find(animation=>animation.name.toLowerCase().endsWith(name.toLowerCase()));
+    if(!clip||!clip.samplers?.length||!clip.channels?.length)fail("Bacteria animation is missing or has no tracks: "+name);
+  }
+  const source=await readFile(join(root,"src/entity-models.js"),"utf8");
+  for(const token of ["Object_166","worldBounds","bendingOverScene","clip.duration>.001","skeleton.update()"]){
+    if(!source.includes(token))fail("Bacteria model audit regression: missing "+token);
+  }
+  console.log("Bacteria model audit: detached export artifact and three animated clips verified.");
 }
 
 async function checkBuildIfPresent() {
@@ -491,9 +547,11 @@ await checkModuleGraph(jsFiles, imports);
 await checkData();
 await checkBuildIfPresent();
 await checkEntityModels();
+await checkBacteriaModel();
 await checkAssetSources();
 await checkSpacePotatoAssets();
 await checkAudioAssets();
+await checkIndustrialPbrAssets();
 await checkWorkflow();
 
 for (const file of files) {
