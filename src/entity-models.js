@@ -24,7 +24,9 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   skinstealer: 3.4,
   smiler: 2.0
 });
-const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({});
+const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
+  bacteria: 1.15
+});
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
 });
@@ -264,6 +266,7 @@ export class EntityModelLibrary{
       const clips=sourceClips.map(clip=>{
         const safeClip=clip.clone();
         safeClip.tracks=safeClip.tracks.filter(track=>{
+          if(entity.type==="bacteria"&&track.name==="Bone001_03.position")return false;
           if(track.name!=="scale"&&!track.name.endsWith(".scale"))return true;
           let target=root;
           if(track.name!=="scale"){
@@ -326,9 +329,18 @@ export class EntityModelLibrary{
       model.mixer.update(0);
       entity.group.updateMatrixWorld(true);
       root.traverse(object=>{if(object.isSkinnedMesh)object.skeleton.update()});
-      const posedBounds=new THREE.Box3().setFromObject(root,true);
-      if(!posedBounds.isEmpty()&&Number.isFinite(posedBounds.min.y)&&posedBounds.min.y<0){
-        normalizedRoot.position.y+=(-posedBounds.min.y)/Math.max(.001,container.scale.y);
+      const posedBounds=new THREE.Box3();
+      for(const mesh of visibleRenderableMeshes){
+        const meshBounds=new THREE.Box3().setFromObject(mesh,mesh.isSkinnedMesh===true);
+        if(!meshBounds.isEmpty())posedBounds.union(meshBounds);
+      }
+      if(!posedBounds.isEmpty()){
+        const relativeCenter=posedBounds.getCenter(new THREE.Vector3()).sub(entity.group.position);
+        const correction=new THREE.Vector3(-relativeCenter.x,-(posedBounds.min.y-entity.group.position.y),-relativeCenter.z);
+        correction.applyQuaternion(entity.group.getWorldQuaternion(new THREE.Quaternion()).invert());
+        correction.applyQuaternion(container.quaternion.clone().invert());
+        correction.divide(container.scale);
+        normalizedRoot.position.add(correction);
         normalizedRoot.updateMatrix();
         entity.group.updateMatrixWorld(true);
       }
