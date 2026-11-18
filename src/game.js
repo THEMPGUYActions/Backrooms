@@ -528,6 +528,8 @@ class Chunk{
         const lot=this.rooms[0];if(lot)this.exit={...lot,kind:"suburb"};
       }else if(level.id==="10"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*5,10)<.22){
         this.exit={kind:"field",x:Math.floor(cells*.68),z:Math.floor(cells*.64)};
+      }else if((level.id==="2"||level.id==="3")&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.22){
+        this.exit={kind:"industrial"};
       }
     }
 
@@ -751,6 +753,19 @@ class Chunk{
           e.side==="south"?new THREE.Vector3(px,1.28,pz+cell/2+.78):
           e.side==="west"?new THREE.Vector3(px-cell/2-.78,1.28,pz):
           new THREE.Vector3(px+cell/2+.78,1.28,pz);
+      }else if(e.kind==="industrial"){
+        const px=this.originX+size*.5,pz=this.originZ+size*.72,doorWidth=1.42,doorHeight=2.55,half=3.1;
+        box(g,new THREE.BoxGeometry(half-doorWidth/2,level.wallHeight,.2),lib.wall,px-(half+doorWidth/2)/2,level.wallHeight/2,pz);
+        box(g,new THREE.BoxGeometry(half-doorWidth/2,level.wallHeight,.2),lib.wall,px+(half+doorWidth/2)/2,level.wallHeight/2,pz);
+        box(g,new THREE.BoxGeometry(doorWidth,level.wallHeight-doorHeight,.2),lib.rustMetal,px,(level.wallHeight+doorHeight)/2,pz);
+        const door=box(g,new THREE.BoxGeometry(doorWidth-.08,doorHeight-.06,.09),lib.exitDoor.clone(),px,doorHeight/2,pz-.08);
+        door.userData.exit=true;
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(.13,doorHeight,.25),lib.exitFrame,px+side*(doorWidth/2+.07),doorHeight/2,pz-.06);
+        box(g,new THREE.BoxGeometry(doorWidth+.28,.14,.25),lib.exitFrame,px,doorHeight+.02,pz-.06);
+        box(g,new THREE.BoxGeometry(.12,.12,.08),level.id==="2"?lib.orangeLight:lib.indicator,px+doorWidth*.28,doorHeight-.28,pz-.2);
+        this.collisionSegments.push({x1:px-half,z1:pz,x2:px-doorWidth/2-.08,z2:pz},{x1:px+doorWidth/2+.08,z1:pz,x2:px+half,z2:pz});
+        this.exit.position.set(px,1.05,pz-.92);
+        this.lightSources.push({position:new THREE.Vector3(px,2.8,pz-.7),color:level.id==="2"?0xa58aff:0x9cdb9a,baseIntensity:3.2,intensity:3.2,distance:7,decay:2});
       }else if(e.kind==="ocean"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         const rim=new THREE.Mesh(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
