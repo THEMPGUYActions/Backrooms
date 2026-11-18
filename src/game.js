@@ -431,6 +431,10 @@ class Chunk{
         // Industrial levels use authored corridor geometry, not the old
         // cell-by-cell maze wall fallback.
         this.walls.fill(0);
+      }else if(level.id==="4"){
+        // Abandoned office is an open floor plate with sparse partitions,
+        // not a yellow-maze of sealed cells.
+        this.walls.fill(0);
       }else if(level.id==="7"){
         // The ocean is intentionally open. Its boundaries are water, not walls.
         this.walls.fill(0);
@@ -950,9 +954,34 @@ class Chunk{
       g.add(belt);
       const beltHalfX=3.6,beltHalfZ=.675;this.collisionSegments.push({x1:beltX-beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ-beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX-beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ-beltHalfZ});
     }else if(level.id==="4"){
-      // Abandoned office: denser desks, chairs, filing cabinets, dead monitors,
-      // cubicle partitions and scattered clutter so rooms no longer read as empty boxes.
+      // Abandoned office: open floor plate with structural columns, desks,
+      // chairs, cabinets — not a yellow maze of sealed cells.
       const rng=new RNG(this.seedKey()^0x44aa);
+      // Structural columns on a grid (reference: open white office with pillars)
+      const colStep=Math.max(2,Math.floor(cells/3));
+      for(let cz=1;cz<cells-1;cz+=colStep)for(let cx=1;cx<cells-1;cx+=colStep){
+        const px=this.originX+(cx+.5)*cell,pz=this.originZ+(cz+.5)*cell;
+        const col=new THREE.Group();col.position.set(px,0,pz);
+        box(col,new THREE.BoxGeometry(.85,level.wallHeight,.85),lib.officePlastic,0,level.wallHeight/2,0);
+        box(col,new THREE.BoxGeometry(1.05,.12,1.05),lib.officePlastic,0,.06,0);
+        box(col,new THREE.BoxGeometry(1.05,.12,1.05),lib.officePlastic,0,level.wallHeight-.06,0);
+        g.add(col);
+        const hr=.48;this.collisionSegments.push({x1:px-hr,z1:pz-hr,x2:px+hr,z2:pz-hr},{x1:px+hr,z1:pz-hr,x2:px+hr,z2:pz+hr},{x1:px+hr,z1:pz+hr,x2:px-hr,z2:pz+hr},{x1:px-hr,z1:pz+hr,x2:px-hr,z2:pz-hr});
+      }
+      // Occasional full-height partition runs (not a full maze)
+      for(let i=0;i<2;i++){
+        const alongX=rng.next()<.5;
+        const a=this.originX+cell*(1.5+rng.next()*(cells-3));
+        const b=this.originZ+cell*(1.5+rng.next()*(cells-3));
+        const len=cell*(1.2+rng.next()*1.8);
+        if(alongX){
+          box(g,new THREE.BoxGeometry(len,level.wallHeight*.92,.12),lib.officePlastic,a,level.wallHeight*.46,b);
+          this.collisionSegments.push({x1:a-len/2,z1:b,x2:a+len/2,z2:b});
+        }else{
+          box(g,new THREE.BoxGeometry(.12,level.wallHeight*.92,len),lib.officePlastic,a,level.wallHeight*.46,b);
+          this.collisionSegments.push({x1:a,z1:b-len/2,x2:a,z2:b+len/2});
+        }
+      }
       const deskCount=6+rng.int(0,4);
       for(let i=0;i<deskCount;i++){
         const ox=this.originX+cell*(1.1+rng.next()*Math.max(.8,cells-2.2));
@@ -3174,25 +3203,38 @@ export class BackroomsGame{
     this.deathSequenceDuration=3.35;
     this.lightState="BLACKOUT";
     this.dead=true;
-    this.paused=true;
-    this.running=false;
+    // Keep running=true so update() still advances the sequence and can respawn.
+    // paused stays false for the same reason; player input is ignored while dead.
+    this.paused=false;
+    this.running=true;
     this.triggerFear(1);
     document.getElementById("hud")?.classList.add("hidden");
     document.getElementById("death")?.classList.add("hidden"); // never show the old text panel
     document.exitPointerLock?.();
     this.audio.scare();
-    // Force nearest bacteria into attack presentation if present.
+    // Stage a bacteria jumpscare in front of the camera when possible.
     try{
       const entities=this.entityManager?.entities||[];
       let best=null,bestD=1e9;
       for(const e of entities){
-        if(e.type!=="bacteria"||!e.group)continue;
+        if(!e.group)continue;
+        if(e.type!=="bacteria"&&e.type!=="hound"&&e.type!=="skinstealer")continue;
         const d=e.group.position.distanceTo(this.player.position);
         if(d<bestD){bestD=d;best=e}
       }
       if(best){
+        const yaw=this.player.yaw||0;
+        const dist=1.15;
+        best.group.position.set(
+          this.player.position.x-Math.sin(yaw)*dist,
+          0,
+          this.player.position.z-Math.cos(yaw)*dist
+        );
+        best.group.rotation.y=yaw+Math.PI;
         best.state="frenzy";
         if(this.entityManager?.modelLibrary){
+          // Drive JUMPSCARE clip if present
+          this.entityManager.modelLibrary.play?.(best,["JUMPSCARE","jumpscare","attack","frenzy"]);
           this.entityManager.modelLibrary.update(best,0);
         }
       }
@@ -3630,7 +3672,7 @@ export class BackroomsGame{
     const raw=(now-this.last)/1000;this.last=now;
     const dt=Math.min(MAX_DT,raw);
     try{
-      if(this.running&&!this.paused)this.update(dt);
+      if((this.running&&!this.paused)||this.deathSequenceActive)this.update(dt);
       this.render();
       if(window.backroomsAdmin?.ready)window.backroomsAdmin.update();
     }catch(error){
