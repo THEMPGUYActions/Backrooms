@@ -6,7 +6,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261013-kane-level0";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-bacteria-lighting1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-bacteria-lighting1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -423,16 +423,113 @@ class Chunk{
     }
 
     if(level.id!=="1"&&level.id!=="0"){
-      const boundaryChance=.19;
+      // Levels 2+ are connected environments, not a grid of sealed boxes.
+      // The old generator only punched occasional chunk-edge doors, leaving
+      // every interior cell surrounded by four fallback walls. Build a seeded
+      // spanning network first, then add level-specific loops and room pockets.
+      if(level.id==="2"||level.id==="3"){
+        // Industrial levels use authored corridor geometry, not the old
+        // cell-by-cell maze wall fallback.
+        this.walls.fill(0);
+      }else if(level.id==="7"){
+        // The ocean is intentionally open. Its boundaries are water, not walls.
+        this.walls.fill(0);
+      }else if(level.id==="9"){
+        // Suburban blocks are open streets with discrete lots, not indoor maze walls.
+        this.walls.fill(0);
+        this.rooms.push({x:1,z:1,w:2,h:2,type:"suburban"},{x:cells-4,z:cells-4,w:2,h:2,type:"suburban"});
+      }else if(level.id==="10"){
+        // The wheat fields are open terrain; the final route is a barn door,
+        // not a fake perimeter wall around each streamed chunk.
+        this.walls.fill(0);
+      }else{
+        const visited=new Uint8Array(cells*cells);
+        const startX=Math.floor(cells/2),startZ=Math.floor(cells/2);
+        const stack=[[startX,startZ]];
+        visited[this.index(startX,startZ)]=1;
+        const dirs=[[0,-1,1,4],[1,0,2,8],[0,1,4,1],[-1,0,8,2]];
+        while(stack.length){
+          const [x,z]=stack[stack.length-1],options=[];
+          for(const [dx,dz,b,ob] of dirs){
+            const nx=x+dx,nz=z+dz;
+            if(nx>=0&&nx<cells&&nz>=0&&nz<cells&&!visited[this.index(nx,nz)])options.push([nx,nz,b,ob]);
+          }
+          if(!options.length){stack.pop();continue}
+          const [nx,nz,b,ob]=rng.pick(options);
+          this.walls[this.index(x,z)]&=~b;
+          this.walls[this.index(nx,nz)]&=~ob;
+          visited[this.index(nx,nz)]=1;
+          stack.push([nx,nz]);
+        }
+
+        const loopChance={"2":.14,"3":.28,"4":.2,"5":.24,"6":.035,"8":.18,"9":.16}[level.id]??.15;
+        for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+          if(x<cells-1&&(this.walls[this.index(x,z)]&2)&&rng.next()<loopChance)this.setEdge(x,z,"east",true);
+          if(z<cells-1&&(this.walls[this.index(x,z)]&4)&&rng.next()<loopChance)this.setEdge(x,z,"south",true);
+        }
+
+        if(level.id==="3"){
+          // A broad, continuous service spine separates the smaller switchgear
+          // corridors and makes the Electrical Station read like a facility.
+          const mid=Math.floor(cells/2);
+          for(let x=0;x<cells-1;x++)this.setEdge(x,mid,"east",true);
+          for(let z=0;z<cells-1;z++)this.setEdge(mid,z,"south",true);
+        }
+
+        if(level.id==="2"||level.id==="5"||level.id==="9"){
+          // Utility bays, hotel rooms and suburban lots are open pockets attached
+          // to the maze, never isolated 4-wall cells.
+          const attempts=level.id==="2"?2:level.id==="9"?2:3;
+          for(let attempt=0;attempt<attempts;attempt++){
+            const w=level.id==="5"?3:2,h=2;
+            const rx=rng.int(1,Math.max(1,cells-w-1)),rz=rng.int(1,Math.max(1,cells-h-1));
+            const room={x:rx,z:rz,w,h,type:level.id==="2"?"maintenance":level.id==="9"?"suburban":"hotel"};
+            if(this.rooms.some(other=>room.x<other.x+other.w+1&&room.x+room.w+1>other.x&&room.z<other.z+other.h+1&&room.z+room.h+1>other.z))continue;
+            for(let rz2=rz;rz2<rz+h;rz2++)for(let rx2=rx;rx2<rx+w;rx2++){
+              if(rx2<rx+w-1)this.setEdge(rx2,rz2,"east",true);
+              if(rz2<rz+h-1)this.setEdge(rx2,rz2,"south",true);
+            }
+            const side=rng.pick(["north","east","south","west"]);
+            const ex=side==="east"?rx+w-1:side==="west"?rx:rx+rng.int(0,w-1);
+            const ez=side==="south"?rz+h-1:side==="north"?rz:rz+rng.int(0,h-1);
+            this.setEdge(ex,ez,side,true);
+            this.rooms.push(room);
+          }
+          if(level.id==="5"&&cycleHash(this.seedKey(),this.cx,this.cz)<.22){
+            const ballroom={x:3,z:3,w:4,h:4,type:"beverly"};
+            const overlaps=this.rooms.some(other=>ballroom.x<other.x+other.w+1&&ballroom.x+ballroom.w+1>other.x&&ballroom.z<other.z+other.h+1&&ballroom.z+ballroom.h+1>other.z);
+            if(!overlaps){
+              for(let rz=ballroom.z;rz<ballroom.z+ballroom.h;rz++)for(let rx=ballroom.x;rx<ballroom.x+ballroom.w;rx++){
+                if(rx<ballroom.x+ballroom.w-1)this.setEdge(rx,rz,"east",true);
+                if(rz<ballroom.z+ballroom.h-1)this.setEdge(rx,rz,"south",true);
+              }
+              for(const [ex,ez,side] of [[ballroom.x+1,ballroom.z,"north"],[ballroom.x+ballroom.w-1,ballroom.z+1,"east"],[ballroom.x+2,ballroom.z+ballroom.h-1,"south"],[ballroom.x,ballroom.z+2,"west"]])this.setEdge(ex,ez,side,true);
+              this.rooms.push(ballroom);
+            }
+          }
+        }
+      }
+
+      const boundaryChance=({"2":0,"3":0,"6":.08,"7":0,"9":0,"10":0})[level.id]??.19;
       for(let x=0;x<cells;x++){
         const gx=this.cx*cells+x;
-        if(canonicalOpen(this.game.seed,gx,this.cz*cells,"h",boundaryChance))this.setEdge(x,0,"north",true);
-        if(canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",boundaryChance))this.setEdge(x,cells-1,"south",true);
+        if(boundaryChance>0&&canonicalOpen(this.game.seed,gx,this.cz*cells,"h",boundaryChance))this.setEdge(x,0,"north",true);
+        if(boundaryChance>0&&canonicalOpen(this.game.seed,gx,this.cz*cells+cells,"h",boundaryChance))this.setEdge(x,cells-1,"south",true);
       }
       for(let z=0;z<cells;z++){
         const gz=this.cz*cells+z;
-        if(canonicalOpen(this.game.seed,this.cx*cells,gz,"v",boundaryChance))this.setEdge(0,z,"west",true);
-        if(canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",boundaryChance))this.setEdge(cells-1,z,"east",true);
+        if(boundaryChance>0&&canonicalOpen(this.game.seed,this.cx*cells,gz,"v",boundaryChance))this.setEdge(0,z,"west",true);
+        if(boundaryChance>0&&canonicalOpen(this.game.seed,this.cx*cells+cells,gz,"v",boundaryChance))this.setEdge(cells-1,z,"east",true);
+      }
+
+      if(level.id==="7"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*17+this.cz*5,7)<.2){
+        const mid=Math.floor(cells/2);this.exit={x:mid,z:mid,side:"south",kind:"ocean"};
+      }else if(level.id==="9"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*11+this.cz*13,9)<.22){
+        const lot=this.rooms[0];if(lot)this.exit={...lot,kind:"suburb"};
+      }else if(level.id==="10"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*5,10)<.22){
+        this.exit={kind:"field",x:Math.floor(cells*.68),z:Math.floor(cells*.64)};
+      }else if((level.id==="2"||level.id==="3")&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.22){
+        this.exit={kind:"industrial"};
       }
     }
 
@@ -515,7 +612,7 @@ class Chunk{
           const intensity=region==="red"?20:30;
           this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
         }
-      }else if(level.id!=="1"&&rngBase.next()<.13){
+      }else if(level.id!=="1"&&level.id!=="6"&&rngBase.next()<(level.id==="5"?.17:level.id==="9"?.025:.13)){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
         const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
         const fixture=box(g,new THREE.BoxGeometry(3.7,.055,.72),material,px,level.wallHeight-.09,pz,0,rotation,0);fixture.userData.light=true;fixture.userData.baseEmissive=material.emissiveIntensity;this.fixtures.push(fixture);
@@ -656,6 +753,38 @@ class Chunk{
           e.side==="south"?new THREE.Vector3(px,1.28,pz+cell/2+.78):
           e.side==="west"?new THREE.Vector3(px-cell/2-.78,1.28,pz):
           new THREE.Vector3(px+cell/2+.78,1.28,pz);
+      }else if(e.kind==="industrial"){
+        const px=this.originX+size*.5,pz=this.originZ+size*.72,doorWidth=1.42,doorHeight=2.55,half=3.1;
+        box(g,new THREE.BoxGeometry(half-doorWidth/2,level.wallHeight,.2),lib.wall,px-(half+doorWidth/2)/2,level.wallHeight/2,pz);
+        box(g,new THREE.BoxGeometry(half-doorWidth/2,level.wallHeight,.2),lib.wall,px+(half+doorWidth/2)/2,level.wallHeight/2,pz);
+        box(g,new THREE.BoxGeometry(doorWidth,level.wallHeight-doorHeight,.2),lib.rustMetal,px,(level.wallHeight+doorHeight)/2,pz);
+        const door=box(g,new THREE.BoxGeometry(doorWidth-.08,doorHeight-.06,.09),lib.exitDoor.clone(),px,doorHeight/2,pz-.08);
+        door.userData.exit=true;
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(.13,doorHeight,.25),lib.exitFrame,px+side*(doorWidth/2+.07),doorHeight/2,pz-.06);
+        box(g,new THREE.BoxGeometry(doorWidth+.28,.14,.25),lib.exitFrame,px,doorHeight+.02,pz-.06);
+        box(g,new THREE.BoxGeometry(.12,.12,.08),level.id==="2"?lib.orangeLight:lib.indicator,px+doorWidth*.28,doorHeight-.28,pz-.2);
+        this.collisionSegments.push({x1:px-half,z1:pz,x2:px-doorWidth/2-.08,z2:pz},{x1:px+doorWidth/2+.08,z1:pz,x2:px+half,z2:pz});
+        this.exit.position.set(px,1.05,pz-.92);
+        this.lightSources.push({position:new THREE.Vector3(px,2.8,pz-.7),color:level.id==="2"?0xa58aff:0x9cdb9a,baseIntensity:3.2,intensity:3.2,distance:7,decay:2});
+      }else if(e.kind==="ocean"){
+        const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
+        const rim=new THREE.Mesh(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
+        const shaft=new THREE.Mesh(new THREE.CylinderGeometry(1.18,1.18,2.8,24,1,true),lib.dark);shaft.position.set(px,-1.35,pz);g.add(shaft);
+        for(let i=0;i<7;i++)box(g,new THREE.BoxGeometry(1.1,.08,.08),lib.metal,px,-.35-i*.32,pz);
+        this.exit.position.set(px,.82,pz);
+      }else if(e.kind==="suburb"){
+        const px=this.originX+(e.x+e.w/2)*cell,pz=this.originZ+(e.z+e.h/2)*cell-3.28;
+        box(g,new THREE.BoxGeometry(1.18,2.3,.09),lib.exitDoor,px,1.15,pz);
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(.1,2.48,.14),lib.exitFrame,px+side*.66,1.24,pz);
+        box(g,new THREE.BoxGeometry(1.42,.12,.16),lib.exitFrame,px,2.42,pz);
+        this.exit.position.set(px,1.1,pz-.5);
+        this.lightSources.push({position:new THREE.Vector3(px,2.5,pz-.5),color:0x9cdb9a,baseIntensity:2.6,intensity:2.6,distance:6,decay:2});
+      }else if(e.kind==="field"){
+        const px=this.originX+(e.x+.5)*cell,pz=this.originZ+(e.z+.5)*cell-3.25;
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(.14,4.2,.18),lib.exitFrame,px+side*1.18,2.1,pz);
+        box(g,new THREE.BoxGeometry(2.55,.16,.18),lib.exitFrame,px,4.05,pz);
+        this.exit.position.set(px,1.1,pz-.55);
+        this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.7),color:0xc2a46b,baseIntensity:2.2,intensity:2.2,distance:7,decay:2});
       }else{
         const p=wallPoint(e,.105,1.95),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
         anomaly.userData.exit=true;
@@ -674,38 +803,138 @@ class Chunk{
     }
 
     if(level.id==="2"){
-      const pipeMat=lib.metal,rng=new RNG(this.seedKey()^0x72ea);
-      for(let i=0;i<5;i++){
-        const y=.75+rng.next()*2.0;
-        const horizontal=new THREE.Mesh(new THREE.CylinderGeometry(.075+rng.next()*.09,.075+rng.next()*.09,size*.52,8),pipeMat);
-        horizontal.rotation.z=Math.PI/2;horizontal.position.set(this.originX+rng.next()*size,y,this.originZ+rng.next()*size);g.add(horizontal);
+      const rng=new RNG(this.seedKey()^0x72ea),pipeMat=lib.metal,rustMat=lib.rustMetal;
+      const addUtilityWall=(x1,z1,x2,z2,height=2.95,material=lib.wall)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+        if(length<.3)return;
+        box(g,new THREE.BoxGeometry(length,height,.18),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        this.collisionSegments.push({x1,z1,x2,z2});
+      };
+      const cx=this.originX+size/2,cz=this.originZ+size/2,door=1.5,offset=1.85;
+      // Two continuous service corridors meet at a cross-junction. Wall runs
+      // are split into real door openings so neighboring streamed chunks join.
+      for(const side of [-1,1]){
+        const x=cx+side*offset,z=cz+side*offset;
+        addUtilityWall(x,this.originZ,x,cz-door/2);
+        addUtilityWall(x,cz+door/2,x,this.originZ+size);
+        addUtilityWall(this.originX,z,cx-door/2,z);
+        addUtilityWall(cx+door/2,z,this.originX+size,z);
+      }
+      // Offset maintenance bays and diagonal returns replace the old repeated
+      // square-cell partitions with a readable, irregular utility-hall layout.
+      for(const sideX of [-1,1])for(const sideZ of [-1,1]){
+        const bx=cx+sideX*size*.29,bz=cz+sideZ*size*.29,w=3.6,h=3.1;
+        const openX=bx-sideX*w/2,backX=bx+sideX*w/2;
+        const openZ=bz-sideZ*h/2,backZ=bz+sideZ*h/2;
+        addUtilityWall(openX,openZ,backX,openZ);
+        addUtilityWall(backX,openZ,backX,backZ);
+        addUtilityWall(backX,backZ,openX,backZ);
+        addUtilityWall(openX,backZ,openX,bz+sideZ*.35);
+        const returnX=bx+sideX*(w/2+1.1),returnZ=bz+sideZ*(h/2+1.1);
+        addUtilityWall(backX,backZ,returnX,returnZ,2.65,lib.rustMetal);
+      }
+      const pipeGeometry=new THREE.CylinderGeometry(.11,.11,cell*.72,8);
+      const cleanPipes=new THREE.InstancedMesh(pipeGeometry,pipeMat,cells*cells);
+      const rustPipes=new THREE.InstancedMesh(pipeGeometry,rustMat,cells*cells);
+      const pipeDummy=new THREE.Object3D();let cleanCount=0,rustCount=0;
+      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
+        if(rng.next()>.16)continue;
+        const px=this.originX+(x+.5)*cell,pz=this.originZ+(z+.5)*cell,alongX=rng.next()<.5;
+        pipeDummy.position.set(px,2.52+rng.next()*.34,pz);
+        pipeDummy.rotation.set(alongX?0:Math.PI/2,0,alongX?Math.PI/2:0);
+        pipeDummy.scale.set(1,1,1);pipeDummy.updateMatrix();
+        if(rng.next()<.48)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
+        else cleanPipes.setMatrixAt(cleanCount++,pipeDummy.matrix);
+      }
+      cleanPipes.count=cleanCount;rustPipes.count=rustCount;
+      cleanPipes.instanceMatrix.needsUpdate=true;rustPipes.instanceMatrix.needsUpdate=true;g.add(cleanPipes,rustPipes);
+      // Valve wheels, pressure gauges and low service vents sit in the bays.
+      for(let i=0;i<8;i++){
+        const x=this.originX+cell*(1+rng.next()*Math.max(1,cells-2)),z=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
+        if(i<5){
+          const valve=new THREE.Mesh(new THREE.TorusGeometry(.19,.035,6,14),lib.handle);
+          valve.position.set(x,2.12+rng.next()*.32,z);valve.rotation.x=Math.PI/2;g.add(valve);
+          const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.055,12),lib.dark);
+          gauge.position.set(x+.24,2.35,z);gauge.rotation.x=Math.PI/2;g.add(gauge);
+        }else{
+          const vent=new THREE.Group();vent.position.set(x,0,z);
+          box(vent,new THREE.BoxGeometry(.92,.12,.72),lib.rustMetal,0,.12,0);
+          const riser=new THREE.Mesh(new THREE.CylinderGeometry(.16,.19,.62,10),lib.metal);riser.position.y=.48;vent.add(riser);
+          const cap=new THREE.Mesh(new THREE.CylinderGeometry(.24,.18,.12,10),lib.rustMetal);cap.position.y=.85;vent.add(cap);g.add(vent);
+          const half=.46;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
+        }
+      }
+      // Floor drains and painted service markings make the corridors read as
+      // maintained infrastructure instead of an empty maze with pipes.
+      for(let i=0;i<6;i++){
+        const x=this.originX+size*(.12+i*.145),z=cz+(i%2?1:-1)*2.55;
+        box(g,new THREE.BoxGeometry(1.25,.025,.34),lib.dark,x,.025,z);
+        for(let stripe=0;stripe<4;stripe++)box(g,new THREE.BoxGeometry(.16,.018,.36),lib.orangeLight,x-.48+stripe*.32,.043,z);
       }
     }else if(level.id==="3"){
       const rng=new RNG(this.seedKey()^0x31e1);
-      for(let i=0;i<8;i++){
-        const y=1.15+rng.next()*2.35;
-        const radius=.055+rng.next()*.085;
-        const vertical=rng.next()<.35;
-        const length=vertical?2.6+ rng.next()*1.4:size*.36+rng.next()*size*.18;
-        const pipe=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,8),lib.metal);
-        if(vertical){
-          pipe.position.set(this.originX+rng.next()*size,y,this.originZ+rng.next()*size);
-        }else{
-          pipe.rotation.z=Math.PI/2;
-          pipe.position.set(this.originX+rng.next()*size,y,this.originZ+rng.next()*size);
+      const addStationWall=(x1,z1,x2,z2,height=3.45,material=lib.rustMetal)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+        if(length<.3)return;
+        box(g,new THREE.BoxGeometry(length,height,.2),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        this.collisionSegments.push({x1,z1,x2,z2});
+      };
+      const cx=this.originX+size/2,cz=this.originZ+size/2;
+      // The station is a single tall machinery hall. These short partitions
+      // form switchgear galleries without rebuilding the abandoned square maze.
+      for(const side of [-1,1]){
+        const z=cz+side*size*.28;
+        addStationWall(this.originX+size*.12,z,cx-3,z,3.15,lib.officePlastic);
+        addStationWall(cx+3,z,this.originX+size*.88,z,3.15,lib.officePlastic);
+        for(const x of [.22,.78]){
+          const px=this.originX+size*x;
+          addStationWall(px,z+side*2.2,px,z+side*5.2,2.9,lib.rustMetal);
         }
-        g.add(pipe);
       }
-      for(let i=0;i<2;i++){
-        const bx=this.originX+cell*(1+rng.next()*Math.max(1,cells-2));
-        const bz=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
-        const panel=new THREE.Group();
-        panel.position.set(bx,1.55,bz);
-        box(panel,new THREE.BoxGeometry(.72,1.1,.16),lib.officePlastic,0,0,0);
-        box(panel,new THREE.BoxGeometry(.055,.055,.035),lib.indicator,.2,.3,-.095);
-        box(panel,new THREE.BoxGeometry(.055,.055,.035),lib.indicator,.2,.12,-.095);
-        g.add(panel);
+      // Switchgear cabinets are arranged as two banks with walkable aisles.
+      for(let bank=0;bank<2;bank++)for(let i=0;i<4;i++){
+        const px=this.originX+size*(bank?.76:.24),pz=this.originZ+size*(.18+i*.2),cabinet=new THREE.Group();
+        cabinet.position.set(px,0,pz);
+        box(cabinet,new THREE.BoxGeometry(1.25,2.35,.98),lib.officePlastic,0,1.18,0);
+        box(cabinet,new THREE.BoxGeometry(1.08,2.02,.07),lib.rustMetal,0,1.18,-.54);
+        for(let row=0;row<4;row++){
+          box(cabinet,new THREE.BoxGeometry(.52,.04,.04),lib.handle,0,.55+row*.37,-.59);
+          const lamp=box(cabinet,new THREE.BoxGeometry(.1,.1,.05),row%2?lib.indicator:lib.orangeLight,.39,.55+row*.37,-.6);
+          lamp.userData.light=true;
+        }
+        g.add(cabinet);
+        const hx=.63,hz=.49;this.collisionSegments.push({x1:px-hx,z1:pz-hz,x2:px+hx,z2:pz-hz},{x1:px+hx,z1:pz-hz,x2:px+hx,z2:pz+hz},{x1:px+hx,z1:pz+hz,x2:px-hx,z2:pz+hz},{x1:px-hx,z1:pz+hz,x2:px-hx,z2:pz-hz});
+        this.lightSources.push({position:new THREE.Vector3(px,1.9,pz-.72),color:0xff9d5b,baseIntensity:2.2,intensity:2.2,distance:5,decay:2});
       }
+      // Transformer banks and bus bars occupy the rear service aisles.
+      for(const px of [.36,.64]){
+        const bx=this.originX+size*px,bz=this.originZ+size*.48,unit=new THREE.Group();unit.position.set(bx,0,bz);
+        box(unit,new THREE.BoxGeometry(2.7,2.9,2.0),lib.rustMetal,0,1.45,0);
+        for(let fin=0;fin<9;fin++)box(unit,new THREE.BoxGeometry(.1,2.2,1.12),lib.metal,-1.12+fin*.28,1.45,-1.08);
+        box(unit,new THREE.BoxGeometry(.72,.5,.08),lib.dark,0,1.9,-1.04);
+        for(let lamp=0;lamp<3;lamp++)box(unit,new THREE.BoxGeometry(.12,.12,.07),lamp===1?lib.orangeLight:lib.indicator,-.22+lamp*.22,1.9,-1.1);
+        g.add(unit);
+        this.collisionSegments.push({x1:bx-1.35,z1:bz-1,x2:bx+1.35,z2:bz-1},{x1:bx+1.35,z1:bz-1,x2:bx+1.35,z2:bz+1},{x1:bx+1.35,z1:bz+1,x2:bx-1.35,z2:bz+1},{x1:bx-1.35,z1:bz+1,x2:bx-1.35,z2:bz-1});
+        this.lightSources.push({position:new THREE.Vector3(bx,2.15,bz-1.2),color:0xffa15b,baseIntensity:4.2,intensity:4.2,distance:9,decay:2});
+      }
+      // Overhead busbars, cable ladders and warning-yellow floor lanes.
+      for(let row=0;row<3;row++){
+        const z=this.originZ+size*(.24+row*.26);
+        const bus=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,size*.78,8),lib.metal);
+        bus.rotation.z=Math.PI/2;bus.position.set(cx,level.wallHeight-.72,z);g.add(bus);
+        for(let x=0;x<7;x++)box(g,new THREE.BoxGeometry(.1,.09,.16),lib.rustMetal,this.originX+size*(.12+x*.125),level.wallHeight-.88,z);
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(size*.78,.035,.11),lib.orangeLight,cx,.035,z+side*1.75);
+      }
+      // A slow conveyor occupies one side bay, not the central walking aisle.
+      const beltX=this.originX+size*.5,beltZ=this.originZ+size*.84,belt=new THREE.Group();belt.position.set(beltX,0,beltZ);
+      box(belt,new THREE.BoxGeometry(7.2,.22,1.35),lib.metal,0,.62,0);
+      box(belt,new THREE.BoxGeometry(6.95,.08,1.02),lib.dark,0,.78,0);
+      for(let roller=0;roller<11;roller++){
+        const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,1.2,8),lib.handle);
+        wheel.rotation.z=Math.PI/2;wheel.position.set(-3.2+roller*.64,.48,0);belt.add(wheel);
+      }
+      g.add(belt);
+      const beltHalfX=3.6,beltHalfZ=.675;this.collisionSegments.push({x1:beltX-beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ-beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX-beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ-beltHalfZ});
     }else if(level.id==="4"){
       const rng=new RNG(this.seedKey()^0x44aa);
       for(let i=0;i<3;i++){
@@ -730,6 +959,172 @@ class Chunk{
         box(windowGroup,new THREE.BoxGeometry(2.9,1.2,.035),lib.windowDark,0,0,0);
         box(windowGroup,new THREE.BoxGeometry(.045,1.28,.05),lib.trim,.0,0,0);
         g.add(windowGroup);
+      }
+    }else if(level.id==="5"){
+      const rng=new RNG(this.seedKey()^0x5a11);
+      // 1930s hotel furniture: dark wood service tables, side lamps and brass chandeliers.
+      for(let i=0;i<Math.min(2,this.rooms.length+1);i++){
+        const x=this.originX+cell*(1.2+rng.next()*(cells-2.4)),z=this.originZ+cell*(1.2+rng.next()*(cells-2.4));
+        const table=new THREE.Group();table.position.set(x,0,z);
+        box(table,new THREE.BoxGeometry(2.2,.14,.82),lib.officeWood,0,.82,0);
+        for(const sx of [-.9,.9])for(const sz of [-.27,.27])box(table,new THREE.BoxGeometry(.09,.8,.09),lib.officeWood,sx,.4,sz);
+        box(table,new THREE.BoxGeometry(.34,.44,.34),lib.trim,.62,1.1,0);
+        const lamp=box(table,new THREE.CylinderGeometry(.11,.16,.34,10),lib.orangeLight,.62,1.48,0);
+        lamp.userData.light=true;
+        g.add(table);
+      }
+      const ballroom=this.rooms.find(room=>room.type==="beverly");
+      const chandelier=new THREE.Group();
+      chandelier.position.set(ballroom?this.originX+(ballroom.x+ballroom.w/2)*cell:this.originX+size/2,level.wallHeight-.48,ballroom?this.originZ+(ballroom.z+ballroom.h/2)*cell:this.originZ+size/2);
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(1.0,.055,8,28),lib.handle);ring.rotation.x=Math.PI/2;chandelier.add(ring);
+      for(let i=0;i<6;i++){
+        const a=i/6*Math.PI*2;
+        const bulb=new THREE.Mesh(new THREE.SphereGeometry(.12,8,6),lib.light);bulb.position.set(Math.cos(a),-.2,Math.sin(a));chandelier.add(bulb);
+      }
+      g.add(chandelier);
+      this.lightSources.push({position:chandelier.position.clone(),color:0xffd6a0,baseIntensity:24,intensity:24,distance:14,decay:2});
+      if(ballroom){
+        const table=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.25,.24,24),lib.officeWood);table.position.set(chandelier.position.x,.92,chandelier.position.z);g.add(table);
+        for(let i=0;i<4;i++){
+          const a=i/4*Math.PI*2,x=chandelier.position.x+Math.cos(a)*2.05,z=chandelier.position.z+Math.sin(a)*2.05;
+          const chair=new THREE.Group();chair.position.set(x,0,z);
+          box(chair,new THREE.BoxGeometry(.72,.12,.72),lib.officeWood,0,.62,0);
+          box(chair,new THREE.BoxGeometry(.72,.82,.12),lib.officeWood,0,1.05,-.31);
+          g.add(chair);
+        }
+        for(let i=0;i<12;i++)box(g,new THREE.BoxGeometry(.12,.035,.12),lib.trim,chandelier.position.x- .8+(i%4)*.52,1.07,chandelier.position.z-.28+Math.floor(i/4)*.28);
+      }
+      if(cycleHash(this.seedKey(),this.cx*7+this.cz*3,0xB01)<.18){
+        const boiler=new THREE.Group();boiler.position.set(this.originX+size*.72,0,this.originZ+size*.72);
+        const tank=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,3.1,16),lib.rustMetal);tank.position.y=1.58;boiler.add(tank);
+        const cap=new THREE.Mesh(new THREE.SphereGeometry(1.0,12,8,0,Math.PI*2,0,Math.PI/2),lib.metal);cap.position.y=3.13;boiler.add(cap);
+        for(let pipe=0;pipe<3;pipe++){
+          const tube=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,3.8,10),lib.metal);tube.rotation.z=Math.PI/2;tube.position.set(0,2.6,-1.15+pipe*.48);boiler.add(tube);
+        }
+        g.add(boiler);this.lightSources.push({position:new THREE.Vector3(boiler.position.x,2.2,boiler.position.z),color:0xff9a55,baseIntensity:5,intensity:5,distance:9,decay:2});
+      }
+    }else if(level.id==="6"){
+      // The lightless level stays deliberately sparse. Low cable runs and
+      // recessed wall plates are only visible inside the flashlight cone.
+      const rng=new RNG(this.seedKey()^0x6b19);
+      for(let i=0;i<3;i++){
+        const z=this.originZ+2+rng.next()*(size-4),x=this.originX+2+rng.next()*(size-4);
+        const cable=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,size*.34,6),lib.cable);
+        cable.rotation.z=Math.PI/2;cable.position.set(x,.22,z);g.add(cable);
+      }
+    }else if(level.id==="7"){
+      const water=lib.water.clone();water.color.setHex(0x163746);water.opacity=.78;water.roughness=.12;water.depthWrite=false;
+      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size),water);surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
+      const rng=new RNG(this.seedKey()^0x7a77),rockGeometry=new THREE.IcosahedronGeometry(1,1);
+      const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,10),rockDummy=new THREE.Object3D();
+      for(let i=0;i<10;i++){
+        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),scale=.8+rng.next()*1.5;
+        rockDummy.position.set(x,-.5-rng.next()*1.8,z);rockDummy.scale.set(scale*1.3,scale*.55,scale*1.1);rockDummy.rotation.y=rng.next()*Math.PI*2;rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
+      }
+      rocks.instanceMatrix.needsUpdate=true;g.add(rocks);
+    }else if(level.id==="8"){
+      const rng=new RNG(this.seedKey()^0x8ca7e);
+      const boulders=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),lib.concrete,16),rockDummy=new THREE.Object3D();
+      for(let i=0;i<16;i++){
+        const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2),radius=.45+rng.next()*1.15;
+        rockDummy.position.set(x,radius*.48,z);rockDummy.scale.set(radius*1.25,radius*.7,radius*.95);rockDummy.rotation.set(rng.next()*.4,rng.next()*Math.PI,rng.next()*.3);rockDummy.updateMatrix();boulders.setMatrixAt(i,rockDummy.matrix);
+        if(radius>1.05){const hx=radius*1.05,hz=radius*.8;this.collisionSegments.push({x1:x-hx,z1:z-hz,x2:x+hx,z2:z-hz},{x1:x+hx,z1:z-hz,x2:x+hx,z2:z+hz},{x1:x+hx,z1:z+hz,x2:x-hx,z2:z+hz},{x1:x-hx,z1:z+hz,x2:x-hx,z2:z-hz})}
+      }
+      const spikes=new THREE.InstancedMesh(new THREE.ConeGeometry(.4,1,7),lib.concrete,8),spikeDummy=new THREE.Object3D();
+      for(let i=0;i<8;i++){
+        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),length=1+rng.next()*2.2;
+        spikeDummy.position.set(x,level.wallHeight-length/2,z);spikeDummy.rotation.x=Math.PI;spikeDummy.scale.set(1,length,1);spikeDummy.updateMatrix();spikes.setMatrixAt(i,spikeDummy.matrix);
+      }
+      boulders.instanceMatrix.needsUpdate=true;spikes.instanceMatrix.needsUpdate=true;g.add(boulders,spikes);
+    }else if(level.id==="9"){
+      const rng=new RNG(this.seedKey()^0x9b42);
+      box(g,new THREE.BoxGeometry(size,.025,3.8),lib.garageBase,this.originX+size/2,.012,this.originZ+size/2);
+      box(g,new THREE.BoxGeometry(3.8,.025,size),lib.garageBase,this.originX+size/2,.014,this.originZ+size/2);
+      for(let mark=0;mark<8;mark++){
+        const x=this.originX+size*.1+mark*size*.105;
+        box(g,new THREE.BoxGeometry(1.2,.018,.09),lib.trim,x,.028,this.originZ+size/2);
+      }
+      for(const room of this.rooms.slice(0,1)){
+        const x=this.originX+(room.x+room.w/2)*cell,z=this.originZ+(room.z+room.h/2)*cell;
+        const house=new THREE.Group();house.position.set(x,0,z);
+        const front=-3.2,halfX=3.7,halfZ=3.2,doorHalf=.62;
+        // Build a hollow house shell with a real front-door opening, not a solid box.
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.12),lib.officePlastic,-(halfX+doorHalf)/2,1.5,front);
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.12),lib.officePlastic,(halfX+doorHalf)/2,1.5,front);
+        box(house,new THREE.BoxGeometry(doorHalf*2,.8,.12),lib.officePlastic,0,2.6,front);
+        box(house,new THREE.BoxGeometry(7.4,3,.12),lib.officePlastic,0,1.5,3.2);
+        box(house,new THREE.BoxGeometry(.12,3,6.4),lib.officePlastic,-3.7,1.5,0);
+        box(house,new THREE.BoxGeometry(.12,3,6.4),lib.officePlastic,3.7,1.5,0);
+        const roof=box(house,new THREE.BoxGeometry(8.0,.24,7.0),lib.officeWood,0,3.08,0);roof.rotation.z=.035;
+        const isExitLot=this.exit?.kind==="suburb"&&this.exit.x===room.x&&this.exit.z===room.z;
+        box(house,new THREE.BoxGeometry(1.12,2.2,.07),isExitLot?lib.exitDoor:lib.officeWood,0,1.1,-3.27);
+        for(const wx of [-2.1,2.1]){
+          box(house,new THREE.BoxGeometry(1.15,1.0,.07),lib.dark,wx,1.95,-3.27);
+          box(house,new THREE.BoxGeometry(1.26,.06,.09),lib.trim,wx,1.95,-3.31);
+        }
+        g.add(house);
+        this.collisionSegments.push(
+          {x1:x-halfX,z1:z-halfZ,x2:x-doorHalf,z2:z-halfZ},
+          {x1:x+doorHalf,z1:z-halfZ,x2:x+halfX,z2:z-halfZ},
+          {x1:x+halfX,z1:z-halfZ,x2:x+halfX,z2:z+halfZ},
+          {x1:x+halfX,z1:z+halfZ,x2:x-halfX,z2:z+halfZ},
+          {x1:x-halfX,z1:z+halfZ,x2:x-halfX,z2:z-halfZ}
+        );
+      }
+      for(let i=0;i<2;i++){
+        const x=this.originX+cell*(1+rng.next()*(cells-2)),z=this.originZ+cell*(1+rng.next()*(cells-2));
+        const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,3.8,7),lib.metal);pole.position.set(x,1.9,z);g.add(pole);
+        const arm=box(g,new THREE.BoxGeometry(.75,.08,.08),lib.metal,x+.34,3.72,z);
+        const bulb=box(g,new THREE.BoxGeometry(.28,.12,.2),lib.dark,x+.68,3.67,z);bulb.userData.light=false;
+      }
+    }else if(level.id==="10"){
+      const rng=new RNG(this.seedKey()^0x10c0);
+      const stalkGeometry=new THREE.CylinderGeometry(.018,.032,1.35,4),headGeometry=new THREE.ConeGeometry(.055,.34,5);
+      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,150),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,150);
+      const q=new THREE.Quaternion(),dummy=new THREE.Object3D();let count=0;
+      for(let i=0;i<150;i++){
+        const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2);
+        if(Math.hypot(x-(this.originX+size/2),z-(this.originZ+size/2))<4)continue;
+        const height=.85+rng.next()*.65,angle=rng.next()*Math.PI*2;
+        dummy.position.set(x,height*.5,z);dummy.rotation.set(0,angle,Math.sin(angle)*.08);dummy.scale.set(1,height/1.35,1);dummy.updateMatrix();stalks.setMatrixAt(count,dummy.matrix);
+        dummy.position.y=height+.12;dummy.scale.set(1,height/1.35,1);dummy.updateMatrix();heads.setMatrixAt(count,dummy.matrix);count++;
+      }
+      stalks.count=count;heads.count=count;stalks.instanceMatrix.needsUpdate=true;heads.instanceMatrix.needsUpdate=true;g.add(stalks,heads);
+      // Tree and shrub lines divide the cultivated plots, with shallow clean ponds between them.
+      const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.12,.2,2.8,7),lib.treeBark,6);
+      const crowns=new THREE.InstancedMesh(new THREE.SphereGeometry(1.25,9,7),lib.treeLeaves,6),treeDummy=new THREE.Object3D();let treeIndex=0;
+      for(const side of [-1,1])for(let i=0;i<3;i++){
+        const x=this.originX+(side<0?size*.12:size*.88),z=this.originZ+size*(.16+i*.34);
+        treeDummy.position.set(x,1.4,z);treeDummy.scale.set(1,1,1);treeDummy.updateMatrix();trunks.setMatrixAt(treeIndex,treeDummy.matrix);
+        treeDummy.position.set(x,3.1,z);treeDummy.scale.set(1.1,1.2,1);treeDummy.updateMatrix();crowns.setMatrixAt(treeIndex,treeDummy.matrix);treeIndex++;
+        const half=.22;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
+      }
+      trunks.instanceMatrix.needsUpdate=true;crowns.instanceMatrix.needsUpdate=true;g.add(trunks,crowns);
+      if(rng.next()<.28){
+        const pond=new THREE.Mesh(new THREE.CircleGeometry(1.7+rng.next()*1.5,20),lib.water.clone());
+        pond.rotation.x=-Math.PI/2;pond.position.set(this.originX+size*(.28+rng.next()*.44),.022,this.originZ+size*(.28+rng.next()*.44));g.add(pond);
+      }
+      const exitBarn=this.exit?.kind==="field",randomBarn=cycleHash(this.seedKey(),this.cx*17+this.cz*7,10)<.2;
+      if(exitBarn||randomBarn){
+        const lotX=exitBarn?this.exit.x:Math.floor(cells*.68),lotZ=exitBarn?this.exit.z:Math.floor(cells*.64);
+        const x=this.originX+(lotX+.5)*cell,z=this.originZ+(lotZ+.5)*cell,barn=new THREE.Group();barn.position.set(x,0,z);
+        const halfX=4.25,halfZ=3.25,doorHalf=1.12,front=-3.25;
+        box(barn,new THREE.BoxGeometry(halfX-doorHalf,4,.14),lib.officeWood,-(halfX+doorHalf)/2,2,front);
+        box(barn,new THREE.BoxGeometry(halfX-doorHalf,4,.14),lib.officeWood,(halfX+doorHalf)/2,2,front);
+        box(barn,new THREE.BoxGeometry(doorHalf*2,1,.14),lib.officeWood,0,3.5,front);
+        box(barn,new THREE.BoxGeometry(8.5,4,.14),lib.officeWood,0,2,halfZ);
+        box(barn,new THREE.BoxGeometry(.14,4,6.5),lib.officeWood,-halfX,2,0);
+        box(barn,new THREE.BoxGeometry(.14,4,6.5),lib.officeWood,halfX,2,0);
+        box(barn,new THREE.BoxGeometry(9.1,.3,7.1),lib.rustMetal,0,4.05,0);
+        box(barn,new THREE.BoxGeometry(2.1,3,.08),exitBarn?lib.exitDoor:lib.dark,0,1.5,front-.08);
+        g.add(barn);
+        this.collisionSegments.push(
+          {x1:x-halfX,z1:z-halfZ,x2:x-doorHalf,z2:z-halfZ},
+          {x1:x+doorHalf,z1:z-halfZ,x2:x+halfX,z2:z-halfZ},
+          {x1:x+halfX,z1:z-halfZ,x2:x+halfX,z2:z+halfZ},
+          {x1:x+halfX,z1:z+halfZ,x2:x-halfX,z2:z+halfZ},
+          {x1:x-halfX,z1:z+halfZ,x2:x-halfX,z2:z-halfZ}
+        );
       }
     }
   }
@@ -1211,6 +1606,18 @@ class WorldStreamer{
       this.ceilingSurface.matrixAutoUpdate=false;
       this.ceilingSurface.frustumCulled=false;
       this.ceilingSurface.renderOrder=-2;
+      this.ceilingSurface.visible=!( ["9","10"].includes(String(this.game.level.id)) );
+    }
+    if(this.game.level.id==="7"){
+      this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
+    }else if(this.game.level.id==="9"){
+      this.library.floor.color.setHex(0x202527);this.library.floor.roughness=.88;this.library.floor.metalness=.03;
+    }else if(this.game.level.id==="10"){
+      this.library.floor.color.setHex(0x68603a);this.library.floor.roughness=.98;this.library.floor.metalness=0;
+    }else if(this.game.level.id==="5"){
+      this.library.floor.color.setHex(0x493238);this.library.floor.roughness=.94;
+    }else if(this.game.level.id==="6"){
+      this.library.floor.color.setHex(0x030406);this.library.ceiling.color.setHex(0x010203);
     }
 
     if(this.floorSurface)this.game.scene.add(this.floorSurface);
@@ -1234,6 +1641,7 @@ class WorldStreamer{
     void (async()=>{
       try{
         if(this.game.level.id==="1")await applyLevel1Assets(this.library,this.game.level,onProgress);
+        else if(this.game.level.id==="2"||this.game.level.id==="3")await applyIndustrialPBR(this.library,this.game.level,onProgress);
         else if(this.game.level.id==="0"){
           await applyFoundFootageLevel0Assets(this.library,this.game.level,onProgress);
           await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
@@ -1755,7 +2163,7 @@ class Player{
     this.game.flashFillTarget.position.copy(this.game.camera.position)
       .addScaledVector(flashForward,2.0);
 
-    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance);
+    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance,this.game.level.id);
   }
 }
 
@@ -1895,6 +2303,43 @@ function makeDeathrat(group){
   group.userData={height:.5,parts,anim:"idle",phase:Math.random()*6.28,rat:true};
 }
 
+function makeLeviathan(group){
+  const hide=entityMat(0x07141d,.98),belly=entityMat(0x263a42,.94),eye=entityMat(0xb8dce4,.3,2.4);
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.72,4.4,8,14),hide);
+  body.rotation.x=Math.PI/2;body.position.set(0,1.05,0);group.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.92,16,12),hide);
+  head.scale.set(1.1,.78,1.25);head.position.set(0,1.18,-2.35);group.add(head);
+  const jaw=new THREE.Mesh(new THREE.SphereGeometry(.72,12,8),belly);
+  jaw.scale.set(1,.32,1.12);jaw.position.set(0,.72,-2.55);group.add(jaw);
+  for(const side of [-1,1]){
+    const eyeMesh=new THREE.Mesh(new THREE.SphereGeometry(.11,10,8),eye);
+    eyeMesh.position.set(side*.63,1.4,-2.85);group.add(eyeMesh);
+  }
+  const tentacles=[];
+  for(let i=0;i<6;i++){
+    const side=i%2?1:-1,offset=(Math.floor(i/2)-1)*.48;
+    const curve=new THREE.CatmullRomCurve3([
+      new THREE.Vector3(side*.42,.85,.2+offset),
+      new THREE.Vector3(side*1.1,.62,.7+offset),
+      new THREE.Vector3(side*1.65,.35,1.35+offset),
+      new THREE.Vector3(side*1.9,.18,2.05+offset)
+    ]);
+    const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,12,.105,6,false),hide);
+    group.add(mesh);tentacles.push(mesh);
+  }
+  group.userData={height:2.6,parts:{body,head,jaw,tentacles},anim:"swim",phase:Math.random()*6.28,leviathan:true};
+}
+
+function makeTiny(group){
+  const skin=entityMat(0x657b80,.72),fin=entityMat(0x9aaeb0,.82),eye=entityMat(0xe7e4d7,.3,1.1);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(.42,12,9),skin);body.scale.set(.72,.55,1.5);body.position.y=.72;group.add(body);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(.3,.62,6),fin);tail.rotation.x=-Math.PI/2;tail.position.set(0,.72,.77);group.add(tail);
+  const fins=[];
+  for(const side of [-1,1]){const f=new THREE.Mesh(new THREE.ConeGeometry(.2,.55,5),fin);f.rotation.z=side*.75;f.position.set(side*.3,.68,.08);group.add(f);fins.push(f)}
+  const eyeMesh=new THREE.Mesh(new THREE.SphereGeometry(.055,8,6),eye);eyeMesh.position.set(.2,.83,-.48);group.add(eyeMesh);
+  group.userData={height:1.1,parts:{body,tail,fins},anim:"swim",phase:Math.random()*6.28,tiny:true};
+}
+
 const ENTITY_TYPES={
   bacteria:{label:"Bacteria",factory:makeBacteria,range:42,speed:2.25,attack:1.1,behavior:"stalk"},
   hound:{label:"Hound",factory:makeHound,range:30,speed:2.15,attack:1.0,behavior:"hunt"},
@@ -1907,7 +2352,9 @@ const ENTITY_TYPES={
   clump:{label:"Clump",factory:makeClump,range:20,speed:.75,attack:1.1,behavior:"slow"},
   duller:{label:"Duller",factory:makeDuller,range:22,speed:1.05,attack:1.0,behavior:"quiet"},
   partygoer:{label:"Partygoer",factory:makePartygoer,range:34,speed:1.8,attack:1.0,behavior:"stalk"},
-  deathrat:{label:"Death Rat",factory:makeDeathrat,range:24,speed:2.7,attack:.75,behavior:"swarm"}
+  deathrat:{label:"Death Rat",factory:makeDeathrat,range:24,speed:2.7,attack:.75,behavior:"swarm"},
+  leviathan:{label:"The Thing",factory:makeLeviathan,range:54,speed:1.35,attack:2.3,behavior:"hunt"},
+  tiny:{label:"Tiny",factory:makeTiny,range:22,speed:2.6,attack:.65,behavior:"swarm"}
 };
 
 function animateEntity(e,dt){
@@ -1926,6 +2373,16 @@ function animateEntity(e,dt){
   if(u.flying&&parts.wings)parts.wings.forEach((w,i)=>{w.rotation.z=Math.sin(t*5+i*Math.PI)*.45});
   if(u.clump&&parts.blobs)parts.blobs.forEach((b,i)=>b.scale.y=1+Math.sin(t*1.7+i)*.08);
   if(u.rat)u.parts.legs.forEach((l,i)=>l.rotation.x=Math.sin(t*8+i*Math.PI)*.5);
+  if(u.leviathan){
+    if(parts.body)parts.body.rotation.z=Math.sin(t*.72)*.045;
+    if(parts.head)parts.head.rotation.y=Math.sin(t*.42)*.08;
+    if(parts.tentacles)parts.tentacles.forEach((v,i)=>{v.rotation.y=Math.sin(t*1.4+i*.9)*.12;v.rotation.x=Math.cos(t*1.1+i*.7)*.08});
+  }
+  if(u.tiny){
+    if(parts.tail)parts.tail.rotation.y=Math.sin(t*8)*.42;
+    if(parts.fins)parts.fins.forEach((v,i)=>v.rotation.x=Math.sin(t*6+i*Math.PI)*.28);
+    if(parts.body)parts.body.rotation.z=Math.sin(t*2)*.06;
+  }
 }
 
 function entityLineOfSight(game,entity,target){
@@ -2054,8 +2511,14 @@ class EntityManager{
     const pools={
       "1":["duller","hound","skinstealer","smiler","clump","crawler","wretch"],
       "2":["smiler","hound","deathmoth"],
-      "3":["hound"],
-      "4":[]
+      "3":["hound","deathmoth","skinstealer"],
+      "4":[],
+      "5":["deathmoth","hound","skinstealer","deathrat"],
+      "6":[],
+      "7":["leviathan","tiny"],
+      "8":["crawler","deathmoth","smiler","wretch"],
+      "9":["smiler","deathmoth","faceling"],
+      "10":[]
     };
     for(const c of this.game.world.entitySpawns()){
       const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
@@ -2067,7 +2530,11 @@ class EntityManager{
       const minSpawn=1,maxSpawn=Math.max(1,grid-2);
       const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2;
       const e=this.create(type,new THREE.Vector3(x,0,z),key);
-      if(e)e.state="idle";
+      if(e){
+        e.state="idle";
+        if(this.game.level.id==="7"&&type==="leviathan")e.group.position.y=-.72;
+        if(this.game.level.id==="7"&&type==="tiny")e.group.position.y=-.28;
+      }
     }
   }
   chooseStalkPoint(e,p){
@@ -2167,9 +2634,14 @@ class EntityManager{
       if(e.state==="chase"&&e.cool<=0){this.game.triggerFear(.035);e.cool=.8}
       this.modelLibrary.update(e,dt);
       if(e.soundTimer<=0){
-        if(e.state==="chase")this.game.audio.entityCue?.(e.type,e.state,d);
-        else if(e.state==="investigate"&&Math.random()<.45)this.game.audio.entityCue?.(e.type,"alert",d);
-        e.soundTimer=e.state==="chase"?.7+Math.random()*.9:3+Math.random()*6;
+        if(e.state==="chase"||e.state==="frenzy"){
+          const pan=Math.sin(Math.atan2(dx,dz)-p.viewYaw);
+          this.game.audio.entityCue?.(e.type,e.state,d,pan);
+        }else if(e.state==="investigate"&&Math.random()<.45){
+          const pan=Math.sin(Math.atan2(dx,dz)-p.viewYaw);
+          this.game.audio.entityCue?.(e.type,"alert",d,pan);
+        }
+        e.soundTimer=e.state==="chase"||e.state==="frenzy"?2.6+Math.random()*2.2:5+Math.random()*7;
       }else e.soundTimer-=dt;
       animateEntity(e,dt);
       e.lastPlayerX=p.position.x;e.lastPlayerZ=p.position.z;
@@ -2555,10 +3027,14 @@ export class BackroomsGame{
   }
   setLevel(id){
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
-    this.scene.fog=new THREE.FogExp2(this.level.id==="1"?0x070809:0x000000,this.level.id==="0"?.014:this.level.id==="1"?.024:.058);
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(0x080704);this.ambient.intensity=this.level.id==="1"?.026:this.level.id==="0"?.044:.052;
+    this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
+    this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x555039:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
-    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
+    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["9","10"].includes(String(this.level.id)) );
+    this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
     const objective=document.getElementById("objective");if(objective)objective.textContent=this.level.objective;
@@ -2575,6 +3051,7 @@ export class BackroomsGame{
       this.player.position.set(0,this.player.eyeY,0);
     }
     this.world.ensureAround(this.player.position.x,this.player.position.z);
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["9","10"].includes(String(this.level.id)) );
     this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
@@ -2815,7 +3292,7 @@ export class BackroomsGame{
         this.audio.ambientSting(.045+Math.random()*.045);
         this.triggerFear(.07);
       }
-    }else{
+    }else if(this.level.id!=="6"){
       if(Math.random()<.55){this.audio.distantKnock((Math.random()<.5?-1:1)*(.85+Math.random()*1.1));this.triggerFear(this.level.id==="2"?.30:.16)}
       else if(Math.random()<.35){this.audio.ambientSting(.065+Math.random()*.065);this.triggerFear(.10)}
     }
@@ -2965,7 +3442,7 @@ export class BackroomsGame{
         ? ["SIGNAL: SECONDARY CARRIER","CAMERA CLOCK DRIFT","MOTION DETECTED","NO EXIT MARKER IN RANGE"]
         : ["POWER BUS: UNSTABLE","FEED: 03:19:XX","THERMAL SIGNATURE LOST","SOMETHING MOVED BETWEEN FRAMES"];
       this.showArgMessage(messages[Math.floor(Math.random()*messages.length)]);
-      if(Math.random()<.46)this.audio.distantKnock();
+      if(this.level.id!=="6"&&Math.random()<.46)this.audio.distantKnock();
     }
   }
 

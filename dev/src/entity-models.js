@@ -24,7 +24,9 @@ const ENTITY_MODEL_TARGET_HEIGHTS = Object.freeze({
   skinstealer: 3.4,
   smiler: 2.0
 });
-const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({});
+const ENTITY_MODEL_TARGET_WIDTHS = Object.freeze({
+  bacteria: 1.15
+});
 const ENTITY_MODEL_YAWS = Object.freeze({
   smiler: Math.PI / 2
 });
@@ -136,30 +138,40 @@ export class EntityModelLibrary{
     const asset=await this.load(entity.type);
     if(!asset||!entity.group.parent)return false;
 
-    let root,container,model;
+    let root,container,model,normalizedRoot,visibleRenderableMeshes=[];
     try{
       if(!asset.scene?.isObject3D)throw new Error("Loaded asset has no valid Three.js scene");
       // Clone cached content per entity. Never re-parent the shared cached scene.
       root=cloneSkeleton(asset.scene);
       if(!root?.isObject3D)throw new Error("Could not clone the loaded scene");
 
-      // The source Bacteria GLB contains a detached Cube.016 mesh whose local Y
-      // coordinates are around 225-237 while the actual rig is around -8 to 19.
-      // It is a stray export artifact, not part of the creature; including it in
-      // bounds normalization makes the visible monster look tiny. Hide it before
-      // calculating bounds and rendering, with a coordinate-based fallback in case
-      // a repacked GLB changes the generated node/geometry name.
+      // The source Bacteria GLB has a detached export mesh (glTF node
+      // Object_166 / mesh Cube.016_Material.002_0) suspended ~55 source units
+      // above the rig. GLTFLoader exposes the node as Object_166 and leaves the
+      // geometry name blank, so checking only the Blender mesh name misses it.
+      // Exclude it by both source identity and its transformed world-space bounds
+      // before normalizing the creature. Local accessor bounds are normalized
+      // signed-short values, so a local-coordinate >100 check cannot catch it.
       if(entity.type==="bacteria"){
+        root.updateMatrixWorld(true);
         root.traverse(object=>{
           if(!object.isMesh||!object.geometry)return;
-          const name=String(object.geometry.name||"")+" "+String(object.name||"");
-          if(name.includes("Cube.016_Material.002_0")){
+          const sourceName=[object.name,object.geometry.name,object.userData?.name].filter(Boolean).join(" ");
+          if(/Object_166|Cube\.016_Material\.002_0/i.test(sourceName)){
             object.visible=false;
+            object.userData.backroomsExportArtifact=true;
             return;
           }
-          if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();
-          const bounds=object.geometry.boundingBox;
-          if(bounds&&[bounds.min.x,bounds.min.y,bounds.min.z,bounds.max.x,bounds.max.y,bounds.max.z].some(value=>Math.abs(value)>100))object.visible=false;
+          const worldBounds=new THREE.Box3().setFromObject(object,object.isSkinnedMesh===true);
+          if(worldBounds.isEmpty())return;
+          const worldSize=worldBounds.getSize(new THREE.Vector3());
+          const worldCenter=worldBounds.getCenter(new THREE.Vector3());
+          // Repacked copies can rename the stray node; this catches the same
+          // detached outlier without relying on compressed accessor values.
+          if(Math.abs(worldCenter.y)>8||worldSize.y>12||Math.max(worldSize.x,worldSize.z)>14){
+            object.visible=false;
+            object.userData.backroomsExportArtifact=true;
+          }
         });
       }
 
@@ -176,7 +188,7 @@ export class EntityModelLibrary{
       };
 
       let meshCount=0;
-      const visibleRenderableMeshes=[];
+      visibleRenderableMeshes=[];
       root.traverse(object=>{
         if(!isVisibleRenderableMesh(object))return;
         meshCount++;
@@ -210,7 +222,7 @@ export class EntityModelLibrary{
       // Source models use inconsistent authoring scales. Normalize height and any
       // explicit horizontal footprint independently.
       const levelRoofHeight=this.game.level?.wallHeight;
-      const targetHeight=entity.type==="bacteria"&&Number.isFinite(levelRoofHeight)?Math.max(.55,(levelRoofHeight-.05)*3.0):(ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8));
+      const targetHeight=entity.type==="bacteria"&&Number.isFinite(levelRoofHeight)?Math.max(2.8,Math.min(4.2,levelRoofHeight*.92)):(ENTITY_MODEL_TARGET_HEIGHTS[entity.type]||Math.max(.55,entity.group.userData.height||1.8));
       const targetWidth=ENTITY_MODEL_TARGET_WIDTHS[entity.type]||null;
       const heightScale=targetHeight/size.y;
       const sourceHorizontalSize=Math.max(size.x,size.z);
@@ -229,7 +241,7 @@ export class EntityModelLibrary{
       container=new THREE.Group();
       container.scale.set(displayScaleXZ,targetHeight,displayScaleXZ);
       container.rotation.y=ENTITY_MODEL_YAWS[entity.type]??Math.PI;
-      const normalizedRoot=new THREE.Group();
+      normalizedRoot=new THREE.Group();
       normalizedRoot.scale.set(1/sourceHorizontalSize,1/size.y,1/sourceHorizontalSize);
       normalizedRoot.position.set(-sourceCenter.x/sourceHorizontalSize,-visibleBounds.min.y/size.y,-sourceCenter.z/sourceHorizontalSize);
       normalizedRoot.add(root);
@@ -254,6 +266,7 @@ export class EntityModelLibrary{
       const clips=sourceClips.map(clip=>{
         const safeClip=clip.clone();
         safeClip.tracks=safeClip.tracks.filter(track=>{
+          if(entity.type==="bacteria"&&track.name==="Bone001_03.position")return false;
           if(track.name!=="scale"&&!track.name.endsWith(".scale"))return true;
           let target=root;
           if(track.name!=="scale"){
@@ -271,20 +284,25 @@ export class EntityModelLibrary{
         });
         safeClip.resetDuration();
         return safeClip;
-      }).filter(clip=>clip.tracks.length>0);
+      }).filter(clip=>clip.tracks.length>0&&Number.isFinite(clip.duration)&&clip.duration>.001);
       if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
       model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale:targetHeight,horizontalScale:displayScaleXZ,sourceCenter:sourceCenter.clone(),sourceHeight:size.y,sourceHorizontalSize,actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0,stableMode:"stalk",pendingMode:"stalk",completedClips:new Set()};
       if(mixer)mixer.addEventListener("finished",event=>{
         const finishedName=normalizeClipName(event.action?.getClip?.().name);
-        if(["jumpscare","bendingoverscene","chasesceneend"].includes(finishedName))model.completedClips.add(finishedName);
+        for(const clipName of ["jumpscare","bendingoverscene","chasesceneend"]){
+          if(finishedName.includes(clipName))model.completedClips.add(clipName);
+        }
       });
       if(mixer)for(const clip of clips){
         const action=mixer.clipAction(clip);
         if(entity.type==="bacteria"){
           const clipName=normalizeClipName(clip.name);
-          action.timeScale=clipName.includes("stalkingpose")?0.38:clipName.includes("tposelifeform")?0.30:clipName.includes("jumpscare")?0.68:0.48;
-          if(clipName.includes("jumpscare")||clipName.includes("bendingoverscene")||clipName.includes("chasesceneend")){
+          if(clipName.includes("bendingoverscene")){
+            action.timeScale=.24;
+            action.setLoop(THREE.LoopRepeat,Infinity);
+          }else{
+            action.timeScale=clipName.includes("jumpscare")?.68:.52;
             action.setLoop(THREE.LoopOnce,1);
             action.clampWhenFinished=true;
           }
@@ -302,16 +320,27 @@ export class EntityModelLibrary{
     // A failed model can never erase the built-in procedural entity.
     for(const child of [...entity.group.children])entity.group.remove(child);
     entity.group.add(container);
-    // The original Bacteria rig has a large offset between its bind-pose mesh
-    // bounds and the animated stalking pose. Re-evaluate the actual skinned
-    // pose after starting its first clip and lift the normalized rig so the
-    // lowest visible vertex sits on the floor instead of below it.
+    // Start the real continuous Bacteria clip before evaluating its skinned
+    // bounds. The source stalkingpose clip is a zero-duration static pose and
+    // was filtered above, so bendingOverScene is the usable looping idle.
     if(entity.type==="bacteria"&&model.mixer){
+      const initialClip=pickClip(model.clips,["bendingOverScene"]);
+      if(initialClip){const action=model.actions.get(initialClip.name);if(action){action.play();model.current=action}}
       model.mixer.update(0);
       entity.group.updateMatrixWorld(true);
-      const posedBounds=new THREE.Box3().setFromObject(root,true);
-      if(!posedBounds.isEmpty()&&Number.isFinite(posedBounds.min.y)&&posedBounds.min.y<0){
-        normalizedRoot.position.y+=(-posedBounds.min.y)/Math.max(.001,container.scale.y);
+      root.traverse(object=>{if(object.isSkinnedMesh)object.skeleton.update()});
+      const posedBounds=new THREE.Box3();
+      for(const mesh of visibleRenderableMeshes){
+        const meshBounds=new THREE.Box3().setFromObject(mesh,mesh.isSkinnedMesh===true);
+        if(!meshBounds.isEmpty())posedBounds.union(meshBounds);
+      }
+      if(!posedBounds.isEmpty()){
+        const relativeCenter=posedBounds.getCenter(new THREE.Vector3()).sub(entity.group.position);
+        const correction=new THREE.Vector3(-relativeCenter.x,-(posedBounds.min.y-entity.group.position.y),-relativeCenter.z);
+        correction.applyQuaternion(entity.group.getWorldQuaternion(new THREE.Quaternion()).invert());
+        correction.applyQuaternion(container.quaternion.clone().invert());
+        correction.divide(container.scale);
+        normalizedRoot.position.add(correction);
         normalizedRoot.updateMatrix();
         entity.group.updateMatrixWorld(true);
       }
@@ -319,7 +348,7 @@ export class EntityModelLibrary{
     entity.model=model;
     entity.group.userData.height=model.targetHeight;
     entity.group.userData.modelWidth=model.targetWidth??null;
-    if(model.mixer)this.play(entity,entity.type==="bacteria"?["stalkingpose"]:["idle","stand","breath"]);
+    if(model.mixer)this.play(entity,entity.type==="bacteria"?["bendingOverScene"]:["idle","stand","breath"]);
     entity.group.userData.realModel=true;
     entity.group.userData.modelFormat=asset.format;
     console.info("[Backrooms] Attached entity model:",entity.type,asset.file,"height",model.targetHeight,"width",model.targetWidth??"auto","units","scaleY",Number(model.container.scale.y.toFixed(3)),"scaleXZ",Number(model.container.scale.x.toFixed(3)),"sourcePivot",model.sourceCenter.toArray().map(v=>Number(v.toFixed(2))));
@@ -362,12 +391,15 @@ export class EntityModelLibrary{
         }
         // These source clips are cinematic one-shots, not walk cycles. Once each
         // has finished, return to the continuous stalking pose until the AI mode changes.
-        let desiredName="stalkingpose";
+        let desiredName="bendingOverScene";
         if(model.stableMode==="chase"&&!model.completedClips.has("chasesceneend"))desiredName="chaseSceneEnd";
-        else if(model.stableMode==="investigate"&&!model.completedClips.has("bendingoverscene"))desiredName="bendingOverScene";
         else if(model.stableMode==="frenzy"&&!model.completedClips.has("jumpscare"))desiredName="JUMPSCARE";
-        const desired=pickClip(model.clips,[desiredName])||pickClip(model.clips,["stalkingpose"]);
+        const desired=pickClip(model.clips,[desiredName])||pickClip(model.clips,["bendingOverScene"]);
         if(desired)this.play(entity,[desired.name]);
+        if(model.current&&normalizeClipName(model.current.getClip().name).includes("bendingoverscene"))model.current.timeScale=state==="chase"||state==="frenzy"?.52:.24;
+        model.phase=(model.phase||0)+dt*(state==="chase"||state==="frenzy"?7:1.4);
+        model.container.position.y=Math.sin(model.phase)*((state==="chase"||state==="frenzy")?.035:.018);
+        model.container.rotation.z=Math.sin(model.phase*.63)*((state==="chase"||state==="frenzy")?.028:.018);
       }else{
         if(state==="chase"||state==="frenzy")this.play(entity,["run","sprint","attack","walk"]);
         else if(state==="investigate"||state==="alert")this.play(entity,["walk","look","idle"]);

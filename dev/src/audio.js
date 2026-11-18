@@ -4,6 +4,20 @@ const RED_ZONE_AUDIO=new URL("../assets/RedZone.ogg",import.meta.url).href;
 export const BACKROOMS_AUDIO_SOURCES=Object.freeze({
   ambient_horror:AUDIO_BASE+"ambient_horror.ogg",
   electric_buzz:AUDIO_BASE+"electric_buzz.ogg",
+  level2_machinery:AUDIO_BASE+"level2_machinery.ogg",
+  ocean_waves:AUDIO_BASE+"ocean_waves.ogg",
+  field_wind:AUDIO_BASE+"field_wind.ogg",
+  field_rain:AUDIO_BASE+"field_rain.ogg",
+  transformer_hum:AUDIO_BASE+"transformer_hum.ogg",
+  industrial_switch:AUDIO_BASE+"industrial_switch.ogg",
+  steam_hiss:AUDIO_BASE+"steam_hiss.ogg",
+  door_creak:AUDIO_BASE+"door_creak.ogg",
+  entity_growl:AUDIO_BASE+"entity_growl.ogg",
+  hound_bark:AUDIO_BASE+"hound_bark.ogg",
+  deathmoth_wings:AUDIO_BASE+"deathmoth_wings.ogg",
+  partygoer_laugh:AUDIO_BASE+"partygoer_laugh.ogg",
+  skinstealer_sigh:AUDIO_BASE+"skinstealer_sigh.ogg",
+  wretch_howl:AUDIO_BASE+"wretch_howl.ogg",
   footsteps:Object.freeze([
     AUDIO_BASE+"footstep_01.ogg",
     AUDIO_BASE+"footstep_02.ogg",
@@ -21,6 +35,8 @@ export class AudioDirector{
     this.ctx=null;this.master=null;this.fxBus=null;this.reverb=null;this.delay=null;
     this.ready=false;this.loading=null;this.buffers=new Map();
     this.stepDistance=0;this.ambientTimer=70;this.buzzTimer=11;this.humGain=null;this.lastRareEvent=-Infinity;
+    this.levelId="0";this.levelAmbienceSource=null;this.levelAmbienceGain=null;this.levelAmbienceKey="";this.levelAmbienceTimer=12;
+    this.levelRainSource=null;this.levelRainGain=null;
     this.volume=Number(localStorage.getItem("br.volume")??.65);
     this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;this.redZoneLoading=null;
     this.redZoneMedia=null;this.redZoneMediaSource=null;this.redZoneMediaGain=null;this.redZoneMediaUnlocked=false;this.redZoneMetadataPromise=null;this.redZonePrimePromise=null;this.redZoneClockStartedAt=0;
@@ -78,8 +94,7 @@ export class AudioDirector{
       this.ready=true;
 
       const entries=[
-        ["ambient_horror",BACKROOMS_AUDIO_SOURCES.ambient_horror],
-        ["electric_buzz",BACKROOMS_AUDIO_SOURCES.electric_buzz],
+        ...Object.entries(BACKROOMS_AUDIO_SOURCES).filter(([key,value])=>key!=="footsteps"&&typeof value==="string"),
         ...BACKROOMS_AUDIO_SOURCES.footsteps.map((url,i)=>["footstep_"+String(i+1).padStart(2,"0"),url])
       ];
       Promise.allSettled(entries.map(async([key,url])=>{
@@ -87,7 +102,8 @@ export class AudioDirector{
         if(!response.ok)throw new Error("HTTP "+response.status);
         this.buffers.set(key,await this.ctx.decodeAudioData(await response.arrayBuffer()));
       })).then(results=>{
-        for(const result of results)if(result.status==="rejected")console.warn("[Backrooms] Audio asset unavailable; generated fallback remains active.",result.reason);
+        for(let i=0;i<results.length;i++)if(results[i].status==="rejected")console.warn("[Backrooms] Audio asset unavailable; generated fallback remains active.",entries[i]?.[0],results[i].reason);
+        this.startLevelAmbience();
       });
     })();
     try{
@@ -99,6 +115,41 @@ export class AudioDirector{
   setVolume(v){
     this.volume=clamp(Number(v));localStorage.setItem("br.volume",this.volume);
     if(this.master)this.master.gain.setTargetAtTime(this.volume,this.ctx.currentTime,.04);
+  }
+  setLevel(levelId){
+    this.levelId=String(levelId??"0");
+    this.levelAmbienceTimer=8+Math.random()*12;
+    this.startLevelAmbience();
+  }
+  startFieldRain(){
+    if(!this.ready||!this.ctx||this.levelId!=="10"||this.levelRainSource)return;
+    const buffer=this.buffers.get("field_rain");if(!buffer)return;
+    const source=this.ctx.createBufferSource();source.buffer=buffer;source.loop=true;
+    const filter=this.ctx.createBiquadFilter();filter.type="lowpass";filter.frequency.value=1650;filter.Q.value=.35;
+    const gain=this.ctx.createGain();gain.gain.value=.032;
+    source.connect(filter).connect(gain);this.connectFx(gain,.09,.045);source.start();
+    this.levelRainSource=source;this.levelRainGain=gain;
+  }
+  startLevelAmbience(){
+    if(!this.ready||!this.ctx)return;
+    const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":this.levelId==="7"?"ocean_waves":this.levelId==="10"?"field_wind":"";
+    if(key===this.levelAmbienceKey&&this.levelAmbienceSource){this.startFieldRain();return}
+    if(this.levelAmbienceSource){try{this.levelAmbienceSource.stop()}catch{}this.levelAmbienceSource.disconnect();this.levelAmbienceSource=null}
+    if(this.levelRainSource){try{this.levelRainSource.stop()}catch{}this.levelRainSource.disconnect();this.levelRainSource=null}
+    this.levelAmbienceGain?.disconnect();this.levelAmbienceGain=null;
+    this.levelRainGain?.disconnect();this.levelRainGain=null;
+    this.levelAmbienceKey=key;
+    if(key){
+      const buffer=this.buffers.get(key);if(!buffer)return;
+      const source=this.ctx.createBufferSource();source.buffer=buffer;source.loop=true;
+      const filter=this.ctx.createBiquadFilter();filter.type="lowpass";filter.frequency.value=this.levelId==="7"?680:this.levelId==="10"?980:this.levelId==="3"?1450:1150;filter.Q.value=.45;
+      const gain=this.ctx.createGain();gain.gain.value=this.levelId==="7"?.145:this.levelId==="10"?.12:this.levelId==="3"?.075:.105;
+      source.connect(filter).connect(gain);this.connectFx(gain,.11,.045);source.start();
+      this.levelAmbienceSource=source;this.levelAmbienceGain=gain;
+      this.startFieldRain();
+    }else if(this.levelId==="3"){
+      this.playBuffer("transformer_hum",{gain:.075,rate:.92+Math.random()*.12,pan:(Math.random()-.5)*.3,send:.3,delay:.1});
+    }
   }
   async testUnlock(){
     if(!this.ctx)return false;
@@ -388,6 +439,7 @@ export class AudioDirector{
     // Short electrical snap inspired by real fluorescent-flicker recordings.
     // The researched reference is TemperMode's CC0 "fluorescent light
     // flickering 1.wav", found on Freesound.
+    this.playBuffer("industrial_switch",{gain:.045,rate:.88+Math.random()*.28,pan,send:.22,delay:.05});
     this.tone(72+Math.random()*34,.026,"square",.012);
     this.noise(.055,.018,1050+Math.random()*650);
     this.playBuffer("electric_buzz",{
@@ -401,47 +453,48 @@ export class AudioDirector{
   flicker(){
     this.flickerAt();
   }
-  entityCue(type,state="alert",distance=8){
+  entityCue(type,state="alert",distance=8,pan=0){
     if(!this.ready)return;
-    const falloff=Math.max(.08,Math.min(1,1/(1+distance*.07)));
-    const chase=state==="chase";
+    const falloff=Math.max(.055,Math.min(1,1/(1+distance*.085)));
+    const chase=state==="chase"||state==="frenzy";
+    const play=(name,gain,rate=1,send=.32,delay=.08)=>this.playBuffer(name,{gain:gain*falloff,rate,pan,send,delay});
     if(type==="hound"){
+      play("hound_bark",chase?.22:.12,.88+Math.random()*.24,.38,.1);
       this.tone(chase?88:104,chase?.18:.11,"sawtooth",(chase?.035:.022)*falloff);
       this.noise(chase?.16:.08,(chase?.028:.014)*falloff,430);
     }else if(type==="smiler"){
-      if(chase){
-        this.tone(52,.24,"sine",.022*falloff);
-        this.tone(1700,.035,"square",.012*falloff);
-      }else{
-        this.tone(980,.045,"sine",.008*falloff);
-      }
+      if(chase){this.tone(52,.24,"sine",.022*falloff);this.tone(1700,.035,"square",.012*falloff)}
+      else this.tone(980,.045,"sine",.008*falloff);
     }else if(type==="skinstealer"){
-      this.noise(chase?.22:.11,(chase?.03:.014)*falloff,260);
-      this.tone(118,.18,"triangle",.018*falloff);
+      play("skinstealer_sigh",chase?.17:.105,.76+Math.random()*.2,.48,.18);
+      this.noise(chase?.22:.11,(chase?.03:.014)*falloff,260);this.tone(118,.18,"triangle",.018*falloff);
     }else if(type==="bacteria"){
-      this.playBuffer("ambient_horror",{gain:.07*falloff,rate:.72+Math.random()*.22,pan:(Math.random()-.5)*.35,send:.5,delay:.2});
+      play("entity_growl",chase?.25:.16,.56+Math.random()*.2,.56,.22);
       this.noise(.2,.018*falloff,700);
     }else if(type==="deathmoth"){
-      this.noise(.13,.02*falloff,1800+Math.random()*900);
-      this.tone(170+Math.random()*70,.08,"triangle",.012*falloff);
+      play("deathmoth_wings",chase?.13:.075,.9+Math.random()*.22,.24,.045);
+      this.noise(.13,.02*falloff,1800+Math.random()*900);this.tone(170+Math.random()*70,.08,"triangle",.012*falloff);
     }else if(type==="crawler"){
-      this.noise(.09,.022*falloff,1200);
-      this.tone(72,.12,"square",.012*falloff);
+      play("hound_bark",.045,1.35+Math.random()*.22,.2,.04);
+      this.noise(.09,.022*falloff,1200);this.tone(72,.12,"square",.012*falloff);
     }else if(type==="clump"){
-      this.tone(48,.2,"sawtooth",.018*falloff);
-      this.noise(.12,.025*falloff,190);
+      play("steam_hiss",.065,.55+Math.random()*.15,.4,.12);
+      this.tone(48,.2,"sawtooth",.018*falloff);this.noise(.12,.025*falloff,190);
     }else if(type==="wretch"){
-      this.tone(64,.3,"sawtooth",.024*falloff);
-      if(chase)this.noise(.22,.025*falloff,360);
+      play("wretch_howl",chase?.22:.13,.82+Math.random()*.2,.5,.2);
+      this.tone(64,.3,"sawtooth",.024*falloff);if(chase)this.noise(.22,.025*falloff,360);
     }else if(type==="duller"||type==="faceling"){
-      this.noise(.07,.01*falloff,550);
-      if(Math.random()<.35)this.tone(72,.09,"triangle",.009*falloff);
+      if(Math.random()<.5)play("skinstealer_sigh",.07,.68+Math.random()*.18,.48,.18);
+      this.noise(.07,.01*falloff,550);if(Math.random()<.35)this.tone(72,.09,"triangle",.009*falloff);
     }else if(type==="partygoer"){
-      this.tone(440,.09,"square",.018*falloff);
-      this.tone(330,.12,"triangle",.012*falloff);
-    }else if(type==="deathrat"){
-      this.noise(.055,.016*falloff,1900);
-      this.tone(112,.06,"square",.01*falloff);
+      play("partygoer_laugh",chase?.21:.14,.88+Math.random()*.18,.48,.16);
+      this.tone(440,.09,"square",.018*falloff);this.tone(330,.12,"triangle",.012*falloff);
+    }else if(type==="deathrat"||type==="tiny"){
+      play("hound_bark",.035,1.55+Math.random()*.22,.18,.03);
+      this.noise(.055,.016*falloff,1900);this.tone(112,.06,"square",.01*falloff);
+    }else if(type==="leviathan"){
+      play("entity_growl",.28,.42+Math.random()*.12,.7,.28);
+      this.tone(36,.42,"sine",.035*falloff);this.noise(.3,.028*falloff,90);
     }else{
       this.noise(.08,.012*falloff,800);
     }
@@ -471,9 +524,19 @@ export class AudioDirector{
     this.tone(72,.08,"square",.022);setTimeout(()=>this.tone(55,.055,"square",.018),130+Math.random()*90);
     setTimeout(()=>this.tone(72,.08,"square",.018),310+Math.random()*110);
     if(Math.random()<.16)this.playBuffer("ambient_horror",{gain:.018,rate:.68,pan,send:.6,delay:.35});
+    if(Math.random()<.22)this.playBuffer("door_creak",{gain:.028,rate:.72+Math.random()*.25,pan,send:.55,delay:.24});
   }
-  update(dt,moving,running,fear=0,proximity=0,lightState="ON",distance=0){
+  update(dt,moving,running,fear=0,proximity=0,lightState="ON",distance=0,levelId=this.levelId){
     if(!this.ready)return;
+    if(String(levelId)!==this.levelId)this.setLevel(levelId);
+    this.levelAmbienceTimer-=dt;
+    if(this.levelId==="3"&&this.levelAmbienceTimer<=0){
+      this.playBuffer("transformer_hum",{gain:.065+Math.random()*.035,rate:.88+Math.random()*.18,pan:(Math.random()-.5)*.42,send:.34,delay:.12});
+      this.levelAmbienceTimer=24+Math.random()*32;
+    }else if(this.levelId==="2"&&this.levelAmbienceTimer<=0){
+      this.playBuffer("steam_hiss",{gain:.045+Math.random()*.025,rate:.8+Math.random()*.28,pan:(Math.random()-.5)*.7,send:.42,delay:.12});
+      this.levelAmbienceTimer=26+Math.random()*36;
+    }
     if(moving){
       this.stepDistance+=Math.max(0,distance);
       const cadence=running?1.03:.71;
@@ -489,12 +552,20 @@ export class AudioDirector{
     const p=clamp(proximity);
 
     if(this.ambientTimer<=0){
-      this.ambientSting(.028+Math.random()*.038);
-      this.ambientTimer=78+Math.random()*110;
+      if(this.levelId==="6"){
+        // Level 6 is canonically silent; only rare, barely audible auditory hallucinations break it.
+        if(Math.random()<.32)this.playBuffer("skinstealer_sigh",{gain:.004,rate:.42+Math.random()*.12,pan:(Math.random()-.5)*.8,send:.18,delay:.18});
+        this.ambientTimer=105+Math.random()*145;
+      }else if(this.levelId==="7"||this.levelId==="10"){
+        this.ambientTimer=92+Math.random()*120;
+      }else{
+        this.ambientSting(.028+Math.random()*.038);
+        this.ambientTimer=78+Math.random()*110;
+      }
     }
 
-    // The ballast buzz becomes audible as you approach an actual fluorescent fixture.
-    if(this.buzzTimer<=0&&lightState==="ON"){
+    // The ballast buzz becomes audible only in built environments with fixtures.
+    if(this.buzzTimer<=0&&lightState==="ON"&&!(["6","7","9","10"].includes(this.levelId))){
       if(p>.03){
         const gain=.035+p*.17;
         this.playBuffer("electric_buzz",{
@@ -511,6 +582,9 @@ export class AudioDirector{
     }
 
     let target=.008+p*.078+fear*.004;
+    if(this.levelId==="6")target=.000015;
+    else if(this.levelId==="7")target*=.22;
+    else if(this.levelId==="10")target*=.16;
     if(lightState==="FLICKER")target*=.48;
     if(lightState==="BLACKOUT")target=.00045;
     if(this.humGain)this.humGain.gain.setTargetAtTime(target,this.ctx.currentTime,.11);

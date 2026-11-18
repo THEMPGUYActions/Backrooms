@@ -2,6 +2,7 @@ import * as THREE from "three";
 THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
+const LOCAL_INDUSTRIAL_ASSET_BASE = new URL("../assets/pbr/industrial/", import.meta.url).href;
 const LOCAL_FF_ASSET_BASE = new URL("../assets/found-footage/", import.meta.url).href
 
 export const FOUND_FOOTAGE_ASSET_SOURCES = Object.freeze({
@@ -215,13 +216,14 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
   try{
     const texture=await loadRemoteTexture(url,color);
     texture.repeat.set(repeat,repeat);
-    const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:material.normalMap;
+    const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:kind==="metalnessMap"?material.metalnessMap:material.normalMap;
     if(previous?.userData?.backroomsOwned)previous.dispose();
     if(kind==="map"){
       material.map=texture;
       if(material.userData?.level0Carpet)material.map=yellowizeCarpetTexture(texture);
     }
     else if(kind==="roughnessMap")material.roughnessMap=texture;
+    else if(kind==="metalnessMap")material.metalnessMap=texture;
     else material.normalMap=texture;
     if(kind==="normalMap")material.normalScale.set(normalStrength,normalStrength);
     material.needsUpdate=true;
@@ -341,6 +343,47 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
   return m;
 }
 
+export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
+  if(level.id!=="2"&&level.id!=="3")return false;
+  const wallPrefix=level.id==="2"?"level2_concrete":"level3_concrete";
+  const metalPrefix=level.id==="2"?"industrial_aged":"industrial_rust";
+  const rustPrefix=level.id==="2"?"industrial_rust":"industrial_aged";
+  const floorPrefix=level.id==="2"?"level3_concrete":"level2_concrete";
+  const entries=[
+    [library.wall,"map",wallPrefix+"_color.jpg",true,2.8,.28,"Utility concrete albedo"],
+    [library.wall,"roughnessMap",wallPrefix+"_roughness.jpg",false,2.8,.28,"Utility concrete roughness"],
+    [library.wall,"normalMap",wallPrefix+"_normal.jpg",false,2.8,.34,"Utility concrete normal"],
+    [library.floor,"map",floorPrefix+"_color.jpg",true,4.2,.16,"Industrial floor albedo"],
+    [library.floor,"roughnessMap",floorPrefix+"_roughness.jpg",false,4.2,.16,"Industrial floor roughness"],
+    [library.floor,"normalMap",floorPrefix+"_normal.jpg",false,4.2,.2,"Industrial floor normal"],
+    [library.metal,"map",metalPrefix+"_color.jpg",true,1.25,.2,"Industrial steel albedo"],
+    [library.metal,"roughnessMap",metalPrefix+"_roughness.jpg",false,1.25,.2,"Industrial steel roughness"],
+    [library.metal,"normalMap",metalPrefix+"_normal.jpg",false,1.25,.28,"Industrial steel normal"],
+    [library.metal,"metalnessMap",metalPrefix+"_metalness.jpg",false,1.25,.2,"Industrial steel metalness"],
+    [library.rustMetal,"map",rustPrefix+"_color.jpg",true,1.1,.2,"Secondary steel albedo"],
+    [library.rustMetal,"roughnessMap",rustPrefix+"_roughness.jpg",false,1.1,.2,"Secondary steel roughness"],
+    [library.rustMetal,"normalMap",rustPrefix+"_normal.jpg",false,1.1,.28,"Secondary steel normal"],
+    [library.rustMetal,"metalnessMap",rustPrefix+"_metalness.jpg",false,1.1,.2,"Secondary steel metalness"]
+  ];
+  library.wall.color.setHex(0xffffff);
+  library.wall.roughness=.94;
+  library.floor.color.setHex(0xffffff);
+  library.floor.roughness=.96;
+  library.metal.color.setHex(0xffffff);
+  library.metal.roughness=.78;
+  library.metal.metalness=.72;
+  library.rustMetal.color.setHex(0xffffff);
+  library.rustMetal.roughness=.86;
+  library.rustMetal.metalness=.48;
+  let done=0;
+  await Promise.all(entries.map(async([material,kind,file,color,repeat,normalStrength,label])=>{
+    await applyRemoteTexture(material,kind,LOCAL_INDUSTRIAL_ASSET_BASE+file,color,repeat,normalStrength);
+    done++;onProgress(done/entries.length,"LOADING INDUSTRIAL PBR",label);
+  }));
+  onProgress(1,"INDUSTRIAL SURFACES READY","Bundled ambientCG CC0 materials loaded");
+  return true;
+}
+
 export async function applyLevel1Assets(library,level,onProgress=()=>{}){
   if(level.id!=="1")return false;
   const maps=[
@@ -420,9 +463,14 @@ export function makeLibrary(level){
     puddle:new THREE.MeshStandardMaterial({color:0x0b0e10,roughness:.045,metalness:.18,transparent:true,opacity:.63}),
     level1Light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.28,metalness:0,emissive:0xfff8e8,emissiveIntensity:2.9}),
     ceiling,
-    metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.62,metalness:.78}),
+    metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.78,metalness:.72}),
+    rustMetal:new THREE.MeshStandardMaterial({color:0x6a4030,roughness:.86,metalness:.48}),
     cable:new THREE.MeshStandardMaterial({color:0x171817,roughness:.79,metalness:.58}),
-    water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72}),
+    water:new THREE.MeshStandardMaterial({color:0x263236,roughness:.09,metalness:.18,transparent:true,opacity:.72,side:THREE.DoubleSide}),
+    wheat:new THREE.MeshStandardMaterial({color:0x85743a,roughness:.96,metalness:0}),
+    wheatHead:new THREE.MeshStandardMaterial({color:0xb29a50,roughness:.98,metalness:0}),
+    treeBark:new THREE.MeshStandardMaterial({color:0x423529,roughness:.98,metalness:0}),
+    treeLeaves:new THREE.MeshStandardMaterial({color:0x596044,roughness:.98,metalness:0}),
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     dampPatch:new THREE.MeshStandardMaterial({color:0x3b3325,roughness:.98,metalness:0,transparent:true,opacity:.15,depthWrite:false,side:THREE.DoubleSide}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),

@@ -1,0 +1,132 @@
+{
+  "pack": "Backrooms Industrial PBR",
+  "license": "CC0-1.0",
+  "files": {
+    "industrial_aged_color.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal063_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal063",
+      "asset": "Metal 063",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 1259638,
+      "sha256": "d4122954971c26b529614f39fb12310de00005d44ce103430c35132f61fca077"
+    },
+    "industrial_aged_metalness.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal063_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal063",
+      "asset": "Metal 063",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 737142,
+      "sha256": "1bd888a9fa307197fd5eaaa883561cfd8350ae634fce0d378e83b8e05632daf8"
+    },
+    "industrial_aged_normal.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal063_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal063",
+      "asset": "Metal 063",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 343987,
+      "sha256": "51e521e2fafd01387216b52fce315e2f094a1fa6efab77a92e2c79870bb2df01"
+    },
+    "industrial_aged_roughness.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal063_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal063",
+      "asset": "Metal 063",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 731180,
+      "sha256": "e83993283739d0a5d350ecd15cf82969aa59ec6e2293bcc6a14aea8a92ba283d"
+    },
+    "industrial_rust_color.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal064_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal064",
+      "asset": "Metal 064",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 1388796,
+      "sha256": "037dd5c4cd6edd3ed3499dd92306e1643b2ebff435cb64d6af4cd901f1b6be88"
+    },
+    "industrial_rust_metalness.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal064_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal064",
+      "asset": "Metal 064",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 813452,
+      "sha256": "b76d1f2fada5d349e4fadb5f02ec2b0e6dde90d1340f1f63bb28c574e6cd9175"
+    },
+    "industrial_rust_normal.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal064_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal064",
+      "asset": "Metal 064",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 643386,
+      "sha256": "29c0604a39fa72d023f2878fa15c057ac1411df0b315485afc0cc0f247c1b6c3"
+    },
+    "industrial_rust_roughness.jpg": {
+      "url": "https://ambientcg.com/get?file=Metal064_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Metal064",
+      "asset": "Metal 064",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 844428,
+      "sha256": "ee5b95a55af3b9c2f01351e00a14899fc56a06cb3610ac0fb041a8cc4af0f594"
+    },
+    "level2_concrete_color.jpg": {
+      "url": "https://ambientcg.com/get?file=Concrete046_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Concrete046",
+      "asset": "Concrete 046",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 1092354,
+      "sha256": "2f155b85c2656305815e94a0efcc0b0087c141e52e98395cc03eb906252150af"
+    },
+    "level2_concrete_normal.jpg": {
+      "url": "https://ambientcg.com/get?file=Concrete046_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Concrete046",
+      "asset": "Concrete 046",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 1080228,
+      "sha256": "b7fb7d45f85bad9e1c61f544e90077735f8f787cd13d3c1161aece11082fe9ff"
+    },
+    "level2_concrete_roughness.jpg": {
+      "url": "https://ambientcg.com/get?file=Concrete046_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Concrete046",
+      "asset": "Concrete 046",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 671268,
+      "sha256": "ee79cf1139197522ac6ed6dad2d9c0429626cd8f2e107aaaf9daa1f4f30e7d7d"
+    },
+    "level3_concrete_color.jpg": {
+      "url": "https://ambientcg.com/get?file=Concrete013_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Concrete013",
+      "asset": "Concrete 013",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 587297,
+      "sha256": "5420feda7200bbb8f558b61b0b99381a4d0fadaa78aa5ff8164cc602e20bc2c4"
+    },
+    "level3_concrete_normal.jpg": {
+      "url": "https://ambientcg.com/get?file=Concrete013_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Concrete013",
+      "asset": "Concrete 013",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 1116367,
+      "sha256": "a3118149726738106f8fd468b463559f34792639fc93e151f9165d143e77ad5a"
+    },
+    "level3_concrete_roughness.jpg": {
+      "url": "https://ambientcg.com/get?file=Concrete013_1K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Concrete013",
+      "asset": "Concrete 013",
+      "author": "ambientCG",
+      "license": "CC0-1.0",
+      "bytes": 286248,
+      "sha256": "963ed3f37f40a37ef3479b3da3e58cea8488938411f293fa6e208913764dfac6"
+    }
+  }
+}
