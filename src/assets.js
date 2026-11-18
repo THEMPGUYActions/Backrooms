@@ -439,8 +439,14 @@ export function makeLibrary(level){
   }
   ceiling.side=THREE.FrontSide;
   ceiling.color.setHex(level.theme.ceiling);
-  ceiling.emissive=new THREE.Color(level.id==="0"?0x766b3e:0x252725);
-  ceiling.emissiveIntensity=level.id==="0"?.022:level.id==="1"?0:.028;
+  ceiling.emissive=new THREE.Color(level.id==="0"?0x766b3e:level.id==="4"?0xd8d8d4:0x252725);
+  ceiling.emissiveIntensity=level.id==="0"?.022:level.id==="1"?0:level.id==="4"?.045:.028;
+  if(level.id==="4"){
+    floor.color.setHex(0x6e7074);
+    floor.map=null;floor.normalMap=null;floor.roughnessMap=null;
+    ceiling.color.setHex(0xecece8);
+    ceiling.map=null;ceiling.normalMap=null;ceiling.roughnessMap=null;
+  }
   const redWall=createPBRMaterial({base:0x8b1717,seed:211,rough:.94,scale:1,normalStrength:.28});
   const redFloor=createPBRMaterial({base:0x4a1212,seed:212,rough:.99,scale:5,normalStrength:.12});
   redWall.color.setHex(0xb51b1b);
@@ -501,7 +507,8 @@ export function makeLibrary(level){
     batteryLabel:new THREE.MeshStandardMaterial({color:0xc9b85f,roughness:.45,metalness:.15,emissive:0x6f5b1c,emissiveIntensity:.45}),
     windowDark:new THREE.MeshStandardMaterial({color:0x121412,roughness:.9,metalness:.05}),
     officeWood:new THREE.MeshStandardMaterial({color:0x6a6253,roughness:.86,metalness:0}),
-    officePlastic:new THREE.MeshStandardMaterial({color:0x343634,roughness:.72,metalness:.12}),
+    officePlastic:new THREE.MeshStandardMaterial({color:0xe8e8e4,roughness:.88,metalness:0}),
+    officeColumn:new THREE.MeshStandardMaterial({color:0xf2f2ee,roughness:.9,metalness:0}),
     indicator:new THREE.MeshStandardMaterial({color:0xff8a3c,roughness:.35,metalness:.1,emissive:0xff5d14,emissiveIntensity:2.2})
   };
 }
