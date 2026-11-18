@@ -132,19 +132,19 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-4",
     next: "5",
     theme: {
-      // Desaturated, aged office — not a bright white showroom
-      wall: 0x8a8578,
-      wallRough: 0.92,
-      floor: 0x4a4740,
-      ceiling: 0x6e6b63,
-      fog: 0x0a0a08,
-      accent: 0xb8a878,
-      light: 0xd8d0b8,
-      ambient: 0x2e2c28
+      // Empty white office plate — cool grey walls, pale floor, drop ceiling
+      wall: 0xd8d8d4,
+      wallRough: 0.88,
+      floor: 0xb8b8b4,
+      ceiling: 0xe8e8e4,
+      fog: 0x1a1a1c,
+      accent: 0xa0a8b0,
+      light: 0xf0f2f5,
+      ambient: 0x3a3c40
     },
-    cellSize: 9.5,
-    wallHeight: 4.0,
-    darkness: 0.22,
+    cellSize: 12.0,
+    wallHeight: 3.6,
+    darkness: 0.12,
     holeChance: 0,
     pipeChance: 0.02,
     batteryChance: 0.14,
