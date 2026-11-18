@@ -936,29 +936,87 @@ class Chunk{
       g.add(belt);
       const beltHalfX=3.6,beltHalfZ=.675;this.collisionSegments.push({x1:beltX-beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ-beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX-beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ-beltHalfZ});
     }else if(level.id==="4"){
+      // Abandoned office: denser desks, chairs, filing cabinets, dead monitors,
+      // cubicle partitions and scattered clutter so rooms no longer read as empty boxes.
       const rng=new RNG(this.seedKey()^0x44aa);
-      for(let i=0;i<3;i++){
-        const ox=this.originX+cell*(1+rng.next()*Math.max(1,cells-2));
-        const oz=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
+      const deskCount=6+rng.int(0,4);
+      for(let i=0;i<deskCount;i++){
+        const ox=this.originX+cell*(1.1+rng.next()*Math.max(.8,cells-2.2));
+        const oz=this.originZ+cell*(1.1+rng.next()*Math.max(.8,cells-2.2));
+        const yaw=(rng.next()<.5?0:Math.PI/2)+rng.next()*.08;
         const desk=new THREE.Group();
-        desk.position.set(ox,.0,oz);
+        desk.position.set(ox,0,oz);
+        desk.rotation.y=yaw;
         box(desk,new THREE.BoxGeometry(1.55,.12,.75),lib.officeWood,0,.78,0);
-        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,-.62,.39,-.27);
-        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,.62,.39,-.27);
-        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,-.62,.39,.27);
-        box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,.62,.39,.27);
-        box(desk,new THREE.BoxGeometry(.8,.5,.06),lib.officePlastic,0,1.08,.18);
-        box(desk,new THREE.BoxGeometry(.62,.035,.035),lib.indicator,0,1.12,.215);
+        for(const [lx,lz] of [[-.62,-.27],[.62,-.27],[-.62,.27],[.62,.27]])
+          box(desk,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,lx,.39,lz);
+        // Dead CRT / monitor
+        box(desk,new THREE.BoxGeometry(.52,.42,.38),lib.officePlastic,0,1.12,-.05);
+        box(desk,new THREE.BoxGeometry(.46,.34,.03),lib.dark,0,1.12,-.26);
+        // Keyboard + papers
+        box(desk,new THREE.BoxGeometry(.48,.03,.18),lib.officePlastic,0,.85,.22);
+        box(desk,new THREE.BoxGeometry(.22,.02,.28),lib.trim,.42,.86,.05);
         g.add(desk);
+        // Chair facing the desk
+        const chair=new THREE.Group();
+        chair.position.set(ox+Math.sin(yaw)*1.05,0,oz+Math.cos(yaw)*1.05);
+        chair.rotation.y=yaw+Math.PI;
+        box(chair,new THREE.BoxGeometry(.58,.08,.58),lib.officePlastic,0,.48,0);
+        box(chair,new THREE.BoxGeometry(.58,.55,.08),lib.officePlastic,0,.8,-.25);
+        for(const [cx,cz] of [[-.22,-.22],[.22,-.22],[-.22,.22],[.22,.22]])
+          box(chair,new THREE.BoxGeometry(.07,.48,.07),lib.officePlastic,cx,.24,cz);
+        g.add(chair);
+        // Soft collision so player cannot walk through desks
+        const half=1.0;
+        this.collisionSegments.push(
+          {x1:ox-half,z1:oz-half,x2:ox+half,z2:oz-half},
+          {x1:ox+half,z1:oz-half,x2:ox+half,z2:oz+half},
+          {x1:ox+half,z1:oz+half,x2:ox-half,z2:oz+half},
+          {x1:ox-half,z1:oz+half,x2:ox-half,z2:oz-half}
+        );
       }
-      for(let i=0;i<Math.min(4,edges.length);i++){
+      // Filing cabinets along walls / aisles
+      for(let i=0;i<4+rng.int(0,3);i++){
+        const fx=this.originX+cell*(.8+rng.next()*(cells-1.6));
+        const fz=this.originZ+cell*(.8+rng.next()*(cells-1.6));
+        const cab=new THREE.Group();
+        cab.position.set(fx,0,fz);
+        cab.rotation.y=rng.next()<.5?0:Math.PI/2;
+        box(cab,new THREE.BoxGeometry(.72,1.65,.48),lib.officePlastic,0,.82,0);
+        for(let d=0;d<3;d++){
+          box(cab,new THREE.BoxGeometry(.64,.04,.04),lib.handle,0,.35+d*.42,-.26);
+        }
+        g.add(cab);
+      }
+      // Low cubicle partitions
+      for(let i=0;i<3+rng.int(0,2);i++){
+        const px=this.originX+cell*(1.2+rng.next()*(cells-2.4));
+        const pz=this.originZ+cell*(1.2+rng.next()*(cells-2.4));
+        const part=new THREE.Group();
+        part.position.set(px,0,pz);
+        part.rotation.y=rng.next()<.5?0:Math.PI/2;
+        box(part,new THREE.BoxGeometry(2.4,1.35,.06),lib.officePlastic,0,.68,0);
+        box(part,new THREE.BoxGeometry(2.4,.08,.08),lib.trim,0,1.36,0);
+        g.add(part);
+      }
+      // Dark windows / frosted glass on edges
+      for(let i=0;i<Math.min(5,edges.length);i++){
         const e=edges[(rng.int(0,edges.length-1)+i*7)%edges.length];
         const p=wallPoint(e,.112,2.25);
         const windowGroup=new THREE.Group();
         windowGroup.position.copy(p.position);windowGroup.rotation.y=p.rotation;
         box(windowGroup,new THREE.BoxGeometry(2.9,1.2,.035),lib.windowDark,0,0,0);
-        box(windowGroup,new THREE.BoxGeometry(.045,1.28,.05),lib.trim,.0,0,0);
+        box(windowGroup,new THREE.BoxGeometry(.045,1.28,.05),lib.trim,0,0,0);
         g.add(windowGroup);
+      }
+      // Occasional toppled chair / trash for environmental storytelling
+      if(rng.next()<.55){
+        const tx=this.originX+cell*(1.5+rng.next()*(cells-3));
+        const tz=this.originZ+cell*(1.5+rng.next()*(cells-3));
+        const trash=new THREE.Group();trash.position.set(tx,0,tz);
+        box(trash,new THREE.BoxGeometry(.35,.42,.35),lib.officePlastic,0,.21,0);
+        box(trash,new THREE.BoxGeometry(.28,.08,.28),lib.trim,0,.45,0);
+        g.add(trash);
       }
     }else if(level.id==="5"){
       const rng=new RNG(this.seedKey()^0x5a11);
