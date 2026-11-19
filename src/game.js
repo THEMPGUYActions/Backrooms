@@ -4,9 +4,10 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
+import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261013-kane-level0";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261013-bacteria-lighting1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-level1wet1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -250,16 +251,14 @@ class Chunk{
     this.walls.fill(15);this.rooms=[];
 
     if(level.id==="1"){
-      // Level 1 uses two generation paths:
-      // a 10x10 DFS maze and a Perlin-selected large parking-garage room.
-      // There is no separate procedural "hall/corridor" generator.
+      // Low-frequency seeded regions keep neighboring chunks in coherent districts.
       const forceStart=this.cx===0&&this.cz===0;
       const worldX=this.cx*cells*level.cellSize;
       const worldZ=this.cz*cells*level.cellSize;
-      const macro=smoothNoise2D(worldX*.002,worldZ*.002,this.game.seed);
-      this.zone=(forceStart||macro>.5)?"mega":"maze";
+      const macro=smoothNoise2D(worldX*.00135,worldZ*.00135,this.game.seed);
+      this.zone=forceStart?"parking":macro>.66?"parking":macro>.32?"halls":"corridors";
 
-      if(this.zone==="mega"){
+      if(this.zone!=="corridors"){
         // Reference megaroom sectors are open concrete garage space.
         this.walls.fill(0);
         for(let z=0;z<cells;z++){
@@ -543,7 +542,7 @@ class Chunk{
     }
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
-    const level1ExitSector=level.id==="1"&&this.zone==="maze"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
+    const level1ExitSector=level.id==="1"&&this.zone==="corridors"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
     if(level.id==="1"){
       // The Level 1 generator places the level2 stairwell on
       // maze-grid sectors outside the starting area, using a 50% roll.
@@ -1450,7 +1449,7 @@ class Chunk{
       });
     };
 
-    if(this.zone==="mega"){
+    if(this.zone==="parking"){
       // 5x5 parking-column rhythm. This is the dominant Level 1 shape in
       // The Level 0 macro room 1: long sightlines with repeating square
       // concrete pillars and low structural beams.
@@ -1517,16 +1516,26 @@ class Chunk{
         if(next()<.7)box(g,new THREE.BoxGeometry(.055,.012,5.6),lineMat,this.originX+x,.012,this.originZ+44);
       }
 
-      // Large wet patches are a major part of the reference appearance.
-      for(let i=0;i<7;i++){
-        const px=this.originX+6+next()*(size-12);
-        const pz=this.originZ+6+next()*(size-12);
-        const puddle=new THREE.Mesh(new THREE.CircleGeometry(.8+next()*3.8,32),lib.puddle);
-        puddle.rotation.x=-Math.PI/2;
-        puddle.rotation.z=next()*Math.PI;
-        puddle.scale.set(1.2+next()*1.7,.38+.18*next(),1);
-        puddle.position.set(px,.014,pz);
-        g.add(puddle);
+      // Abandoned vehicles are rare landmarks, kept clear of the chunk's central route.
+      const carCount=next()<.42?1:next()<.18?2:0;
+      for(let i=0;i<carCount;i++){
+        const px=this.originX+12+next()*(size-24),pz=this.originZ+12+next()*(size-24);
+        if(Math.abs(px-(this.originX+size/2))<5&&Math.abs(pz-(this.originZ+size/2))<5)continue;
+        const car=new THREE.Group();car.position.set(px,0,pz);car.rotation.y=next()<.5?0:Math.PI/2;
+        box(car,new THREE.BoxGeometry(1.82,.62,3.75),lib.garageBase,0,.72,0);
+        box(car,new THREE.BoxGeometry(1.58,.72,1.65),lib.metal,0,1.34,-.12);
+        box(car,new THREE.BoxGeometry(1.62,.12,3.25),lib.rustMetal,0,1.08,0);
+        for(const z of [-1.18,1.18])for(const x of [-.94,.94]){
+          const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.2,12),lib.dark);
+          wheel.rotation.z=Math.PI/2;wheel.position.set(x,.42,z);car.add(wheel);
+        }
+        g.add(car);
+        this.collisionSegments.push(
+          {x1:px-.98,z1:pz-1.95,x2:px+.98,z2:pz-1.95},
+          {x1:px+.98,z1:pz-1.95,x2:px+.98,z2:pz+1.95},
+          {x1:px+.98,z1:pz+1.95,x2:px-.98,z2:pz+1.95},
+          {x1:px-.98,z1:pz+1.95,x2:px-.98,z2:pz-1.95}
+        );
       }
 
       // Sparse service hardware at the edge of a few bays.
@@ -1537,8 +1546,64 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.16,1.8,.28),lib.garageBase,px,.9,pz);
         box(g,new THREE.BoxGeometry(.5,.08,.32),lib.metal,px,1.72,pz);
       }
+    }else if(this.zone==="halls"){
+      const addHallWall=(x1,z1,x2,z2,height=3.25,material=lib.concrete)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz);
+        if(length<.3)return;
+        box(g,new THREE.BoxGeometry(length,height,.18),material,(x1+x2)/2,height/2,(z1+z2)/2,0,-Math.atan2(dz,dx),0);
+        this.collisionSegments.push({x1,z1,x2,z2});
+      };
+      const left=this.originX+size*.32,right=this.originX+size*.68;
+      const near=this.originZ+size*.1,far=this.originZ+size*.9;
+      // Two broken partition runs create three broad, connected warehouse halls.
+      for(const x of [left,right]){
+        addHallWall(x,near,x,near+size*.34);
+        addHallWall(x,near+size*.49,x,far);
+      }
+      addHallWall(this.originX+size*.12,this.originZ+size*.5,left-1,this.originZ+size*.5,2.9);
+      addHallWall(right+1,this.originZ+size*.5,this.originX+size*.88,this.originZ+size*.5,2.9);
+
+      // Repeating columns and overhead fluorescent rows give the halls scale.
+      for(const x of [this.originX+size*.18,this.originX+size*.82]){
+        for(let z=12;z<size-8;z+=24){
+          const px=x,pz=this.originZ+z;
+          box(g,new THREE.BoxGeometry(.72,level.wallHeight,.72),lib.concrete,px,level.wallHeight/2,pz);
+          box(g,new THREE.BoxGeometry(.94,.12,.94),lib.garageBase,px,.06,pz);
+        }
+      }
+      for(let z=10;z<size-8;z+=18){
+        addLight(this.originX+size*.5,this.originZ+z,0,1.08,108+next()*22);
+      }
+      for(const x of [left+4,right-4]){
+        for(let z=12;z<size-10;z+=28){
+          if(next()<.24)continue;
+          addLight(x,this.originZ+z,Math.PI/2,.78,78+next()*18);
+        }
+      }
+
+      // Sparse industrial shelving: steel uprights, crossbars and stored crates.
+      for(const x of [left-3,right+3]){
+        for(let z=14;z<size-12;z+=22){
+          const pz=this.originZ+z;
+          for(const side of [-1,1]){
+            const px=x+side*.82;
+            box(g,new THREE.BoxGeometry(.09,2.35,.09),lib.metal,px,1.175,pz);
+            box(g,new THREE.BoxGeometry(.09,2.35,.09),lib.metal,px,1.175,pz+2.2);
+          }
+          for(const y of [.42,1.18,1.94]){
+            box(g,new THREE.BoxGeometry(1.75,.09,.12),lib.rustMetal,x,y,pz+1.1);
+            if(next()<.66)box(g,new THREE.BoxGeometry(1.25,.48,.92),lib.crate,x,y+.29,pz+1.1);
+          }
+          this.collisionSegments.push(
+            {x1:x-.9,z1:pz+.7,x2:x+.9,z2:pz+.7},
+            {x1:x+.9,z1:pz+.7,x2:x+.9,z2:pz+1.5},
+            {x1:x+.9,z1:pz+1.5,x2:x-.9,z2:pz+1.5},
+            {x1:x-.9,z1:pz+1.5,x2:x-.9,z2:pz+.7}
+          );
+        }
+      }
     }else{
-      // The non-megaroom path is the maze portion of the reference generator.
+      // Narrower service corridors use a seeded DFS topology with occasional widened rooms.
       // It still uses the same gray concrete palette, not the yellow Level 0
       // materials or a painted-white ceiling.
       for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
@@ -1566,6 +1631,43 @@ class Chunk{
           }
         }
       }
+    }
+
+    // Condensation and tracked-in water vary by district but remain seed-stable.
+    const puddleCount=this.zone==="parking"?7:this.zone==="halls"?6:4;
+    const patchCount=this.zone==="corridors"?5:8;
+    const makeWetShape=(radiusX,radiusZ,points)=>{
+      const shape=new THREE.Shape();
+      for(let i=0;i<points;i++){
+        const angle=i/points*Math.PI*2;
+        const irregular=.62+next()*.48;
+        const x=Math.cos(angle)*radiusX*irregular;
+        const z=Math.sin(angle)*radiusZ*irregular;
+        if(i===0)shape.moveTo(x,z);else shape.lineTo(x,z);
+      }
+      shape.closePath();
+      return shape;
+    };
+    for(let i=0;i<patchCount;i++){
+      const px=this.originX+5+next()*(size-10),pz=this.originZ+5+next()*(size-10);
+      const shape=makeWetShape(1.8+next()*4.8,1.1+next()*3.1,9+Math.floor(next()*5));
+      const patch=new THREE.Mesh(new THREE.ShapeGeometry(shape),lib.wetConcrete);
+      patch.rotation.x=-Math.PI/2;
+      patch.rotation.z=next()*Math.PI*2;
+      patch.position.set(px,.009+next()*.002,pz);
+      patch.renderOrder=1;
+      g.add(patch);
+    }
+    for(let i=0;i<puddleCount;i++){
+      const px=this.originX+5+next()*(size-10),pz=this.originZ+5+next()*(size-10);
+      const shape=makeWetShape(1.15+next()*2.9,.7+next()*1.9,11+Math.floor(next()*7));
+      const puddle=new THREE.Mesh(new THREE.ShapeGeometry(shape,2),lib.puddle);
+      puddle.rotation.x=-Math.PI/2;
+      puddle.rotation.z=next()*Math.PI*2;
+      puddle.position.set(px,.018,pz);
+      puddle.renderOrder=2;
+      puddle.userData.isLevel1Puddle=true;
+      g.add(puddle);
     }
   }
 
@@ -3663,7 +3765,15 @@ export class BackroomsGame{
     clearTimeout(this.argMessageTimer);this.argMessageTimer=setTimeout(()=>el.classList.add("hidden"),2300+Math.random()*2400);
   }
 
-  render(){this.vhsPass.uniforms.resolution.value.set(Math.max(1,this.renderer.domElement.clientWidth||innerWidth),Math.max(1,this.renderer.domElement.clientHeight||innerHeight));this.composer.render()}
+  render(){
+    if(this.level.id==="1"&&this.world.library?.puddle){
+      if(!this.level1Reflection)this.level1Reflection=new Level1Reflection(this.renderer,this.scene,this.camera,isTouchControlsDevice());
+      this.level1Reflection.setMaterial(this.world.library.puddle);
+      this.level1Reflection.render(this.gameTime);
+    }
+    this.vhsPass.uniforms.resolution.value.set(Math.max(1,this.renderer.domElement.clientWidth||innerWidth),Math.max(1,this.renderer.domElement.clientHeight||innerHeight));
+    this.composer.render();
+  }
   loop(now){
     const raw=(now-this.last)/1000;this.last=now;
     const dt=Math.min(MAX_DT,raw);
