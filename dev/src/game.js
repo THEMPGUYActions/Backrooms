@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10c";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10c";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10e";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10e";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -442,6 +442,10 @@ class Chunk{
       }else if(level.id==="10"){
         // The wheat fields are open terrain; the final route is a barn door,
         // not a fake perimeter wall around each streamed chunk.
+        this.walls.fill(0);
+      }else if(level.id==="8"){
+        // Natural karst caves are open chamber networks, not a square-cell maze.
+        // Organic rock banks below define the traversable 9th Road.
         this.walls.fill(0);
       }else{
         const visited=new Uint8Array(cells*cells);
@@ -1252,8 +1256,8 @@ class Chunk{
         box(room,new THREE.BoxGeometry(8.6,3.1,.18),lib.concrete,0,1.65,-4.25);
         box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,-4.25,1.65,0);
         box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,4.25,1.65,0);
-        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,-1.45,1.65,4.25);
-        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,1.45,1.65,4.25);
+        box(room,new THREE.BoxGeometry(2.8,3.1,.18),lib.concrete,-2.85,1.65,4.25);
+        box(room,new THREE.BoxGeometry(2.8,3.1,.18),lib.concrete,2.85,1.65,4.25);
         box(room,new THREE.BoxGeometry(2.9,.22,.2),lib.concrete,0,3.1,4.25);
         const puddle=new THREE.Mesh(new THREE.PlaneGeometry(7.7,7.7),lib.water.clone());
         puddle.rotation.x=-Math.PI/2;puddle.position.set(0,.19,0);puddle.material.opacity=.34;room.add(puddle);
@@ -1269,7 +1273,8 @@ class Chunk{
         g.add(room);
         this.collisionSegments.push(
           {x1:-4.3,z1:-4.3,x2:4.3,z2:-4.3},{x1:-4.3,z1:-4.3,x2:-4.3,z2:4.3},
-          {x1:4.3,z1:-4.3,x2:4.3,z2:4.3}
+          {x1:4.3,z1:-4.3,x2:4.3,z2:4.3},
+          {x1:-4.3,z1:4.3,x2:-1.45,z2:4.3},{x1:1.45,z1:4.3,x2:4.3,z2:4.3}
         );
       }
     }else if(level.id==="8"){
@@ -1300,8 +1305,37 @@ class Chunk{
         const pool=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*1.8,24),lib.water.clone());
         pool.rotation.x=-Math.PI/2;pool.position.set(px,.018,pz);pool.material.color.setHex(0x25434a);pool.material.opacity=.76;g.add(pool);
       }
+      // A sinuous 9th Road passes through broad chambers linked by natural
+      // constrictions. Instanced rock banks keep the cave organic and cheap.
+      const road=[
+        [this.originX+size*.04,this.originZ+size*.5],
+        [this.originX+size*.2,this.originZ+size*.5],
+        [this.originX+size*.34,this.originZ+size*.36],
+        [this.originX+size*.5,this.originZ+size*.5],
+        [this.originX+size*.68,this.originZ+size*.5],
+        [this.originX+size*.82,this.originZ+size*.34],
+        [this.originX+size*.97,this.originZ+size*.34]
+      ];
+      const wallGeometry=new THREE.IcosahedronGeometry(1,1),wallInstances=new THREE.InstancedMesh(wallGeometry,lib.concrete,120);
+      const wallDummy=new THREE.Object3D();let wallIndex=0;
+      for(let segment=0;segment<road.length-1;segment++){
+        const [ax,az]=road[segment],[bx,bz]=road[segment+1],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);
+        const nx=-dz/length,nz=dx/length;
+        for(const side of [-1,1]){
+          this.collisionSegments.push({x1:ax+nx*4.4*side,z1:az+nz*4.4*side,x2:bx+nx*4.4*side,z2:bz+nz*4.4*side});
+          for(let distance=3.5;distance<length-2;distance+=4.2){
+            const t=distance/length,x=ax+dx*t+nx*(4.8+rng.next()*1.1)*side,z=az+dz*t+nz*(4.8+rng.next()*1.1)*side;
+            const scale=1.65+rng.next()*1.1;
+            wallDummy.position.set(x,1.25+rng.next()*.45,z);
+            wallDummy.scale.set(scale*1.2,1.55+rng.next()*1.1,scale);
+            wallDummy.rotation.set(rng.next()*.35,rng.next()*Math.PI*2,rng.next()*.3);
+            wallDummy.updateMatrix();wallInstances.setMatrixAt(wallIndex++,wallDummy.matrix);
+          }
+        }
+      }
+      wallInstances.count=wallIndex;wallInstances.instanceMatrix.needsUpdate=true;g.add(wallInstances);
       for(let i=0;i<3;i++){
-        const x=this.originX+size*(.22+i*.28),z=this.originZ+size*.52,sign=new THREE.Group();sign.position.set(x,0,z);
+        const [x,z]=road[1+i*2],sign=new THREE.Group();sign.position.set(x,0,z);
         const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.075,2.1,8),lib.rustMetal);post.position.y=1.05;sign.add(post);
         box(sign,new THREE.BoxGeometry(.9,.42,.08),lib.hotelGold,0,2.05,0);
         box(sign,new THREE.BoxGeometry(.72,.26,.035),lib.dark,0,2.05,.055);
