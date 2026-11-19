@@ -834,6 +834,37 @@ class Chunk{
         const returnX=bx+sideX*(w/2+1.1),returnZ=bz+sideZ*(h/2+1.1);
         addUtilityWall(backX,backZ,returnX,returnZ,2.65,lib.rustMetal);
       }
+      // Level 2's tunnel plan kinks at 45-degree angles instead of repeating
+      // square rooms. The short diagonal returns preserve the walkable spine.
+      for(const sx of [-1,1])for(const sz of [-1,1]){
+        const ax=cx+sx*9,az=cz+sz*8,bx=cx+sx*15,bz=cz+sz*14,cx2=cx+sx*21,cz2=cz+sz*14;
+        addUtilityWall(ax,az,bx,bz,2.85,lib.wall2);
+        addUtilityWall(bx,bz,cx2,cz2,2.85,lib.brickWall);
+        addUtilityWall(cx2,cz2,cx+sx*25,cz+sz*18,2.65,lib.rustMetal);
+      }
+      // Pump skids, pressure vessels and oil drums break up the long service runs.
+      for(let i=0;i<4;i++){
+        const side=i%2?1:-1,px=cx+side*(12+Math.floor(i/2)*15),pz=cz+(i<2?-1:1)*23;
+        const pump=new THREE.Group();pump.position.set(px,0,pz);
+        box(pump,new THREE.BoxGeometry(1.45,.42,1.05),lib.rustMetal,0,.22,0);
+        const tank=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,1.45,12),i%2?lib.metal:lib.rustMetal);
+        tank.position.set(0,1.0,0);pump.add(tank);
+        const motor=box(pump,new THREE.BoxGeometry(.72,.55,.7),lib.metal,.72,.5,0);
+        const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.06,12),lib.dark);
+        gauge.rotation.x=Math.PI/2;gauge.position.set(.25,1.45,-.37);pump.add(gauge);
+        const wheel=new THREE.Mesh(new THREE.TorusGeometry(.2,.035,6,14),lib.hotelGold);
+        wheel.position.set(-.42,1.18,-.43);pump.add(wheel);
+        g.add(pump);
+        const hx=.95,hz=.72;this.collisionSegments.push(
+          {x1:px-hx,z1:pz-hz,x2:px+hx,z2:pz-hz},{x1:px+hx,z1:pz-hz,x2:px+hx,z2:pz+hz},
+          {x1:px+hx,z1:pz+hz,x2:px-hx,z2:pz+hz},{x1:px-hx,z1:pz+hz,x2:px-hx,z2:pz-hz}
+        );
+      }
+      for(let i=0;i<3;i++){
+        const x=cx-18+i*18,z=cz+(i%2?28:-28);
+        const drum=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.9,12),lib.rustMetal);
+        drum.position.set(x,.47,z);g.add(drum);
+      }
       // CylinderGeometry is Y-up. Horizontal runs: rotate so the long axis follows corridor.
       // alongX → rot.z = PI/2; alongZ → rot.x = PI/2. Vertical risers stay unrotated.
       const pipeGeometry=new THREE.CylinderGeometry(.11,.11,cell*.72,8);
@@ -940,6 +971,37 @@ class Chunk{
         for(let x=0;x<7;x++)box(g,new THREE.BoxGeometry(.1,.09,.16),lib.rustMetal,this.originX+size*(.12+x*.125),level.wallHeight-.88,z);
         for(const side of [-1,1])box(g,new THREE.BoxGeometry(size*.78,.035,.11),lib.orangeLight,cx,.035,z+side*1.75);
       }
+      // Generator alternators and control cabinets make this a power station,
+      // not just a corridor with electrical boxes.
+      for(let unitIndex=0;unitIndex<2;unitIndex++){
+        const gx=this.originX+size*(unitIndex?.82:.18),gz=this.originZ+size*.72,generator=new THREE.Group();
+        generator.position.set(gx,0,gz);
+        box(generator,new THREE.BoxGeometry(3.8,1.65,2.6),lib.rustMetal,0,.95,0);
+        box(generator,new THREE.BoxGeometry(3.35,.16,2.25),lib.metal,0,1.83,0);
+        for(let fin=0;fin<10;fin++)box(generator,new THREE.BoxGeometry(.1,1.3,1.8),lib.metal,-1.55+fin*.34,.98,-.08);
+        const alternator=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,1.3,16),lib.metal);
+        alternator.rotation.z=Math.PI/2;alternator.position.set(0,2.15,0);generator.add(alternator);
+        for(let lamp=0;lamp<4;lamp++){
+          const led=box(generator,new THREE.BoxGeometry(.14,.12,.05),lamp===1?lib.indicator:lib.orangeLight,-.48+lamp*.32,1.35,-1.34);
+          led.userData.light=true;
+        }
+        g.add(generator);
+        this.collisionSegments.push(
+          {x1:gx-1.9,z1:gz-1.3,x2:gx+1.9,z2:gz-1.3},{x1:gx+1.9,z1:gz-1.3,x2:gx+1.9,z2:gz+1.3},
+          {x1:gx+1.9,z1:gz+1.3,x2:gx-1.9,z2:gz+1.3},{x1:gx-1.9,z1:gz+1.3,x2:gx-1.9,z2:gz-1.3}
+        );
+        this.lightSources.push({position:new THREE.Vector3(gx,2.1,gz),color:0xffa15b,baseIntensity:7,intensity:7,distance:11,decay:2});
+      }
+      // Cable trenches and insulated floor crossings lead between machine banks.
+      for(let row=0;row<3;row++){
+        const z=this.originZ+size*(.28+row*.2);
+        box(g,new THREE.BoxGeometry(size*.72,.08,.48),lib.dark,cx,.04,z);
+        for(let cable=0;cable<5; cable++){
+          const line=box(g,new THREE.BoxGeometry(size*.68,.025,.035),cable%2?lib.indicator:lib.orangeLight,cx,.095,z-.16+cable*.08);
+          line.userData.light=false;
+        }
+      }
+
       // A slow conveyor occupies one side bay, not the central walking aisle.
       const beltX=this.originX+size*.5,beltZ=this.originZ+size*.84,belt=new THREE.Group();belt.position.set(beltX,0,beltZ);
       box(belt,new THREE.BoxGeometry(7.2,.22,1.35),lib.metal,0,.62,0);
@@ -978,21 +1040,28 @@ class Chunk{
       addOfficeWall(o1x,o0z,o1x,cz-door/2);
       addOfficeWall(o1x,cz+door/2,o1x,o1z);
 
-      // Structural columns on a regular grid
-      const spacing=Math.max(5.0,cell*.5);
+      // Sparse structural columns are instanced. The old 6 m grid created
+      // more than 3,800 collision edges in one chunk and made the office feel
+      // like a parking garage instead of an open commercial floor plate.
+      const spacing=Math.max(16,cell*1.5),columnPositions=[];
       for(let z=this.originZ+spacing;z<this.originZ+size-spacing*.45;z+=spacing){
-        for(let x=this.originX+spacing;x<this.originX+size-spacing*.45;x+=spacing){
-          const col=new THREE.Group();col.position.set(x,0,z);
-          box(col,new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,0,level.wallHeight/2,0);
-          box(col,new THREE.BoxGeometry(.95,.1,.95),colMat,0,.05,0);
-          box(col,new THREE.BoxGeometry(.95,.1,.95),colMat,0,level.wallHeight-.05,0);
-          g.add(col);
-          const hr=.42;this.collisionSegments.push(
-            {x1:x-hr,z1:z-hr,x2:x+hr,z2:z-hr},{x1:x+hr,z1:z-hr,x2:x+hr,z2:z+hr},
-            {x1:x+hr,z1:z+hr,x2:x-hr,z2:z+hr},{x1:x-hr,z1:z+hr,x2:x-hr,z2:z-hr}
-          );
-        }
+        for(let x=this.originX+spacing;x<this.originX+size-spacing*.45;x+=spacing)columnPositions.push({x,z});
       }
+      const columnDummy=new THREE.Object3D();
+      const columnMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,columnPositions.length);
+      const baseMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.95,.1,.95),colMat,columnPositions.length);
+      const capMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.95,.1,.95),colMat,columnPositions.length);
+      columnPositions.forEach((p,i)=>{
+        columnDummy.position.set(p.x,level.wallHeight/2,p.z);columnDummy.updateMatrix();columnMesh.setMatrixAt(i,columnDummy.matrix);
+        columnDummy.position.set(p.x,.05,p.z);columnDummy.updateMatrix();baseMesh.setMatrixAt(i,columnDummy.matrix);
+        columnDummy.position.set(p.x,level.wallHeight-.05,p.z);columnDummy.updateMatrix();capMesh.setMatrixAt(i,columnDummy.matrix);
+        const hr=.48;this.collisionSegments.push(
+          {x1:p.x-hr,z1:p.z-hr,x2:p.x+hr,z2:p.z-hr},{x1:p.x+hr,z1:p.z-hr,x2:p.x+hr,z2:p.z+hr},
+          {x1:p.x+hr,z1:p.z+hr,x2:p.x-hr,z2:p.z+hr},{x1:p.x-hr,z1:p.z+hr,x2:p.x-hr,z2:p.z-hr}
+        );
+      });
+      columnMesh.instanceMatrix.needsUpdate=true;baseMesh.instanceMatrix.needsUpdate=true;capMesh.instanceMatrix.needsUpdate=true;
+      g.add(columnMesh,baseMesh,capMesh);
 
       // Dense fluorescent panel grid (drop ceiling)
       for(let z=this.originZ+2.2;z<this.originZ+size-1.5;z+=3.0){
@@ -1078,6 +1147,33 @@ class Chunk{
         box(cab,new THREE.BoxGeometry(.08,.08,.12),lib.handle,.55,1.1,-.02);
         g.add(cab);
       }
+      // The Main Hall is the most furnished area: mahogany sofas, framed
+      // portraits and brass room plaques contrast with the otherwise empty rooms.
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.2+i*.3),z=this.originZ+size*.22,sofa=new THREE.Group();
+        sofa.position.set(x,0,z);
+        box(sofa,new THREE.BoxGeometry(2.35,.48,.82),lib.mahogany,0,.48,0);
+        box(sofa,new THREE.BoxGeometry(2.35,.62,.22),lib.officeWood,0,.92,-.31);
+        for(const sx of [-.98,.98])box(sofa,new THREE.BoxGeometry(.28,.72,.82),lib.mahogany,sx,.72,0);
+        g.add(sofa);
+        const picture=new THREE.Group();picture.position.set(x,2.35,z-1.2);
+        box(picture,new THREE.BoxGeometry(.92,.72,.08),lib.hotelGold,0,0,0);
+        box(picture,new THREE.BoxGeometry(.76,.56,.035),lib.mahogany,0,0,.055);g.add(picture);
+      }
+      for(let i=0;i<4;i++){
+        const x=this.originX+size*(.12+i*.22),z=this.originZ+size*.42,plaque=new THREE.Group();
+        plaque.position.set(x,2.0,z);box(plaque,new THREE.BoxGeometry(.48,.22,.045),lib.hotelGold,0,0,0);
+        box(plaque,new THREE.BoxGeometry(.31,.035,.055),lib.mahogany,0,0,.03);g.add(plaque);
+      }
+      // Rare antique cage elevator landmark.
+      if(cycleHash(this.seedKey(),this.cx,this.cz+0x51)<.34){
+        const ex=this.originX+size*.82,ez=this.originZ+size*.28,elevator=new THREE.Group();elevator.position.set(ex,0,ez);
+        for(const x of [-1.05,1.05])for(const z of [-1.05,1.05]){
+          const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,3.6,8),lib.hotelGold);post.position.set(x,1.8,z);elevator.add(post);
+        }
+        for(const y of [.35,1.2,2.05,2.9])for(const x of [-1,0,1])box(elevator,new THREE.BoxGeometry(.045,.045,2.05),lib.hotelGold,x,y,0);
+        box(elevator,new THREE.BoxGeometry(1.9,.12,1.9),lib.mahogany,0,.12,0);g.add(elevator);
+      }
       const ballroom=this.rooms.find(room=>room.type==="beverly");
       const chandelier=new THREE.Group();
       chandelier.position.set(ballroom?this.originX+(ballroom.x+ballroom.w/2)*cell:this.originX+size/2,level.wallHeight-.48,ballroom?this.originZ+(ballroom.z+ballroom.h/2)*cell:this.originZ+size/2);
@@ -1126,16 +1222,56 @@ class Chunk{
         const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4);
         box(g,new THREE.BoxGeometry(.35+rng.next()*.4,.08,.25+rng.next()*.3),lib.rustMetal,x,.05,z);
       }
+      // Acoustic wall panels and tactile seams are just visible in the
+      // flashlight beam. Level 6 has no working lights and remains silent.
+      for(let i=0;i<6;i++){
+        const p=this.originX+size*(.1+i*.16);
+        box(g,new THREE.BoxGeometry(1.25,.52,.035),lib.wall2,p,1.72,this.originZ+.12);
+        box(g,new THREE.BoxGeometry(.035,.52,1.25),lib.wall2,this.originX+.12,1.72,p);
+        box(g,new THREE.BoxGeometry(.025,2.4,.04),lib.concrete,p,1.2,this.originZ+.16);
+      }
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.2+i*.3),z=this.originZ+size*(i%2?.72:.28);
+        box(g,new THREE.BoxGeometry(1.1,2.6,.12),lib.concrete,x,1.3,z);
+        box(g,new THREE.BoxGeometry(.72,2.15,.08),lib.dark,x,1.25,z-.08);
+      }
     }else if(level.id==="7"){
-      const water=lib.water.clone();water.color.setHex(0x163746);water.opacity=.78;water.roughness=.12;water.depthWrite=false;
+      const water=lib.water.clone();water.color.setHex(0x1a4354);water.opacity=.82;water.roughness=.16;water.metalness=.08;water.depthWrite=false;
       const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size),water);surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
       const rng=new RNG(this.seedKey()^0x7a77),rockGeometry=new THREE.IcosahedronGeometry(1,1);
-      const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,10),rockDummy=new THREE.Object3D();
-      for(let i=0;i<10;i++){
-        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),scale=.8+rng.next()*1.5;
-        rockDummy.position.set(x,-.5-rng.next()*1.8,z);rockDummy.scale.set(scale*1.3,scale*.55,scale*1.1);rockDummy.rotation.y=rng.next()*Math.PI*2;rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
+      const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,24),rockDummy=new THREE.Object3D();
+      for(let i=0;i<24;i++){
+        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),scale=.8+rng.next()*2.1;
+        rockDummy.position.set(x,-.65-rng.next()*2.8,z);rockDummy.scale.set(scale*1.45,scale*.62,scale*1.2);rockDummy.rotation.y=rng.next()*Math.PI*2;rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
       }
       rocks.instanceMatrix.needsUpdate=true;g.add(rocks);
+      // Furnished flooded entrance room built sideways into the ocean ceiling.
+      if(this.cx===0&&this.cz===0){
+        const room=new THREE.Group();
+        box(room,new THREE.BoxGeometry(8.6,.16,8.6),lib.officeWood,0,.10,0);
+        box(room,new THREE.BoxGeometry(8.6,3.1,.18),lib.concrete,0,1.65,-4.25);
+        box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,-4.25,1.65,0);
+        box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,4.25,1.65,0);
+        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,-1.45,1.65,4.25);
+        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,1.45,1.65,4.25);
+        box(room,new THREE.BoxGeometry(2.9,.22,.2),lib.concrete,0,3.1,4.25);
+        const puddle=new THREE.Mesh(new THREE.PlaneGeometry(7.7,7.7),lib.water.clone());
+        puddle.rotation.x=-Math.PI/2;puddle.position.set(0,.19,0);puddle.material.opacity=.34;room.add(puddle);
+        box(room,new THREE.BoxGeometry(1.5,2.25,.38),lib.officeWood,-3.15,1.28,-.35);
+        for(let shelf=0;shelf<4;shelf++)box(room,new THREE.BoxGeometry(1.38,.055,.34),lib.trim,-3.15,.48+shelf*.48,-.12);
+        const chair=new THREE.Group();chair.position.set(2.25,0,-1.1);
+        box(chair,new THREE.BoxGeometry(.78,.18,.78),lib.officeWood,0,.48,0);
+        box(chair,new THREE.BoxGeometry(.78,1.0,.16),lib.officeWood,0,1.02,-.32);room.add(chair);
+        box(room,new THREE.BoxGeometry(1.0,.12,.62),lib.officeWood,.55,.52,.75);
+        for(const x of [-.35,1.45])for(const z of [.5,1.0])box(room,new THREE.BoxGeometry(.07,.48,.07),lib.officeWood,x,.24,z);
+        const lamp=box(room,new THREE.CylinderGeometry(.14,.18,.32,10),lib.light,-2.8,3.0,-2.5);
+        lamp.userData.light=true;lamp.userData.baseEmissive=1.2;
+        g.add(room);
+        this.collisionSegments.push(
+          {x1:-4.3,z1:-4.3,x2:4.3,z2:-4.3},{x1:-4.3,z1:-4.3,x2:-4.3,z2:4.3},
+          {x1:4.3,z1:-4.3,x2:4.3,z2:4.3}
+        );
+      }
     }else if(level.id==="8"){
       // Cave systems: denser floor rock + ceiling spikes + ground stalagmites
       const rng=new RNG(this.seedKey()^0x8ca7e);
@@ -1157,26 +1293,71 @@ class Chunk{
         stagDummy.position.set(x,h/2,z);stagDummy.rotation.set(0,rng.next()*Math.PI,0);stagDummy.scale.set(.8+rng.next()*.5,h, .8+rng.next()*.5);stagDummy.updateMatrix();stags.setMatrixAt(i,stagDummy.matrix);
       }
       boulders.instanceMatrix.needsUpdate=true;spikes.instanceMatrix.needsUpdate=true;stags.instanceMatrix.needsUpdate=true;g.add(boulders,spikes,stags);
+      // Cold pools and M.E.G. 9th Road markers give the karst network a
+      // recognizable route through its natural chambers.
+      for(let i=0;i<3;i++){
+        const px=this.originX+size*(.2+i*.3),pz=this.originZ+size*(.28+(i%2)*.42);
+        const pool=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*1.8,24),lib.water.clone());
+        pool.rotation.x=-Math.PI/2;pool.position.set(px,.018,pz);pool.material.color.setHex(0x25434a);pool.material.opacity=.76;g.add(pool);
+      }
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.22+i*.28),z=this.originZ+size*.52,sign=new THREE.Group();sign.position.set(x,0,z);
+        const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.075,2.1,8),lib.rustMetal);post.position.y=1.05;sign.add(post);
+        box(sign,new THREE.BoxGeometry(.9,.42,.08),lib.hotelGold,0,2.05,0);
+        box(sign,new THREE.BoxGeometry(.72,.26,.035),lib.dark,0,2.05,.055);
+        box(sign,new THREE.BoxGeometry(.42,.035,.04),lib.indicator,0,2.05,.08);g.add(sign);
+      }
     }else if(level.id==="9"){
       const rng=new RNG(this.seedKey()^0x9b42);
-      box(g,new THREE.BoxGeometry(size,.025,3.8),lib.garageBase,this.originX+size/2,.012,this.originZ+size/2);
-      box(g,new THREE.BoxGeometry(3.8,.025,size),lib.garageBase,this.originX+size/2,.014,this.originZ+size/2);
-      for(let mark=0;mark<8;mark++){
-        const x=this.originX+size*.1+mark*size*.105;
-        box(g,new THREE.BoxGeometry(1.2,.018,.09),lib.trim,x,.028,this.originZ+size/2);
+      // Unpainted wet asphalt streets, stone sidewalks and grassy front lots.
+      box(g,new THREE.BoxGeometry(size,.04,8.8),lib.asphalt,this.originX+size/2,.012,this.originZ+size/2);
+      box(g,new THREE.BoxGeometry(8.8,.04,size),lib.asphalt,this.originX+size/2,.014,this.originZ+size/2);
+      for(const side of [-1,1]){
+        box(g,new THREE.BoxGeometry(size,.08,1.8),lib.sidewalk,this.originX+size/2,.045,this.originZ+size/2+side*5.25);
+        box(g,new THREE.BoxGeometry(1.8,.08,size),lib.sidewalk,this.originX+size/2+side*5.25,.045,this.originZ+size/2);
+        box(g,new THREE.BoxGeometry(size,.035,8),lib.lawn,this.originX+size/2,.012,this.originZ+size/2+side*18);
+        box(g,new THREE.BoxGeometry(8,.035,size),lib.lawn,this.originX+size/2+side*18,.012,this.originZ+size/2);
       }
-      for(const room of this.rooms.slice(0,1)){
+      // Rainwater gathers in shallow, irregular patches on the unmarked road.
+      for(let i=0;i<5;i++){
+        const px=this.originX+size*(.12+rng.next()*.76),pz=this.originZ+size*(.5+(rng.next()-.5)*.12);
+        const puddle=new THREE.Mesh(new THREE.CircleGeometry(.8+rng.next()*1.5,18),lib.wetAsphalt);
+        puddle.rotation.x=-Math.PI/2;puddle.scale.set(1.8,.65,1);puddle.position.set(px,.038,pz);g.add(puddle);
+      }
+      const leafGeometry=new THREE.PlaneGeometry(.18,.1),leaves=new THREE.InstancedMesh(leafGeometry,lib.leaf,90),leafDummy=new THREE.Object3D();
+      for(let i=0;i<90;i++){
+        const x=this.originX+rng.next()*size,z=this.originZ+rng.next()*size;
+        leafDummy.position.set(x,.045,z);leafDummy.rotation.x=-Math.PI/2;leafDummy.rotation.z=rng.next()*Math.PI*2;
+        leafDummy.scale.set(.55+rng.next(),.55+rng.next(),1);leafDummy.updateMatrix();leaves.setMatrixAt(i,leafDummy.matrix);
+      }
+      leaves.instanceMatrix.needsUpdate=true;g.add(leaves);
+      for(let roomIndex=0;roomIndex<this.rooms.length;roomIndex++){
+        const room=this.rooms[roomIndex];
         const x=this.originX+(room.x+room.w/2)*cell,z=this.originZ+(room.z+room.h/2)*cell;
         const house=new THREE.Group();house.position.set(x,0,z);
-        const front=-3.2,halfX=3.7,halfZ=3.2,doorHalf=.62;
+        const front=-4.0,halfX=4.35,halfZ=3.85,doorHalf=.68;
+        const wallMat=roomIndex%2?lib.officePlastic:lib.maintenanceWall;
+        const roofMat=roomIndex%2?lib.mahogany:lib.officeWood;
         // Build a hollow house shell with a real front-door opening, not a solid box.
-        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.12),lib.officePlastic,-(halfX+doorHalf)/2,1.5,front);
-        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.12),lib.officePlastic,(halfX+doorHalf)/2,1.5,front);
-        box(house,new THREE.BoxGeometry(doorHalf*2,.8,.12),lib.officePlastic,0,2.6,front);
-        box(house,new THREE.BoxGeometry(7.4,3,.12),lib.officePlastic,0,1.5,3.2);
-        box(house,new THREE.BoxGeometry(.12,3,6.4),lib.officePlastic,-3.7,1.5,0);
-        box(house,new THREE.BoxGeometry(.12,3,6.4),lib.officePlastic,3.7,1.5,0);
-        const roof=box(house,new THREE.BoxGeometry(8.0,.24,7.0),lib.officeWood,0,3.08,0);roof.rotation.z=.035;
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.14),wallMat,-(halfX+doorHalf)/2,1.5,front);
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.14),wallMat,(halfX+doorHalf)/2,1.5,front);
+        box(house,new THREE.BoxGeometry(doorHalf*2,.8,.14),wallMat,0,2.6,front);
+        box(house,new THREE.BoxGeometry(halfX*2,3,.14),wallMat,0,1.5,halfZ);
+        box(house,new THREE.BoxGeometry(.14,3,halfZ*2),wallMat,-halfX,1.5,0);
+        box(house,new THREE.BoxGeometry(.14,3,halfZ*2),wallMat,halfX,1.5,0);
+        const roof=box(house,new THREE.BoxGeometry(halfX*2+.5,.3,halfZ*2+.5),roofMat,0,3.08,0);roof.rotation.z=.035;
+        // Front porch, steps and a garage bay make the lots read as homes.
+        box(house,new THREE.BoxGeometry(2.6,.16,1.2),lib.officeWood,0,.12,-5.0);
+        box(house,new THREE.BoxGeometry(2.0,.12,.42),lib.officeWood,0,.06,-5.75);
+        box(house,new THREE.BoxGeometry(2.5,2.1,.08),lib.officeWood,0,1.05,front-.09);
+        box(house,new THREE.BoxGeometry(2.1,1.7,.06),lib.dark,0,1.9,front-.12);
+        // Furnished but unpowered interior silhouettes.
+        box(house,new THREE.BoxGeometry(1.6,.52,.72),lib.mahogany,-1.65,.55,1.1);
+        box(house,new THREE.BoxGeometry(.8,1.7,.5),lib.officeWood,2.1,.85,1.3);
+        for(const wx of [-2.7,2.7]){
+          box(house,new THREE.BoxGeometry(1.2,1.0,.06),lib.dark,wx,1.95,front-.08);
+          box(house,new THREE.BoxGeometry(1.32,.07,.08),lib.trim,wx,1.95,front-.12);
+        }
         const isExitLot=this.exit?.kind==="suburb"&&this.exit.x===room.x&&this.exit.z===room.z;
         box(house,new THREE.BoxGeometry(1.12,2.2,.07),isExitLot?lib.exitDoor:lib.officeWood,0,1.1,-3.27);
         for(const wx of [-2.1,2.1]){
@@ -1192,18 +1373,20 @@ class Chunk{
           {x1:x-halfX,z1:z+halfZ,x2:x-halfX,z2:z-halfZ}
         );
       }
-      for(let i=0;i<2;i++){
-        const x=this.originX+cell*(1+rng.next()*(cells-2)),z=this.originZ+cell*(1+rng.next()*(cells-2));
-        const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,3.8,7),lib.metal);pole.position.set(x,1.9,z);g.add(pole);
-        const arm=box(g,new THREE.BoxGeometry(.75,.08,.08),lib.metal,x+.34,3.72,z);
-        const bulb=box(g,new THREE.BoxGeometry(.28,.12,.2),lib.dark,x+.68,3.67,z);bulb.userData.light=false;
+      for(let i=0;i<5;i++){
+        const x=this.originX+size*(.12+i*.19),z=this.originZ+size*(i%2?.46:.54);
+        const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,4.4,7),lib.metal);pole.position.set(x,2.2,z);g.add(pole);
+        box(g,new THREE.BoxGeometry(1.0,.08,.08),lib.metal,x+.45,4.28,z);
+        const bulb=box(g,new THREE.BoxGeometry(.28,.12,.2),lib.dark,x+.9,4.22,z);bulb.userData.light=false;
+        if(rng.next()<.28)this.lightSources.push({position:new THREE.Vector3(x+.9,4.15,z),color:0xd8e0d9,baseIntensity:7,intensity:7,distance:9,decay:2});
       }
     }else if(level.id==="10"){
       const rng=new RNG(this.seedKey()^0x10c0);
       const stalkGeometry=new THREE.CylinderGeometry(.018,.032,1.35,4),headGeometry=new THREE.ConeGeometry(.055,.34,5);
-      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,150),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,150);
-      const q=new THREE.Quaternion(),dummy=new THREE.Object3D();let count=0;
-      for(let i=0;i<150;i++){
+      const cropCount=1100;
+      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
+      const dummy=new THREE.Object3D();let count=0;
+      for(let i=0;i<cropCount;i++){
         const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2);
         if(Math.hypot(x-(this.originX+size/2),z-(this.originZ+size/2))<4)continue;
         const height=.85+rng.next()*.65,angle=rng.next()*Math.PI*2;
@@ -1212,18 +1395,23 @@ class Chunk{
       }
       stalks.count=count;heads.count=count;stalks.instanceMatrix.needsUpdate=true;heads.instanceMatrix.needsUpdate=true;g.add(stalks,heads);
       // Tree and shrub lines divide the cultivated plots, with shallow clean ponds between them.
-      const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.12,.2,2.8,7),lib.treeBark,6);
-      const crowns=new THREE.InstancedMesh(new THREE.SphereGeometry(1.25,9,7),lib.treeLeaves,6),treeDummy=new THREE.Object3D();let treeIndex=0;
-      for(const side of [-1,1])for(let i=0;i<3;i++){
-        const x=this.originX+(side<0?size*.12:size*.88),z=this.originZ+size*(.16+i*.34);
+      const treeCount=14;
+      const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.12,.2,2.8,7),lib.treeBark,treeCount);
+      const crowns=new THREE.InstancedMesh(new THREE.SphereGeometry(1.25,9,7),lib.treeLeaves,treeCount),treeDummy=new THREE.Object3D();let treeIndex=0;
+      for(let row=0;row<2;row++)for(let i=0;i<7;i++){
+        const x=this.originX+(row===0?size*.12:size*.88),z=this.originZ+size*(.08+i*.14);
         treeDummy.position.set(x,1.4,z);treeDummy.scale.set(1,1,1);treeDummy.updateMatrix();trunks.setMatrixAt(treeIndex,treeDummy.matrix);
         treeDummy.position.set(x,3.1,z);treeDummy.scale.set(1.1,1.2,1);treeDummy.updateMatrix();crowns.setMatrixAt(treeIndex,treeDummy.matrix);treeIndex++;
         const half=.22;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
       }
       trunks.instanceMatrix.needsUpdate=true;crowns.instanceMatrix.needsUpdate=true;g.add(trunks,crowns);
-      if(rng.next()<.28){
-        const pond=new THREE.Mesh(new THREE.CircleGeometry(1.7+rng.next()*1.5,20),lib.water.clone());
-        pond.rotation.x=-Math.PI/2;pond.position.set(this.originX+size*(.28+rng.next()*.44),.022,this.originZ+size*(.28+rng.next()*.44));g.add(pond);
+      // Farm tracks and a pair of shallow, clear irrigation ponds.
+      box(g,new THREE.BoxGeometry(size,.035,3.8),lib.farmDirt,this.originX+size/2,.012,this.originZ+size*.54);
+      for(let i=0;i<2;i++){
+        const pond=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*2.2,24),lib.water.clone());
+        pond.rotation.x=-Math.PI/2;
+        pond.position.set(this.originX+size*(.22+rng.next()*.56),.022,this.originZ+size*(.22+rng.next()*.56));
+        pond.material.color.setHex(0x526d70);pond.material.opacity=.86;g.add(pond);
       }
       const exitBarn=this.exit?.kind==="field",randomBarn=cycleHash(this.seedKey(),this.cx*17+this.cz*7,10)<.2;
       if(exitBarn||randomBarn){

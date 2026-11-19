@@ -74,26 +74,28 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-2",
     next: "3",
     theme: {
-      wall: 0x62605a,
+      wall: 0x6d625a,
       wallRough: 0.96,
-      floor: 0x2f302f,
-      ceiling: 0x252625,
-      fog: 0x000000,
-      accent: 0x8f6cff,
-      light: 0xb9b0ff,
-      ambient: 0x2e3340
+      floor: 0x49433e,
+      ceiling: 0x39332f,
+      fog: 0x0b0908,
+      accent: 0xd18b43,
+      light: 0xffd4a1,
+      ambient: 0x24201b
     },
     cellSize: 5.0,
     wallHeight: 3.2,
-    darkness: 0.28,
+    darkness: 0.18,
     holeChance: 0,
-    pipeChance: 0.28,
+    pipeChance: 0.34,
     entity: "smiler",
     exitStyle: "violet",
     batteryChance: 0.10,
     exitAfterChunks: 5,
-    objective: "The power is unstable. Reach the emergency threshold.",
-    safe: false
+    objective: "Follow the chalk marks through the hot utility tunnels. Find the service lift.",
+    safe: false,
+    ambientIntensity: 0.105,
+    fogDensity: 0.014
   },
   "3": {
     id: "3",
@@ -103,26 +105,28 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-3",
     next: "4",
     theme: {
-      wall: 0x66584f,
+      wall: 0x684c40,
       wallRough: 0.96,
-      floor: 0x50504c,
-      ceiling: 0x878781,
-      fog: 0x000000,
-      accent: 0xffa45c,
-      light: 0xd9d5c7,
-      ambient: 0x151818
+      floor: 0x55514b,
+      ceiling: 0x625e57,
+      fog: 0x080706,
+      accent: 0xffa15b,
+      light: 0xffdfba,
+      ambient: 0x201b17
     },
     cellSize: 7.2,
     wallHeight: 3.9,
-    darkness: 0.34,
+    darkness: 0.22,
     holeChance: 0.004,
-    pipeChance: 0.38,
+    pipeChance: 0.42,
     batteryChance: 0.10,
     entity: "hound",
     exitStyle: "green",
     exitAfterChunks: 4,
-    objective: "Follow the service markings. Find an elevator out.",
-    safe: false
+    objective: "Trace the live busbars to the generator control room. Find an elevator out.",
+    safe: false,
+    ambientIntensity: 0.115,
+    fogDensity: 0.012
   },
   "4": {
     id: "4",
@@ -144,22 +148,23 @@ export const LEVELS = {
     },
     cellSize: 12.0,
     wallHeight: 3.6,
-    darkness: 0.12,
+    darkness: 0.06,
     holeChance: 0,
     pipeChance: 0.02,
     batteryChance: 0.14,
     entity: "none",
     exitStyle: "green",
     exitAfterChunks: 5,
-    objective: "The lights still work. Find the next door.",
-    safe: true
+    objective: "Search the quiet office floors for the stairwell. Stock up before moving on.",
+    safe: true, ambientIntensity: 0.19, fogDensity: 0.006
   },
   "5": {
     id: "5", number: "LEVEL 5", name: "TERROR HOTEL",
     sourceTitle: 'Level 5 - "Terror Hotel"', sourceUrl: "https://backrooms-wiki.wikidot.com/level-5", next: "6",
-    theme: { wall: 0x654b4a, wallRough: .92, floor: 0x382c2d, ceiling: 0x8f8174, fog: 0x100b0b, accent: 0xc7a36d, light: 0xf4d8ad, ambient: 0x211716 },
-    cellSize: 10.5, wallHeight: 4.2, darkness: .16, holeChance: 0, pipeChance: 0, entity: "deathmoth", exitStyle: "gold", exitAfterChunks: 4, batteryChance: .12,
-    objective: "The hotel is still expecting guests. Find the boiler room exit.", safe: false, ambientIntensity: .09, fogDensity: .018
+    theme: { wall: 0x704541, wallRough: .88, floor: 0x493238, ceiling: 0xb4a38d, fog: 0x100b0a, accent: 0xd7b36d, light: 0xffdfb5, ambient: 0x30231f },
+    cellSize: 10.5, wallHeight: 4.2, darkness: .10, holeChance: 0, pipeChance: 0, entity: "deathmoth", exitStyle: "gold", exitAfterChunks: 4, batteryChance: .12,
+    objective: "Find the Beverly Room, then follow the boiler pipes to the service stair.",
+    safe: false, ambientIntensity: .135, fogDensity: .008
   },
   "6": {
     id: "6", number: "LEVEL 6", name: "LIGHTS OUT",
@@ -171,30 +176,34 @@ export const LEVELS = {
   "7": {
     id: "7", number: "LEVEL 7", name: "THALASSOPHOBIA",
     sourceTitle: 'Level 7 - "Thalassophobia"', sourceUrl: "https://backrooms-wiki.wikidot.com/level-7", next: "8",
-    theme: { wall: 0x182a35, wallRough: .92, floor: 0x10232e, ceiling: 0x07131c, fog: 0x06131e, accent: 0x4f8ca4, light: 0x9bbac6, ambient: 0x07121a },
-    cellSize: 14, wallHeight: 4.5, darkness: .48, holeChance: .008, pipeChance: 0, entity: "leviathan", exitStyle: "blue", exitAfterChunks: 4, batteryChance: .08,
-    objective: "The ocean has no visible bottom. Find the cave beneath the waterline.", safe: false, ambientIntensity: .035, fogDensity: .012
+    theme: { wall: 0x263c48, wallRough: .92, floor: 0x10232e, ceiling: 0x25333a, fog: 0x142b36, accent: 0x67a6bd, light: 0xb4d0da, ambient: 0x263b46 },
+    cellSize: 14, wallHeight: 4.5, darkness: .34, holeChance: .008, pipeChance: 0, entity: "leviathan", exitStyle: "blue", exitAfterChunks: 4, batteryChance: .08,
+    objective: "Descend from the flooded entrance room into the ocean. Find the underwater cave.",
+    safe: false, ambientIntensity: .065, fogDensity: .008
   },
   "8": {
     id: "8", number: "LEVEL 8", name: "CAVE SYSTEMS",
     sourceTitle: 'Level 8 - "Cave Systems"', sourceUrl: "https://backrooms-wiki.wikidot.com/level-8", next: "9",
-    theme: { wall: 0x514b43, wallRough: 1, floor: 0x25231f, ceiling: 0x302d29, fog: 0x050504, accent: 0x8b785e, light: 0xb0a28c, ambient: 0x11100e },
-    cellSize: 8.5, wallHeight: 5.4, darkness: .52, holeChance: .012, pipeChance: 0, entity: "crawler", exitStyle: "green", exitAfterChunks: 4, batteryChance: .11,
-    objective: "The cave keeps folding back on itself. Stay on the marked path.", safe: false, ambientIntensity: .035, fogDensity: .025
+    theme: { wall: 0x625b50, wallRough: 1, floor: 0x302e28, ceiling: 0x49443b, fog: 0x10100e, accent: 0x9b8b69, light: 0xc4b79d, ambient: 0x1b1a16 },
+    cellSize: 8.5, wallHeight: 5.4, darkness: .40, holeChance: .012, pipeChance: 0, entity: "crawler", exitStyle: "green", exitAfterChunks: 4, batteryChance: .11,
+    objective: "Follow the marked 9th Road through the flooded cave chambers. Find the exit.",
+    safe: false, ambientIntensity: .052, fogDensity: .016
   },
   "9": {
     id: "9", number: "LEVEL 9", name: "THE SUBURBS",
     sourceTitle: 'Level 9 - "The Suburbs"', sourceUrl: "https://backrooms-wiki.wikidot.com/level-9", next: "10",
-    theme: { wall: 0x4c514f, wallRough: .94, floor: 0x171a1b, ceiling: 0x080b0e, fog: 0x020407, accent: 0x7d9b8d, light: 0x9aa9a1, ambient: 0x05090c },
-    cellSize: 18, wallHeight: 4.1, darkness: .76, holeChance: 0, pipeChance: 0, entity: "smiler", exitStyle: "green", exitAfterChunks: 4, batteryChance: .10,
-    objective: "The streetlights are dead. Do not trust the houses with open doors.", safe: false, ambientIntensity: .018, fogDensity: .014
+    theme: { wall: 0x656b68, wallRough: .94, floor: 0x202426, ceiling: 0x15191b, fog: 0x080c10, accent: 0x8b9c91, light: 0xb1beb8, ambient: 0x101619 },
+    cellSize: 18, wallHeight: 4.1, darkness: .68, holeChance: 0, pipeChance: 0, entity: "smiler", exitStyle: "green", exitAfterChunks: 4, batteryChance: .10,
+    objective: "Follow the wet residential streets. Search the houses, but watch the fog.",
+    safe: false, ambientIntensity: .035, fogDensity: .011
   },
   "10": {
     id: "10", number: "LEVEL 10", name: "BUMPER CROP",
     sourceTitle: 'Level 10 - "Bumper Crop"', sourceUrl: "https://backrooms-wiki.wikidot.com/level-10", next: null,
-    theme: { wall: 0x8c8054, wallRough: .98, floor: 0x4b4829, ceiling: 0x9b9a86, fog: 0x78816c, accent: 0xc0a75c, light: 0xe1d8b8, ambient: 0x3c3a2b },
-    cellSize: 20, wallHeight: 4.8, darkness: .08, holeChance: 0, pipeChance: 0, entity: "none", exitStyle: "gold", exitAfterChunks: 2, batteryChance: .04,
-    objective: "The fields go on forever. Find the old barn and the way home.", safe: true, ambientIntensity: .16, fogDensity: .006
+    theme: { wall: 0x9b916b, wallRough: .98, floor: 0x5b5738, ceiling: 0xb3b0a0, fog: 0x8b9387, accent: 0xcbb66d, light: 0xe7dfc4, ambient: 0x555548 },
+    cellSize: 20, wallHeight: 4.8, darkness: .04, holeChance: 0, pipeChance: 0, entity: "none", exitStyle: "gold", exitAfterChunks: 2, batteryChance: .04,
+    objective: "Cross the wheat and barley plots. Find the old farm buildings and the way home.",
+    safe: true, ambientIntensity: .20, fogDensity: .004
   }
 };
 
