@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createLevel1PuddleMaterial } from "./level1-wet.js";
+import { createLevel1PuddleMaterial } from "./level1-wet.js?v=20261119-level1wet1";
 THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
