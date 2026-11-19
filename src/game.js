@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261013-kane-level0";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-level1wet1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
