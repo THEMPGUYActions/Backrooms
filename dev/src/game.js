@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10f";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10f";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10g";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10g";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -1428,7 +1428,7 @@ class Chunk{
     }else if(level.id==="10"){
       const rng=new RNG(this.seedKey()^0x10c0);
       const stalkGeometry=new THREE.CylinderGeometry(.018,.032,1.35,4),headGeometry=new THREE.ConeGeometry(.055,.34,5);
-      const cropCount=1100;
+      const cropCount=isTouchControlsDevice()?1400:3000;
       const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
       const dummy=new THREE.Object3D();let count=0;
       for(let i=0;i<cropCount;i++){
