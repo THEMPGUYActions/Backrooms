@@ -1428,7 +1428,7 @@ class Chunk{
     }else if(level.id==="10"){
       const rng=new RNG(this.seedKey()^0x10c0);
       const stalkGeometry=new THREE.CylinderGeometry(.018,.032,1.35,4),headGeometry=new THREE.ConeGeometry(.055,.34,5);
-      const cropCount=1100;
+      const cropCount=isTouchControlsDevice()?1400:3000;
       const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
       const dummy=new THREE.Object3D();let count=0;
       for(let i=0;i<cropCount;i++){
