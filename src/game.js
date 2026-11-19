@@ -1147,6 +1147,33 @@ class Chunk{
         box(cab,new THREE.BoxGeometry(.08,.08,.12),lib.handle,.55,1.1,-.02);
         g.add(cab);
       }
+      // The Main Hall is the most furnished area: mahogany sofas, framed
+      // portraits and brass room plaques contrast with the otherwise empty rooms.
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.2+i*.3),z=this.originZ+size*.22,sofa=new THREE.Group();
+        sofa.position.set(x,0,z);
+        box(sofa,new THREE.BoxGeometry(2.35,.48,.82),lib.mahogany,0,.48,0);
+        box(sofa,new THREE.BoxGeometry(2.35,.62,.22),lib.officeWood,0,.92,-.31);
+        for(const sx of [-.98,.98])box(sofa,new THREE.BoxGeometry(.28,.72,.82),lib.mahogany,sx,.72,0);
+        g.add(sofa);
+        const picture=new THREE.Group();picture.position.set(x,2.35,z-1.2);
+        box(picture,new THREE.BoxGeometry(.92,.72,.08),lib.hotelGold,0,0,0);
+        box(picture,new THREE.BoxGeometry(.76,.56,.035),lib.mahogany,0,0,.055);g.add(picture);
+      }
+      for(let i=0;i<4;i++){
+        const x=this.originX+size*(.12+i*.22),z=this.originZ+size*.42,plaque=new THREE.Group();
+        plaque.position.set(x,2.0,z);box(plaque,new THREE.BoxGeometry(.48,.22,.045),lib.hotelGold,0,0,0);
+        box(plaque,new THREE.BoxGeometry(.31,.035,.055),lib.mahogany,0,0,.03);g.add(plaque);
+      }
+      // Rare antique cage elevator landmark.
+      if(cycleHash(this.seedKey(),this.cx,this.cz+0x51)<.34){
+        const ex=this.originX+size*.82,ez=this.originZ+size*.28,elevator=new THREE.Group();elevator.position.set(ex,0,ez);
+        for(const x of [-1.05,1.05])for(const z of [-1.05,1.05]){
+          const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,3.6,8),lib.hotelGold);post.position.set(x,1.8,z);elevator.add(post);
+        }
+        for(const y of [.35,1.2,2.05,2.9])for(const x of [-1,0,1])box(elevator,new THREE.BoxGeometry(.045,.045,2.05),lib.hotelGold,x,y,0);
+        box(elevator,new THREE.BoxGeometry(1.9,.12,1.9),lib.mahogany,0,.12,0);g.add(elevator);
+      }
       const ballroom=this.rooms.find(room=>room.type==="beverly");
       const chandelier=new THREE.Group();
       chandelier.position.set(ballroom?this.originX+(ballroom.x+ballroom.w/2)*cell:this.originX+size/2,level.wallHeight-.48,ballroom?this.originZ+(ballroom.z+ballroom.h/2)*cell:this.originZ+size/2);
@@ -1195,16 +1222,56 @@ class Chunk{
         const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4);
         box(g,new THREE.BoxGeometry(.35+rng.next()*.4,.08,.25+rng.next()*.3),lib.rustMetal,x,.05,z);
       }
+      // Acoustic wall panels and tactile seams are just visible in the
+      // flashlight beam. Level 6 has no working lights and remains silent.
+      for(let i=0;i<6;i++){
+        const p=this.originX+size*(.1+i*.16);
+        box(g,new THREE.BoxGeometry(1.25,.52,.035),lib.wall2,p,1.72,this.originZ+.12);
+        box(g,new THREE.BoxGeometry(.035,.52,1.25),lib.wall2,this.originX+.12,1.72,p);
+        box(g,new THREE.BoxGeometry(.025,2.4,.04),lib.concrete,p,1.2,this.originZ+.16);
+      }
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.2+i*.3),z=this.originZ+size*(i%2?.72:.28);
+        box(g,new THREE.BoxGeometry(1.1,2.6,.12),lib.concrete,x,1.3,z);
+        box(g,new THREE.BoxGeometry(.72,2.15,.08),lib.dark,x,1.25,z-.08);
+      }
     }else if(level.id==="7"){
-      const water=lib.water.clone();water.color.setHex(0x163746);water.opacity=.78;water.roughness=.12;water.depthWrite=false;
+      const water=lib.water.clone();water.color.setHex(0x1a4354);water.opacity=.82;water.roughness=.16;water.metalness=.08;water.depthWrite=false;
       const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size),water);surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
       const rng=new RNG(this.seedKey()^0x7a77),rockGeometry=new THREE.IcosahedronGeometry(1,1);
-      const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,10),rockDummy=new THREE.Object3D();
-      for(let i=0;i<10;i++){
-        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),scale=.8+rng.next()*1.5;
-        rockDummy.position.set(x,-.5-rng.next()*1.8,z);rockDummy.scale.set(scale*1.3,scale*.55,scale*1.1);rockDummy.rotation.y=rng.next()*Math.PI*2;rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
+      const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,24),rockDummy=new THREE.Object3D();
+      for(let i=0;i<24;i++){
+        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),scale=.8+rng.next()*2.1;
+        rockDummy.position.set(x,-.65-rng.next()*2.8,z);rockDummy.scale.set(scale*1.45,scale*.62,scale*1.2);rockDummy.rotation.y=rng.next()*Math.PI*2;rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
       }
       rocks.instanceMatrix.needsUpdate=true;g.add(rocks);
+      // Furnished flooded entrance room built sideways into the ocean ceiling.
+      if(this.cx===0&&this.cz===0){
+        const room=new THREE.Group();
+        box(room,new THREE.BoxGeometry(8.6,.16,8.6),lib.officeWood,0,.10,0);
+        box(room,new THREE.BoxGeometry(8.6,3.1,.18),lib.concrete,0,1.65,-4.25);
+        box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,-4.25,1.65,0);
+        box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,4.25,1.65,0);
+        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,-1.45,1.65,4.25);
+        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,1.45,1.65,4.25);
+        box(room,new THREE.BoxGeometry(2.9,.22,.2),lib.concrete,0,3.1,4.25);
+        const puddle=new THREE.Mesh(new THREE.PlaneGeometry(7.7,7.7),lib.water.clone());
+        puddle.rotation.x=-Math.PI/2;puddle.position.set(0,.19,0);puddle.material.opacity=.34;room.add(puddle);
+        box(room,new THREE.BoxGeometry(1.5,2.25,.38),lib.officeWood,-3.15,1.28,-.35);
+        for(let shelf=0;shelf<4;shelf++)box(room,new THREE.BoxGeometry(1.38,.055,.34),lib.trim,-3.15,.48+shelf*.48,-.12);
+        const chair=new THREE.Group();chair.position.set(2.25,0,-1.1);
+        box(chair,new THREE.BoxGeometry(.78,.18,.78),lib.officeWood,0,.48,0);
+        box(chair,new THREE.BoxGeometry(.78,1.0,.16),lib.officeWood,0,1.02,-.32);room.add(chair);
+        box(room,new THREE.BoxGeometry(1.0,.12,.62),lib.officeWood,.55,.52,.75);
+        for(const x of [-.35,1.45])for(const z of [.5,1.0])box(room,new THREE.BoxGeometry(.07,.48,.07),lib.officeWood,x,.24,z);
+        const lamp=box(room,new THREE.CylinderGeometry(.14,.18,.32,10),lib.light,-2.8,3.0,-2.5);
+        lamp.userData.light=true;lamp.userData.baseEmissive=1.2;
+        g.add(room);
+        this.collisionSegments.push(
+          {x1:-4.3,z1:-4.3,x2:4.3,z2:-4.3},{x1:-4.3,z1:-4.3,x2:-4.3,z2:4.3},
+          {x1:4.3,z1:-4.3,x2:4.3,z2:4.3}
+        );
+      }
     }else if(level.id==="8"){
       // Cave systems: denser floor rock + ceiling spikes + ground stalagmites
       const rng=new RNG(this.seedKey()^0x8ca7e);
@@ -1226,6 +1293,20 @@ class Chunk{
         stagDummy.position.set(x,h/2,z);stagDummy.rotation.set(0,rng.next()*Math.PI,0);stagDummy.scale.set(.8+rng.next()*.5,h, .8+rng.next()*.5);stagDummy.updateMatrix();stags.setMatrixAt(i,stagDummy.matrix);
       }
       boulders.instanceMatrix.needsUpdate=true;spikes.instanceMatrix.needsUpdate=true;stags.instanceMatrix.needsUpdate=true;g.add(boulders,spikes,stags);
+      // Cold pools and M.E.G. 9th Road markers give the karst network a
+      // recognizable route through its natural chambers.
+      for(let i=0;i<3;i++){
+        const px=this.originX+size*(.2+i*.3),pz=this.originZ+size*(.28+(i%2)*.42);
+        const pool=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*1.8,24),lib.water.clone());
+        pool.rotation.x=-Math.PI/2;pool.position.set(px,.018,pz);pool.material.color.setHex(0x25434a);pool.material.opacity=.76;g.add(pool);
+      }
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.22+i*.28),z=this.originZ+size*.52,sign=new THREE.Group();sign.position.set(x,0,z);
+        const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.075,2.1,8),lib.rustMetal);post.position.y=1.05;sign.add(post);
+        box(sign,new THREE.BoxGeometry(.9,.42,.08),lib.hotelGold,0,2.05,0);
+        box(sign,new THREE.BoxGeometry(.72,.26,.035),lib.dark,0,2.05,.055);
+        box(sign,new THREE.BoxGeometry(.42,.035,.04),lib.indicator,0,2.05,.08);g.add(sign);
+      }
     }else if(level.id==="9"){
       const rng=new RNG(this.seedKey()^0x9b42);
       box(g,new THREE.BoxGeometry(size,.025,3.8),lib.garageBase,this.originX+size/2,.012,this.originZ+size/2);
