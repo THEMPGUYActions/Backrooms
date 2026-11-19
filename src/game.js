@@ -1521,7 +1521,7 @@ class Chunk{
       for(let i=0;i<carCount;i++){
         const px=this.originX+12+next()*(size-24),pz=this.originZ+12+next()*(size-24);
         if(Math.abs(px-(this.originX+size/2))<5&&Math.abs(pz-(this.originZ+size/2))<5)continue;
-        const car=new THREE.Group();car.position.set(px,0,pz);car.rotation.y=next()<.5?0:Math.PI/2;
+        const car=new THREE.Group();car.position.set(px,0,pz);
         box(car,new THREE.BoxGeometry(1.82,.62,3.75),lib.garageBase,0,.72,0);
         box(car,new THREE.BoxGeometry(1.58,.72,1.65),lib.metal,0,1.34,-.12);
         box(car,new THREE.BoxGeometry(1.62,.12,3.25),lib.rustMetal,0,1.08,0);
