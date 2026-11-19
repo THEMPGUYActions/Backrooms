@@ -1,13 +1,13 @@
-const CACHE_NAME="backrooms-assets-v40";
+const CACHE_NAME="backrooms-assets-v41";
 const CORE=[
   "index.html",
   "styles.css",
-  "src/main.js?v=20261119-levels2-10",
-  "src/game.js?v=20261119-levels2-10",
+  "src/main.js?v=20261119-levels2-10b",
+  "src/game.js?v=20261119-levels2-10b",
   "src/entity-models.js",
-  "src/assets.js?v=20261119-levels2-10",
+  "src/assets.js?v=20261119-levels2-10b",
   "src/level1-wet.js?v=20261119-level1wet1",
-  "src/levels.js?v=20261119-levels2-10",
+  "src/levels.js?v=20261119-levels2-10b",
   "src/audio.js",
   "src/levels.js",
   "src/admin.js",
