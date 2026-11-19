@@ -443,6 +443,10 @@ class Chunk{
         // The wheat fields are open terrain; the final route is a barn door,
         // not a fake perimeter wall around each streamed chunk.
         this.walls.fill(0);
+      }else if(level.id==="8"){
+        // Natural karst caves are open chamber networks, not a square-cell maze.
+        // Organic rock banks below define the traversable 9th Road.
+        this.walls.fill(0);
       }else{
         const visited=new Uint8Array(cells*cells);
         const startX=Math.floor(cells/2),startZ=Math.floor(cells/2);
@@ -1301,8 +1305,37 @@ class Chunk{
         const pool=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*1.8,24),lib.water.clone());
         pool.rotation.x=-Math.PI/2;pool.position.set(px,.018,pz);pool.material.color.setHex(0x25434a);pool.material.opacity=.76;g.add(pool);
       }
+      // A sinuous 9th Road passes through broad chambers linked by natural
+      // constrictions. Instanced rock banks keep the cave organic and cheap.
+      const road=[
+        [this.originX+size*.04,this.originZ+size*.5],
+        [this.originX+size*.2,this.originZ+size*.5],
+        [this.originX+size*.34,this.originZ+size*.36],
+        [this.originX+size*.5,this.originZ+size*.5],
+        [this.originX+size*.68,this.originZ+size*.5],
+        [this.originX+size*.82,this.originZ+size*.34],
+        [this.originX+size*.97,this.originZ+size*.34]
+      ];
+      const wallGeometry=new THREE.IcosahedronGeometry(1,1),wallInstances=new THREE.InstancedMesh(wallGeometry,lib.concrete,120);
+      const wallDummy=new THREE.Object3D();let wallIndex=0;
+      for(let segment=0;segment<road.length-1;segment++){
+        const [ax,az]=road[segment],[bx,bz]=road[segment+1],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);
+        const nx=-dz/length,nz=dx/length;
+        for(const side of [-1,1]){
+          this.collisionSegments.push({x1:ax+nx*4.4*side,z1:az+nz*4.4*side,x2:bx+nx*4.4*side,z2:bz+nz*4.4*side});
+          for(let distance=3.5;distance<length-2;distance+=4.2){
+            const t=distance/length,x=ax+dx*t+nx*(4.8+next()*1.1)*side,z=az+dz*t+nz*(4.8+next()*1.1)*side;
+            const scale=1.65+next()*1.1;
+            wallDummy.position.set(x,1.25+next()*.45,z);
+            wallDummy.scale.set(scale*1.2,1.55+next()*1.1,scale);
+            wallDummy.rotation.set(next()*.35,next()*Math.PI*2,next()*.3);
+            wallDummy.updateMatrix();wallInstances.setMatrixAt(wallIndex++,wallDummy.matrix);
+          }
+        }
+      }
+      wallInstances.count=wallIndex;wallInstances.instanceMatrix.needsUpdate=true;g.add(wallInstances);
       for(let i=0;i<3;i++){
-        const x=this.originX+size*(.22+i*.28),z=this.originZ+size*.52,sign=new THREE.Group();sign.position.set(x,0,z);
+        const [x,z]=road[1+i*2],sign=new THREE.Group();sign.position.set(x,0,z);
         const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.075,2.1,8),lib.rustMetal);post.position.y=1.05;sign.add(post);
         box(sign,new THREE.BoxGeometry(.9,.42,.08),lib.hotelGold,0,2.05,0);
         box(sign,new THREE.BoxGeometry(.72,.26,.035),lib.dark,0,2.05,.055);
