@@ -2081,7 +2081,7 @@ class WorldStreamer{
     }
     return best<90?1-best/90:0;
   }
-  nearbyLightSources(x,z,frustum,camera){
+  nearbyLightSources(x,z,frustum){
     const out=[];
     const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
@@ -2090,11 +2090,9 @@ class WorldStreamer{
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
       for(const light of c.lightSources){
+        if(!frustum.containsPoint(light.position))continue;
         const range=Math.max(34,light.distance||0);
         const d=Math.hypot(light.position.x-x,light.position.z-z);
-        // A point light can illuminate geometry that is outside the camera
-        // frustum. Do not cull it because the light source itself is behind
-        // the camera or just outside the view.
         if(d>Math.max(96,range+54))continue;
         out.push({light,d,score:d});
       }
@@ -3162,7 +3160,7 @@ export class BackroomsGame{
     this.toast(this.level.objective,2.4);
   }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);document.title="The Backrooms: Level "+this.level.id;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x555039:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
@@ -3514,7 +3512,7 @@ export class BackroomsGame{
     const frustumMatrix=this._lightFrustumMatrix||(this._lightFrustumMatrix=new THREE.Matrix4());
     frustumMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse);
     lightFrustum.setFromProjectionMatrix(frustumMatrix);
-    const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z,lightFrustum,this.camera);
+    const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z,lightFrustum);
     const next=sources.slice(0,this.localLights.length);
     for(let i=0;i<this.localLights.length;i++){
       const target=this.localLights[i],entry=next[i];
@@ -3565,6 +3563,7 @@ export class BackroomsGame{
 
     if(t>=duration){
       this.introPlaying=false;
+      document.title="The Backrooms: Level "+this.level.id;
       this.running=true;this.paused=false;this.dead=false;
       document.getElementById("hud").classList.remove("hidden");
       const mobileControls=document.getElementById("mobile-controls");
