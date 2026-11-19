@@ -776,7 +776,7 @@ class Chunk{
       }else if(e.kind==="cave"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         const arch=new THREE.Mesh(new THREE.TorusGeometry(1.7,.22,10,24),lib.concrete);
-        arch.rotation.x=Math.PI/2;arch.position.set(px,1.45,pz);g.add(arch);
+        arch.position.set(px,1.45,pz);g.add(arch);
         box(g,new THREE.BoxGeometry(1.55,2.35,.14),lib.mahogany,px,1.18,pz-.08);
         box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px-.9,1.28,pz-.08);
         box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px+.9,1.28,pz-.08);
