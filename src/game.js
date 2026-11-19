@@ -834,6 +834,37 @@ class Chunk{
         const returnX=bx+sideX*(w/2+1.1),returnZ=bz+sideZ*(h/2+1.1);
         addUtilityWall(backX,backZ,returnX,returnZ,2.65,lib.rustMetal);
       }
+      // Level 2's tunnel plan kinks at 45-degree angles instead of repeating
+      // square rooms. The short diagonal returns preserve the walkable spine.
+      for(const sx of [-1,1])for(const sz of [-1,1]){
+        const ax=cx+sx*9,az=cz+sz*8,bx=cx+sx*15,bz=cz+sz*14,cx2=cx+sx*21,cz2=cz+sz*14;
+        addUtilityWall(ax,az,bx,bz,2.85,lib.wall2);
+        addUtilityWall(bx,bz,cx2,cz2,2.85,lib.brickWall);
+        addUtilityWall(cx2,cz2,cx+sx*25,cz+sz*18,2.65,lib.rustMetal);
+      }
+      // Pump skids, pressure vessels and oil drums break up the long service runs.
+      for(let i=0;i<4;i++){
+        const side=i%2?1:-1,px=cx+side*(12+Math.floor(i/2)*15),pz=cz+(i<2?-1:1)*23;
+        const pump=new THREE.Group();pump.position.set(px,0,pz);
+        box(pump,new THREE.BoxGeometry(1.45,.42,1.05),lib.rustMetal,0,.22,0);
+        const tank=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,1.45,12),i%2?lib.metal:lib.rustMetal);
+        tank.position.set(0,1.0,0);pump.add(tank);
+        const motor=box(pump,new THREE.BoxGeometry(.72,.55,.7),lib.metal,.72,.5,0);
+        const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.06,12),lib.dark);
+        gauge.rotation.x=Math.PI/2;gauge.position.set(.25,1.45,-.37);pump.add(gauge);
+        const wheel=new THREE.Mesh(new THREE.TorusGeometry(.2,.035,6,14),lib.hotelGold);
+        wheel.position.set(-.42,1.18,-.43);pump.add(wheel);
+        g.add(pump);
+        const hx=.95,hz=.72;this.collisionSegments.push(
+          {x1:px-hx,z1:pz-hz,x2:px+hx,z2:pz-hz},{x1:px+hx,z1:pz-hz,x2:px+hx,z2:pz+hz},
+          {x1:px+hx,z1:pz+hz,x2:px-hx,z2:pz+hz},{x1:px-hx,z1:pz+hz,x2:px-hx,z2:pz-hz}
+        );
+      }
+      for(let i=0;i<3;i++){
+        const x=cx-18+i*18,z=cz+(i%2?28:-28);
+        const drum=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.9,12),lib.rustMetal);
+        drum.position.set(x,.47,z);g.add(drum);
+      }
       // CylinderGeometry is Y-up. Horizontal runs: rotate so the long axis follows corridor.
       // alongX → rot.z = PI/2; alongZ → rot.x = PI/2. Vertical risers stay unrotated.
       const pipeGeometry=new THREE.CylinderGeometry(.11,.11,cell*.72,8);
@@ -940,6 +971,37 @@ class Chunk{
         for(let x=0;x<7;x++)box(g,new THREE.BoxGeometry(.1,.09,.16),lib.rustMetal,this.originX+size*(.12+x*.125),level.wallHeight-.88,z);
         for(const side of [-1,1])box(g,new THREE.BoxGeometry(size*.78,.035,.11),lib.orangeLight,cx,.035,z+side*1.75);
       }
+      // Generator alternators and control cabinets make this a power station,
+      // not just a corridor with electrical boxes.
+      for(let unitIndex=0;unitIndex<2;unitIndex++){
+        const gx=this.originX+size*(unitIndex?.82:.18),gz=this.originZ+size*.72,generator=new THREE.Group();
+        generator.position.set(gx,0,gz);
+        box(generator,new THREE.BoxGeometry(3.8,1.65,2.6),lib.rustMetal,0,.95,0);
+        box(generator,new THREE.BoxGeometry(3.35,.16,2.25),lib.metal,0,1.83,0);
+        for(let fin=0;fin<10;fin++)box(generator,new THREE.BoxGeometry(.1,1.3,1.8),lib.metal,-1.55+fin*.34,.98,-.08);
+        const alternator=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,1.3,16),lib.metal);
+        alternator.rotation.z=Math.PI/2;alternator.position.set(0,2.15,0);generator.add(alternator);
+        for(let lamp=0;lamp<4;lamp++){
+          const led=box(generator,new THREE.BoxGeometry(.14,.12,.05),lamp===1?lib.indicator:lib.orangeLight,-.48+lamp*.32,1.35,-1.34);
+          led.userData.light=true;
+        }
+        g.add(generator);
+        this.collisionSegments.push(
+          {x1:gx-1.9,z1:gz-1.3,x2:gx+1.9,z2:gz-1.3},{x1:gx+1.9,z1:gz-1.3,x2:gx+1.9,z2:gz+1.3},
+          {x1:gx+1.9,z1:gz+1.3,x2:gx-1.9,z2:gz+1.3},{x1:gx-1.9,z1:gz+1.3,x2:gx-1.9,z2:gz-1.3}
+        );
+        this.lightSources.push({position:new THREE.Vector3(gx,2.1,gz),color:0xffa15b,baseIntensity:7,intensity:7,distance:11,decay:2});
+      }
+      // Cable trenches and insulated floor crossings lead between machine banks.
+      for(let row=0;row<3;row++){
+        const z=this.originZ+size*(.28+row*.2);
+        box(g,new THREE.BoxGeometry(size*.72,.08,.48),lib.dark,cx,.04,z);
+        for(let cable=0;cable<5; cable++){
+          const line=box(g,new THREE.BoxGeometry(size*.68,.025,.035),cable%2?lib.indicator:lib.orangeLight,cx,.095,z-.16+cable*.08);
+          line.userData.light=false;
+        }
+      }
+
       // A slow conveyor occupies one side bay, not the central walking aisle.
       const beltX=this.originX+size*.5,beltZ=this.originZ+size*.84,belt=new THREE.Group();belt.position.set(beltX,0,beltZ);
       box(belt,new THREE.BoxGeometry(7.2,.22,1.35),lib.metal,0,.62,0);
@@ -978,21 +1040,28 @@ class Chunk{
       addOfficeWall(o1x,o0z,o1x,cz-door/2);
       addOfficeWall(o1x,cz+door/2,o1x,o1z);
 
-      // Structural columns on a regular grid
-      const spacing=Math.max(5.0,cell*.5);
+      // Sparse structural columns are instanced. The old 6 m grid created
+      // more than 3,800 collision edges in one chunk and made the office feel
+      // like a parking garage instead of an open commercial floor plate.
+      const spacing=Math.max(16,cell*1.5),columnPositions=[];
       for(let z=this.originZ+spacing;z<this.originZ+size-spacing*.45;z+=spacing){
-        for(let x=this.originX+spacing;x<this.originX+size-spacing*.45;x+=spacing){
-          const col=new THREE.Group();col.position.set(x,0,z);
-          box(col,new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,0,level.wallHeight/2,0);
-          box(col,new THREE.BoxGeometry(.95,.1,.95),colMat,0,.05,0);
-          box(col,new THREE.BoxGeometry(.95,.1,.95),colMat,0,level.wallHeight-.05,0);
-          g.add(col);
-          const hr=.42;this.collisionSegments.push(
-            {x1:x-hr,z1:z-hr,x2:x+hr,z2:z-hr},{x1:x+hr,z1:z-hr,x2:x+hr,z2:z+hr},
-            {x1:x+hr,z1:z+hr,x2:x-hr,z2:z+hr},{x1:x-hr,z1:z+hr,x2:x-hr,z2:z-hr}
-          );
-        }
+        for(let x=this.originX+spacing;x<this.originX+size-spacing*.45;x+=spacing)columnPositions.push({x,z});
       }
+      const columnDummy=new THREE.Object3D();
+      const columnMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,columnPositions.length);
+      const baseMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.95,.1,.95),colMat,columnPositions.length);
+      const capMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.95,.1,.95),colMat,columnPositions.length);
+      columnPositions.forEach((p,i)=>{
+        columnDummy.position.set(p.x,level.wallHeight/2,p.z);columnDummy.updateMatrix();columnMesh.setMatrixAt(i,columnDummy.matrix);
+        columnDummy.position.set(p.x,.05,p.z);columnDummy.updateMatrix();baseMesh.setMatrixAt(i,columnDummy.matrix);
+        columnDummy.position.set(p.x,level.wallHeight-.05,p.z);columnDummy.updateMatrix();capMesh.setMatrixAt(i,columnDummy.matrix);
+        const hr=.48;this.collisionSegments.push(
+          {x1:p.x-hr,z1:p.z-hr,x2:p.x+hr,z2:p.z-hr},{x1:p.x+hr,z1:p.z-hr,x2:p.x+hr,z2:p.z+hr},
+          {x1:p.x+hr,z1:p.z+hr,x2:p.x-hr,z2:p.z+hr},{x1:p.x-hr,z1:p.z+hr,x2:p.x-hr,z2:p.z-hr}
+        );
+      });
+      columnMesh.instanceMatrix.needsUpdate=true;baseMesh.instanceMatrix.needsUpdate=true;capMesh.instanceMatrix.needsUpdate=true;
+      g.add(columnMesh,baseMesh,capMesh);
 
       // Dense fluorescent panel grid (drop ceiling)
       for(let z=this.originZ+2.2;z<this.originZ+size-1.5;z+=3.0){
