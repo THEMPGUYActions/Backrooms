@@ -2355,6 +2355,7 @@ class WorldStreamer{
   }
   exitAt(x,z){
     const c=this.chunkAt(x,z);if(!c||!c.exit)return false;
+    if(c.exit.kind==="ocean"&&this.game.player.position.y> -2.4)return false;
     return Math.hypot(c.exit.position.x-x,c.exit.position.z-z)<1.25;
   }
   lightProximity(x,z){
@@ -2436,7 +2437,7 @@ class Player{
     this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.yaw=0;this.pitch=0;
     this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;
     this.flashlight=true;this.flashBattery=100;
-    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;this.redFlashBoost=1;
+    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;this.redFlashBoost=1;this.inOcean=false;
     this.viewYaw=0;this.viewPitch=0;
   }
   reset(){
@@ -2444,6 +2445,7 @@ class Player{
     this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;
     this.health=this.stamina=this.hydration=this.sanity=100;this.flashBattery=100;
     this.flashlight=this.game.startFlash;
+    this.inOcean=false;
     this.flashWarmup=1.15;
     this.redFlashBoost=1;
     this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();
@@ -2463,6 +2465,34 @@ class Player{
     const oldX=this.position.x,oldZ=this.position.z;
     this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
     const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;
+    const level7Ocean=this.game.level.id==="7"&&(Math.abs(this.position.x)>4.5||this.position.z>4.5||this.position.z< -4.5);
+    if(level7Ocean){
+      if(!this.inOcean){
+        this.inOcean=true;
+        this.position.y=.82;
+        this.game.toast("Ocean: look down and move forward to dive. Look up to surface.",4);
+      }
+      // Pitch-driven swimming works with both keyboard and touch-look controls.
+      // Buoyancy holds depth when the player is not actively swimming.
+      const swimInput=-mv.y;
+      this.position.y=THREE.MathUtils.clamp(
+        this.position.y-Math.sin(this.pitch)*swimInput*speed*dt,
+        -12,
+        1.2
+      );
+      const underwater=this.position.y<.045;
+      if(this.game.scene.fog){
+        this.game.scene.fog.color.setHex(underwater?0x061722:0x142b36);
+        this.game.scene.fog.density=underwater?.032:.008;
+      }
+    }else{
+      this.inOcean=false;
+      this.position.y=this.eyeY;
+      if(this.game.level.id==="7"&&this.game.scene.fog){
+        this.game.scene.fog.color.setHex(0x142b36);
+        this.game.scene.fog.density=.008;
+      }
+    }
     if(this.game.redZoneTrapped&&this.game.redZoneBounds){
       const b=this.game.redZoneBounds;
       this.position.x=Math.max(b.minX,Math.min(b.maxX,this.position.x));
@@ -2507,7 +2537,7 @@ class Player{
     const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.11;
     const side=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
     const cameraTarget=this.position.clone().addScaledVector(side,bobX);
-    cameraTarget.y=this.eyeY+bobY+breathing+shakeY;
+    cameraTarget.y=this.position.y+bobY+breathing+shakeY;
     this.game.camera.position.lerp(cameraTarget,1-Math.exp(-dt*24));
 
     const targetFov=run?67:62;
