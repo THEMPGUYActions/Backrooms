@@ -1324,11 +1324,11 @@ class Chunk{
         for(const side of [-1,1]){
           this.collisionSegments.push({x1:ax+nx*4.4*side,z1:az+nz*4.4*side,x2:bx+nx*4.4*side,z2:bz+nz*4.4*side});
           for(let distance=3.5;distance<length-2;distance+=4.2){
-            const t=distance/length,x=ax+dx*t+nx*(4.8+next()*1.1)*side,z=az+dz*t+nz*(4.8+next()*1.1)*side;
-            const scale=1.65+next()*1.1;
-            wallDummy.position.set(x,1.25+next()*.45,z);
-            wallDummy.scale.set(scale*1.2,1.55+next()*1.1,scale);
-            wallDummy.rotation.set(next()*.35,next()*Math.PI*2,next()*.3);
+            const t=distance/length,x=ax+dx*t+nx*(4.8+rng.next()*1.1)*side,z=az+dz*t+nz*(4.8+rng.next()*1.1)*side;
+            const scale=1.65+rng.next()*1.1;
+            wallDummy.position.set(x,1.25+rng.next()*.45,z);
+            wallDummy.scale.set(scale*1.2,1.55+rng.next()*1.1,scale);
+            wallDummy.rotation.set(rng.next()*.35,rng.next()*Math.PI*2,rng.next()*.3);
             wallDummy.updateMatrix();wallInstances.setMatrixAt(wallIndex++,wallDummy.matrix);
           }
         }
