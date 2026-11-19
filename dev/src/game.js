@@ -269,14 +269,12 @@ class Chunk{
           this.walls[this.index(x,0)]|=1;
           this.walls[this.index(x,cells-1)]|=4;
         }
-        // Keep large garage sectors connected. These openings are the
-        // browser equivalent of the neighboring megaroom connections.
-        for(const i of [2,7]){
-          this.setEdge(i,0,"north",true);
-          this.setEdge(i,cells-1,"south",true);
-          this.setEdge(0,i,"west",true);
-          this.setEdge(cells-1,i,"east",true);
-        }
+        // Match the corridor sector's deterministic perimeter pattern so
+        // every district transition lines up across streamed chunk borders.
+        for(let i=0;i<cells;i+=2)this.setEdge(i,0,"north",true);
+        for(let i=1;i<cells;i+=2)this.setEdge(cells-1,i,"east",true);
+        for(let i=cells-2;i>=0;i-=2)this.setEdge(i,cells-1,"south",true);
+        for(let i=cells-1;i>=0;i-=2)this.setEdge(0,i,"west",true);
       }else{
         // Exact Level1MazeGenerator topology: randomized DFS over 10x10
         // cells, starting at [0,0], with no extra loop carving.
@@ -1520,7 +1518,7 @@ class Chunk{
       const carCount=next()<.42?1:next()<.18?2:0;
       for(let i=0;i<carCount;i++){
         const px=this.originX+12+next()*(size-24),pz=this.originZ+12+next()*(size-24);
-        if(Math.abs(px-(this.originX+size/2))<5&&Math.abs(pz-(this.originZ+size/2))<5)continue;
+        if(Math.hypot(px-(this.originX+size/2),pz-(this.originZ+size/2))<8)continue;
         const car=new THREE.Group();car.position.set(px,0,pz);
         box(car,new THREE.BoxGeometry(1.82,.62,3.75),lib.garageBase,0,.72,0);
         box(car,new THREE.BoxGeometry(1.58,.72,1.65),lib.metal,0,1.34,-.12);
