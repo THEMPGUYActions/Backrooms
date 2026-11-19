@@ -1252,8 +1252,8 @@ class Chunk{
         box(room,new THREE.BoxGeometry(8.6,3.1,.18),lib.concrete,0,1.65,-4.25);
         box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,-4.25,1.65,0);
         box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,4.25,1.65,0);
-        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,-1.45,1.65,4.25);
-        box(room,new THREE.BoxGeometry(.18,3.1,.2),lib.concrete,1.45,1.65,4.25);
+        box(room,new THREE.BoxGeometry(2.8,3.1,.18),lib.concrete,-2.85,1.65,4.25);
+        box(room,new THREE.BoxGeometry(2.8,3.1,.18),lib.concrete,2.85,1.65,4.25);
         box(room,new THREE.BoxGeometry(2.9,.22,.2),lib.concrete,0,3.1,4.25);
         const puddle=new THREE.Mesh(new THREE.PlaneGeometry(7.7,7.7),lib.water.clone());
         puddle.rotation.x=-Math.PI/2;puddle.position.set(0,.19,0);puddle.material.opacity=.34;room.add(puddle);
@@ -1269,7 +1269,8 @@ class Chunk{
         g.add(room);
         this.collisionSegments.push(
           {x1:-4.3,z1:-4.3,x2:4.3,z2:-4.3},{x1:-4.3,z1:-4.3,x2:-4.3,z2:4.3},
-          {x1:4.3,z1:-4.3,x2:4.3,z2:4.3}
+          {x1:4.3,z1:-4.3,x2:4.3,z2:4.3},
+          {x1:-4.3,z1:4.3,x2:-1.45,z2:4.3},{x1:1.45,z1:4.3,x2:4.3,z2:4.3}
         );
       }
     }else if(level.id==="8"){
