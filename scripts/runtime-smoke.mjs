@@ -98,14 +98,18 @@ try{
 
   const command=(method,params={},timeoutMs=10000)=>new Promise((resolveCommand,rejectCommand)=>{
     const id=++commandId;
-    pending.set(id,message=>resolveCommand(message));
-    ws.send(JSON.stringify({id,method,params}));
-    setTimeout(()=>{
+    let timeout=null;
+    pending.set(id,message=>{
+      if(timeout!==null)clearTimeout(timeout);
+      resolveCommand(message);
+    });
+    timeout=setTimeout(()=>{
       if(pending.has(id)){
         pending.delete(id);
         rejectCommand(new Error("CDP timeout: "+method));
       }
     },timeoutMs);
+    ws.send(JSON.stringify({id,method,params}));
   });
 
   await command("Runtime.enable");
