@@ -1309,24 +1309,55 @@ class Chunk{
       }
     }else if(level.id==="9"){
       const rng=new RNG(this.seedKey()^0x9b42);
-      box(g,new THREE.BoxGeometry(size,.025,3.8),lib.garageBase,this.originX+size/2,.012,this.originZ+size/2);
-      box(g,new THREE.BoxGeometry(3.8,.025,size),lib.garageBase,this.originX+size/2,.014,this.originZ+size/2);
-      for(let mark=0;mark<8;mark++){
-        const x=this.originX+size*.1+mark*size*.105;
-        box(g,new THREE.BoxGeometry(1.2,.018,.09),lib.trim,x,.028,this.originZ+size/2);
+      // Unpainted wet asphalt streets, stone sidewalks and grassy front lots.
+      box(g,new THREE.BoxGeometry(size,.04,8.8),lib.asphalt,this.originX+size/2,.012,this.originZ+size/2);
+      box(g,new THREE.BoxGeometry(8.8,.04,size),lib.asphalt,this.originX+size/2,.014,this.originZ+size/2);
+      for(const side of [-1,1]){
+        box(g,new THREE.BoxGeometry(size,.08,1.8),lib.sidewalk,this.originX+size/2,.045,this.originZ+size/2+side*5.25);
+        box(g,new THREE.BoxGeometry(1.8,.08,size),lib.sidewalk,this.originX+size/2+side*5.25,.045,this.originZ+size/2);
+        box(g,new THREE.BoxGeometry(size,.035,8),lib.lawn,this.originX+size/2,.012,this.originZ+size/2+side*18);
+        box(g,new THREE.BoxGeometry(8,.035,size),lib.lawn,this.originX+size/2+side*18,.012,this.originZ+size/2);
       }
-      for(const room of this.rooms.slice(0,1)){
+      // Rainwater gathers in shallow, irregular patches on the unmarked road.
+      for(let i=0;i<5;i++){
+        const px=this.originX+size*(.12+rng.next()*.76),pz=this.originZ+size*(.5+(rng.next()-.5)*.12);
+        const puddle=new THREE.Mesh(new THREE.CircleGeometry(.8+rng.next()*1.5,18),lib.wetAsphalt);
+        puddle.rotation.x=-Math.PI/2;puddle.scale.set(1.8,.65,1);puddle.position.set(px,.038,pz);g.add(puddle);
+      }
+      const leafGeometry=new THREE.PlaneGeometry(.18,.1),leaves=new THREE.InstancedMesh(leafGeometry,lib.leaf,90),leafDummy=new THREE.Object3D();
+      for(let i=0;i<90;i++){
+        const x=this.originX+rng.next()*size,z=this.originZ+rng.next()*size;
+        leafDummy.position.set(x,.045,z);leafDummy.rotation.x=-Math.PI/2;leafDummy.rotation.z=rng.next()*Math.PI*2;
+        leafDummy.scale.set(.55+rng.next(),.55+rng.next(),1);leafDummy.updateMatrix();leaves.setMatrixAt(i,leafDummy.matrix);
+      }
+      leaves.instanceMatrix.needsUpdate=true;g.add(leaves);
+      for(let roomIndex=0;roomIndex<this.rooms.length;roomIndex++){
+        const room=this.rooms[roomIndex];
         const x=this.originX+(room.x+room.w/2)*cell,z=this.originZ+(room.z+room.h/2)*cell;
         const house=new THREE.Group();house.position.set(x,0,z);
-        const front=-3.2,halfX=3.7,halfZ=3.2,doorHalf=.62;
+        const front=-4.0,halfX=4.35,halfZ=3.85,doorHalf=.68;
+        const wallMat=roomIndex%2?lib.officePlastic:lib.maintenanceWall;
+        const roofMat=roomIndex%2?lib.mahogany:lib.officeWood;
         // Build a hollow house shell with a real front-door opening, not a solid box.
-        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.12),lib.officePlastic,-(halfX+doorHalf)/2,1.5,front);
-        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.12),lib.officePlastic,(halfX+doorHalf)/2,1.5,front);
-        box(house,new THREE.BoxGeometry(doorHalf*2,.8,.12),lib.officePlastic,0,2.6,front);
-        box(house,new THREE.BoxGeometry(7.4,3,.12),lib.officePlastic,0,1.5,3.2);
-        box(house,new THREE.BoxGeometry(.12,3,6.4),lib.officePlastic,-3.7,1.5,0);
-        box(house,new THREE.BoxGeometry(.12,3,6.4),lib.officePlastic,3.7,1.5,0);
-        const roof=box(house,new THREE.BoxGeometry(8.0,.24,7.0),lib.officeWood,0,3.08,0);roof.rotation.z=.035;
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.14),wallMat,-(halfX+doorHalf)/2,1.5,front);
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,3,.14),wallMat,(halfX+doorHalf)/2,1.5,front);
+        box(house,new THREE.BoxGeometry(doorHalf*2,.8,.14),wallMat,0,2.6,front);
+        box(house,new THREE.BoxGeometry(halfX*2,3,.14),wallMat,0,1.5,halfZ);
+        box(house,new THREE.BoxGeometry(.14,3,halfZ*2),wallMat,-halfX,1.5,0);
+        box(house,new THREE.BoxGeometry(.14,3,halfZ*2),wallMat,halfX,1.5,0);
+        const roof=box(house,new THREE.BoxGeometry(halfX*2+.5,.3,halfZ*2+.5),roofMat,0,3.08,0);roof.rotation.z=.035;
+        // Front porch, steps and a garage bay make the lots read as homes.
+        box(house,new THREE.BoxGeometry(2.6,.16,1.2),lib.officeWood,0,.12,-5.0);
+        box(house,new THREE.BoxGeometry(2.0,.12,.42),lib.officeWood,0,.06,-5.75);
+        box(house,new THREE.BoxGeometry(2.5,2.1,.08),lib.officeWood,0,1.05,front-.09);
+        box(house,new THREE.BoxGeometry(2.1,1.7,.06),lib.dark,0,1.9,front-.12);
+        // Furnished but unpowered interior silhouettes.
+        box(house,new THREE.BoxGeometry(1.6,.52,.72),lib.mahogany,-1.65,.55,1.1);
+        box(house,new THREE.BoxGeometry(.8,1.7,.5),lib.officeWood,2.1,.85,1.3);
+        for(const wx of [-2.7,2.7]){
+          box(house,new THREE.BoxGeometry(1.2,1.0,.06),lib.dark,wx,1.95,front-.08);
+          box(house,new THREE.BoxGeometry(1.32,.07,.08),lib.trim,wx,1.95,front-.12);
+        }
         const isExitLot=this.exit?.kind==="suburb"&&this.exit.x===room.x&&this.exit.z===room.z;
         box(house,new THREE.BoxGeometry(1.12,2.2,.07),isExitLot?lib.exitDoor:lib.officeWood,0,1.1,-3.27);
         for(const wx of [-2.1,2.1]){
@@ -1342,18 +1373,20 @@ class Chunk{
           {x1:x-halfX,z1:z+halfZ,x2:x-halfX,z2:z-halfZ}
         );
       }
-      for(let i=0;i<2;i++){
-        const x=this.originX+cell*(1+rng.next()*(cells-2)),z=this.originZ+cell*(1+rng.next()*(cells-2));
-        const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,3.8,7),lib.metal);pole.position.set(x,1.9,z);g.add(pole);
-        const arm=box(g,new THREE.BoxGeometry(.75,.08,.08),lib.metal,x+.34,3.72,z);
-        const bulb=box(g,new THREE.BoxGeometry(.28,.12,.2),lib.dark,x+.68,3.67,z);bulb.userData.light=false;
+      for(let i=0;i<5;i++){
+        const x=this.originX+size*(.12+i*.19),z=this.originZ+size*(i%2?.46:.54);
+        const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,4.4,7),lib.metal);pole.position.set(x,2.2,z);g.add(pole);
+        box(g,new THREE.BoxGeometry(1.0,.08,.08),lib.metal,x+.45,4.28,z);
+        const bulb=box(g,new THREE.BoxGeometry(.28,.12,.2),lib.dark,x+.9,4.22,z);bulb.userData.light=false;
+        if(rng.next()<.28)this.lightSources.push({position:new THREE.Vector3(x+.9,4.15,z),color:0xd8e0d9,baseIntensity:7,intensity:7,distance:9,decay:2});
       }
     }else if(level.id==="10"){
       const rng=new RNG(this.seedKey()^0x10c0);
       const stalkGeometry=new THREE.CylinderGeometry(.018,.032,1.35,4),headGeometry=new THREE.ConeGeometry(.055,.34,5);
-      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,150),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,150);
-      const q=new THREE.Quaternion(),dummy=new THREE.Object3D();let count=0;
-      for(let i=0;i<150;i++){
+      const cropCount=1100;
+      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
+      const dummy=new THREE.Object3D();let count=0;
+      for(let i=0;i<cropCount;i++){
         const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2);
         if(Math.hypot(x-(this.originX+size/2),z-(this.originZ+size/2))<4)continue;
         const height=.85+rng.next()*.65,angle=rng.next()*Math.PI*2;
@@ -1362,18 +1395,23 @@ class Chunk{
       }
       stalks.count=count;heads.count=count;stalks.instanceMatrix.needsUpdate=true;heads.instanceMatrix.needsUpdate=true;g.add(stalks,heads);
       // Tree and shrub lines divide the cultivated plots, with shallow clean ponds between them.
-      const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.12,.2,2.8,7),lib.treeBark,6);
-      const crowns=new THREE.InstancedMesh(new THREE.SphereGeometry(1.25,9,7),lib.treeLeaves,6),treeDummy=new THREE.Object3D();let treeIndex=0;
-      for(const side of [-1,1])for(let i=0;i<3;i++){
-        const x=this.originX+(side<0?size*.12:size*.88),z=this.originZ+size*(.16+i*.34);
+      const treeCount=14;
+      const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.12,.2,2.8,7),lib.treeBark,treeCount);
+      const crowns=new THREE.InstancedMesh(new THREE.SphereGeometry(1.25,9,7),lib.treeLeaves,treeCount),treeDummy=new THREE.Object3D();let treeIndex=0;
+      for(let row=0;row<2;row++)for(let i=0;i<7;i++){
+        const x=this.originX+(row===0?size*.12:size*.88),z=this.originZ+size*(.08+i*.14);
         treeDummy.position.set(x,1.4,z);treeDummy.scale.set(1,1,1);treeDummy.updateMatrix();trunks.setMatrixAt(treeIndex,treeDummy.matrix);
         treeDummy.position.set(x,3.1,z);treeDummy.scale.set(1.1,1.2,1);treeDummy.updateMatrix();crowns.setMatrixAt(treeIndex,treeDummy.matrix);treeIndex++;
         const half=.22;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
       }
       trunks.instanceMatrix.needsUpdate=true;crowns.instanceMatrix.needsUpdate=true;g.add(trunks,crowns);
-      if(rng.next()<.28){
-        const pond=new THREE.Mesh(new THREE.CircleGeometry(1.7+rng.next()*1.5,20),lib.water.clone());
-        pond.rotation.x=-Math.PI/2;pond.position.set(this.originX+size*(.28+rng.next()*.44),.022,this.originZ+size*(.28+rng.next()*.44));g.add(pond);
+      // Farm tracks and a pair of shallow, clear irrigation ponds.
+      box(g,new THREE.BoxGeometry(size,.035,3.8),lib.farmDirt,this.originX+size/2,.012,this.originZ+size*.54);
+      for(let i=0;i<2;i++){
+        const pond=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*2.2,24),lib.water.clone());
+        pond.rotation.x=-Math.PI/2;
+        pond.position.set(this.originX+size*(.22+rng.next()*.56),.022,this.originZ+size*(.22+rng.next()*.56));
+        pond.material.color.setHex(0x526d70);pond.material.opacity=.86;g.add(pond);
       }
       const exitBarn=this.exit?.kind==="field",randomBarn=cycleHash(this.seedKey(),this.cx*17+this.cz*7,10)<.2;
       if(exitBarn||randomBarn){
