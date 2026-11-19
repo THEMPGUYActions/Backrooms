@@ -3563,6 +3563,7 @@ export class BackroomsGame{
 
     if(t>=duration){
       this.introPlaying=false;
+      document.title="The Backrooms: Level "+this.level.id;
       this.running=true;this.paused=false;this.dead=false;
       document.getElementById("hud").classList.remove("hidden");
       const mobileControls=document.getElementById("mobile-controls");
