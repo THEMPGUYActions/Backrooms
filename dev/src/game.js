@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10c";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10c";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -1349,8 +1349,6 @@ class Chunk{
         // Front porch, steps and a garage bay make the lots read as homes.
         box(house,new THREE.BoxGeometry(2.6,.16,1.2),lib.officeWood,0,.12,-5.0);
         box(house,new THREE.BoxGeometry(2.0,.12,.42),lib.officeWood,0,.06,-5.75);
-        box(house,new THREE.BoxGeometry(2.5,2.1,.08),lib.officeWood,0,1.05,front-.09);
-        box(house,new THREE.BoxGeometry(2.1,1.7,.06),lib.dark,0,1.9,front-.12);
         // Furnished but unpowered interior silhouettes.
         box(house,new THREE.BoxGeometry(1.6,.52,.72),lib.mahogany,-1.65,.55,1.1);
         box(house,new THREE.BoxGeometry(.8,1.7,.5),lib.officeWood,2.1,.85,1.3);
@@ -1359,10 +1357,10 @@ class Chunk{
           box(house,new THREE.BoxGeometry(1.32,.07,.08),lib.trim,wx,1.95,front-.12);
         }
         const isExitLot=this.exit?.kind==="suburb"&&this.exit.x===room.x&&this.exit.z===room.z;
-        box(house,new THREE.BoxGeometry(1.12,2.2,.07),isExitLot?lib.exitDoor:lib.officeWood,0,1.1,-3.27);
+        box(house,new THREE.BoxGeometry(1.12,2.2,.07),isExitLot?lib.exitDoor:lib.officeWood,0,1.1,front-.08);
         for(const wx of [-2.1,2.1]){
-          box(house,new THREE.BoxGeometry(1.15,1.0,.07),lib.dark,wx,1.95,-3.27);
-          box(house,new THREE.BoxGeometry(1.26,.06,.09),lib.trim,wx,1.95,-3.31);
+          box(house,new THREE.BoxGeometry(1.15,1.0,.07),lib.dark,wx,1.95,front-.08);
+          box(house,new THREE.BoxGeometry(1.26,.06,.09),lib.trim,wx,1.95,front-.12);
         }
         g.add(house);
         this.collisionSegments.push(
@@ -1412,6 +1410,24 @@ class Chunk{
         pond.rotation.x=-Math.PI/2;
         pond.position.set(this.originX+size*(.22+rng.next()*.56),.022,this.originZ+size*(.22+rng.next()*.56));
         pond.material.color.setHex(0x526d70);pond.material.opacity=.86;g.add(pond);
+      }
+      // Small weathered sheds and tool stores punctuate the fields between barns.
+      if(cycleHash(this.seedKey(),this.cx*23+this.cz*11,0x51)<.32){
+        const sx=this.originX+size*(.2+rng.next()*.6),sz=this.originZ+size*(.2+rng.next()*.6),shed=new THREE.Group();
+        shed.position.set(sx,0,sz);
+        box(shed,new THREE.BoxGeometry(4.2,2.5,.12),lib.officeWood,0,1.25,-1.55);
+        box(shed,new THREE.BoxGeometry(4.2,2.5,.12),lib.officeWood,0,1.25,1.55);
+        box(shed,new THREE.BoxGeometry(.12,2.5,3.1),lib.officeWood,-2.1,1.25,0);
+        box(shed,new THREE.BoxGeometry(.12,2.5,3.1),lib.officeWood,2.1,1.25,0);
+        box(shed,new THREE.BoxGeometry(4.6,.22,3.5),lib.rustMetal,0,2.58,0);
+        box(shed,new THREE.BoxGeometry(1.05,2.05,.08),lib.mahogany,0,1.02,-1.62);
+        g.add(shed);
+        this.collisionSegments.push(
+          {x1:sx-2.1,z1:sz-1.55,x2:sx+2.1,z2:sz-1.55},
+          {x1:sx+2.1,z1:sz-1.55,x2:sx+2.1,z2:sz+1.55},
+          {x1:sx+2.1,z1:sz+1.55,x2:sx-2.1,z2:sz+1.55},
+          {x1:sx-2.1,z1:sz+1.55,x2:sx-2.1,z2:sz-1.55}
+        );
       }
       const exitBarn=this.exit?.kind==="field",randomBarn=cycleHash(this.seedKey(),this.cx*17+this.cz*7,10)<.2;
       if(exitBarn||randomBarn){
