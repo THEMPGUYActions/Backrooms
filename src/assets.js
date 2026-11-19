@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createLevel1PuddleMaterial } from "./level1-wet.js";
 THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
@@ -466,7 +467,8 @@ export function makeLibrary(level){
     warningLine:new THREE.MeshStandardMaterial({color:0xc0a84a,roughness:.76,metalness:0}),
     garageBeam:new THREE.MeshStandardMaterial({color:0x383a39,roughness:.88,metalness:0}),
     garageBase:new THREE.MeshStandardMaterial({color:0x555957,roughness:.86,metalness:0}),
-    puddle:new THREE.MeshStandardMaterial({color:0x0b0e10,roughness:.045,metalness:.18,transparent:true,opacity:.63}),
+    puddle:createLevel1PuddleMaterial(),
+    wetConcrete:new THREE.MeshPhysicalMaterial({color:0x343a38,roughness:.28,metalness:.025,clearcoat:.92,clearcoatRoughness:.16,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide}),
     level1Light:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.28,metalness:0,emissive:0xfff8e8,emissiveIntensity:2.9}),
     ceiling,
     metal:new THREE.MeshStandardMaterial({color:0x3d3f3e,roughness:.78,metalness:.72}),
