@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10e";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10e";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10f";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10f";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -529,6 +529,8 @@ class Chunk{
 
       if(level.id==="7"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*17+this.cz*5,7)<.2){
         const mid=Math.floor(cells/2);this.exit={x:mid,z:mid,side:"south",kind:"ocean"};
+      }else if(level.id==="8"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*17+this.cz*5,8)<.24){
+        this.exit={x:Math.floor(cells*.84),z:Math.floor(cells*.34),kind:"cave"};
       }else if(level.id==="9"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*11+this.cz*13,9)<.22){
         const lot=this.rooms[0];if(lot)this.exit={...lot,kind:"suburb"};
       }else if(level.id==="10"&&Math.hypot(this.cx,this.cz)>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*5,10)<.22){
@@ -771,6 +773,17 @@ class Chunk{
         this.collisionSegments.push({x1:px-half,z1:pz,x2:px-doorWidth/2-.08,z2:pz},{x1:px+doorWidth/2+.08,z1:pz,x2:px+half,z2:pz});
         this.exit.position.set(px,1.05,pz-.92);
         this.lightSources.push({position:new THREE.Vector3(px,2.8,pz-.7),color:level.id==="2"?0xa58aff:0x9cdb9a,baseIntensity:3.2,intensity:3.2,distance:7,decay:2});
+      }else if(e.kind==="cave"){
+        const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
+        const arch=new THREE.Mesh(new THREE.TorusGeometry(1.7,.22,10,24),lib.concrete);
+        arch.position.set(px,1.45,pz);g.add(arch);
+        box(g,new THREE.BoxGeometry(1.55,2.35,.14),lib.mahogany,px,1.18,pz-.08);
+        box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px-.9,1.28,pz-.08);
+        box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px+.9,1.28,pz-.08);
+        box(g,new THREE.BoxGeometry(2.0,.16,.2),lib.hotelGold,px,2.58,pz-.08);
+        box(g,new THREE.BoxGeometry(.72,.28,.06),lib.indicator,px,2.15,pz-.18);
+        this.exit.position.set(px,1.05,pz-.85);
+        this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.9),color:0xd8c28b,baseIntensity:3.4,intensity:3.4,distance:8,decay:2});
       }else if(e.kind==="ocean"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         const rim=new THREE.Mesh(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
