@@ -8,7 +8,7 @@ import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level3-electrical-level4-office1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level1-ramp-texture-uv2";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level0-spawn-ceiling-level3-uv1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
@@ -2495,7 +2495,9 @@ class WorldStreamer{
         this.library.ceiling
       );
       this.ceilingSurface.rotation.x=Math.PI/2;
-      this.ceilingSurface.position.set(0,this.game.level.id==="0"?this.game.level.wallHeight-.025:this.game.level.wallHeight+.002,0);
+      // Keep the ceiling plane just above wall tops. Level 0 previously put
+      // both surfaces at the same Y coordinate, causing tiny z-fighting seams.
+      this.ceilingSurface.position.set(0,this.game.level.wallHeight+.008,0);
       this.ceilingSurface.updateMatrix();
       this.ceilingSurface.matrixAutoUpdate=false;
       this.ceilingSurface.frustumCulled=false;
@@ -2531,18 +2533,26 @@ class WorldStreamer{
     this.updateWallTextureTiling();
 
     // The procedural fallback is complete at this point. Do not make startup
-    // depend on remote texture downloads or external asset hosts.
+    // depend on remote texture downloads or external asset hosts. Capture this
+    // level/library pair: a player can change levels while these promises are
+    // pending, and reading this.game.level/this.library after an await used to
+    // apply Level 0 carpet maps to the next level's ceiling material.
+    const assetLibrary=this.library,assetLevel=this.game.level;
     void (async()=>{
       try{
-        if(this.game.level.id==="1")await applyLevel1Assets(this.library,this.game.level,onProgress);
-        else if(this.game.level.id==="2"||this.game.level.id==="3")await applyIndustrialPBR(this.library,this.game.level,onProgress);
-        else if(this.game.level.id==="0"){
-          await applyFoundFootageLevel0Assets(this.library,this.game.level,onProgress);
-          await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
-        }else await applyLevelSpecificPBR(this.library,this.game.level,onProgress);
+        if(assetLevel.id==="1")await applyLevel1Assets(assetLibrary,assetLevel,onProgress);
+        else if(assetLevel.id==="2"||assetLevel.id==="3")await applyIndustrialPBR(assetLibrary,assetLevel,onProgress);
+        else if(assetLevel.id==="0"){
+          await applyFoundFootageLevel0Assets(assetLibrary,assetLevel,onProgress);
+          if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
+          await applyOpenGameArtPBR(assetLibrary,assetLevel,onProgress);
+        }else await applyLevelSpecificPBR(assetLibrary,assetLevel,onProgress);
       }catch(error){
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
+      // A superseded configuration must never retile or otherwise mutate the
+      // active level's materials after its own asset load has started.
+      if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
       this.updateSurfaceTiling();
       this.updateWallTextureTiling();
     })();
@@ -2621,7 +2631,7 @@ class WorldStreamer{
             {material:this.library?.ceiling,tileWorldX:5.4,tileWorldZ:5.4}
           ]
         : [
-            {material:this.library?.floor,tileWorldX:3.0,tileWorldZ:3.0},
+            {material:this.library?.floor,tileWorldX:this.game.level.id==="3"?2.4:3.0,tileWorldZ:this.game.level.id==="3"?2.4:3.0},
             {material:this.library?.ceiling,tileWorldX:1.25,tileWorldZ:1.25}
           ];
 
@@ -2731,18 +2741,33 @@ class WorldStreamer{
     return{x:chunk.originX+c*this.game.level.cellSize+this.game.level.cellSize/2,z:chunk.originZ+c*this.game.level.cellSize+this.game.level.cellSize/2};
   }
     findSafeSpawn(x,z,radius=.36){
-    const direct=this.collision(new THREE.Vector3(x,0,z),radius);
-    if(Math.hypot(direct.x-x,direct.z-z)<.02)return {x,z};
-    const candidates=[
-      [2,0],[-2,0],[0,2],[0,-2],[4,0],[-4,0],[0,4],[0,-4],
-      [2,2],[-2,2],[2,-2],[-2,-2],[6,0],[-6,0],[0,6],[0,-6],
-      [4,2],[-4,2],[4,-2],[-4,-2],[2,4],[-2,4],[2,-4],[-2,-4]
-    ];
-    for(const [dx,dz] of candidates){
-      const cx=x+dx,cz=z+dz,hit=this.collision(new THREE.Vector3(cx,0,cz),radius);
-      if(Math.hypot(hit.x-cx,hit.z-cz)<.02)return {x:cx,z:cz};
+    // Never accept the collision resolver's pushed position as a spawn: a
+    // push can land against a second segment (especially garage columns) and
+    // leave the player wedged inside the next obstacle. Search clear points
+    // around the preferred location and only accept a point that stays put.
+    const candidates=[[0,0]];
+    const step=Math.max(.5,Math.min(1.0,this.game.level.cellSize/8));
+    for(let ring=1;ring<=12;ring++){
+      const distance=ring*step;
+      const count=Math.max(8,Math.ceil(2*Math.PI*distance/(step*.8)));
+      for(let i=0;i<count;i++){
+        const angle=(i/count)*Math.PI*2;
+        candidates.push([Math.cos(angle)*distance,Math.sin(angle)*distance]);
+      }
     }
-    return {x:direct.x,z:direct.z};
+    for(const [dx,dz] of candidates){
+      const cx=x+dx,cz=z+dz;
+      const hit=this.collision(new THREE.Vector3(cx,0,cz),radius);
+      if(Math.hypot(hit.x-cx,hit.z-cz)>.015)continue;
+      // Confirm a second independent pass is stable; this catches corner
+      // cases where resolving one pole/wall pushes the point into another.
+      const verify=this.collision(new THREE.Vector3(hit.x,0,hit.z),radius);
+      if(Math.hypot(verify.x-hit.x,verify.z-hit.z)>.015)continue;
+      return {x:hit.x,z:hit.z};
+    }
+    // Keep the preferred point only as a last-resort fallback; callers still
+    // get a finite location if a malformed chunk has no walkable surface.
+    return {x,z};
   }
   walkSurfaceHeightAt(x,z){
     if(this.game.level.id!=="1")return 0;

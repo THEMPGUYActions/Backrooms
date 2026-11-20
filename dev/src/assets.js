@@ -262,6 +262,7 @@ function yellowizeCarpetTexture(texture){
   shifted.colorSpace=THREE.SRGBColorSpace;
   shifted.wrapS=texture.wrapS;shifted.wrapT=texture.wrapT;shifted.repeat.copy(texture.repeat);
   shifted.userData.backroomsOwned=true;
+  shifted.userData.sourceUrl=texture.userData.sourceUrl;
   texture.dispose();
   return shifted;
 }
@@ -272,13 +273,16 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
     // independent. A shared Texture lets floor tiling silently retile pillars.
     const texture=(await loadRemoteTexture(url,color)).clone();
     texture.userData.backroomsOwned=true;
+    texture.userData.sourceUrl=url;
     texture.needsUpdate=true;
-    // PBR maps use UVs beyond 0..1 on world-scaled walls and pipe geometry.
-    // ClampToEdge silently smears the edge texel over those regions.
+    const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:kind==="metalnessMap"?material.metalnessMap:material.normalMap;
+    // Keep the currently configured world-space tiling while an async map is
+    // replaced. Resetting this to 1 briefly stretches the entire floor/ceiling
+    // across the streamed surface until the whole PBR batch finishes loading.
     texture.wrapS=THREE.RepeatWrapping;
     texture.wrapT=THREE.RepeatWrapping;
-    texture.repeat.set(1,1);
-    const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:kind==="metalnessMap"?material.metalnessMap:material.normalMap;
+    if(previous){texture.repeat.copy(previous.repeat);texture.offset.copy(previous.offset)}
+    else texture.repeat.set(1,1);
     if(previous?.userData?.backroomsOwned)previous.dispose();
     if(kind==="map"){
       material.map=texture;
@@ -412,7 +416,7 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
   const wallPrefix=level.id==="2"?"level2_concrete":"level3_concrete";
   const metalPrefix=level.id==="2"?"industrial_aged":"industrial_rust";
   const rustPrefix=level.id==="2"?"industrial_rust":"industrial_aged";
-  const floorPrefix=level.id==="2"?"level3_concrete":"level2_concrete";
+  const floorPrefix=level.id==="2"?"level2_concrete":"level3_concrete";
   const entries=[
     [library.wall,"map",wallPrefix+"_color.jpg",true,1,.28,"Utility concrete albedo"],
     [library.wall,"roughnessMap",wallPrefix+"_roughness.jpg",false,1,.28,"Utility concrete roughness"],
