@@ -8,7 +8,7 @@ import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level3-electrical-level4-office1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level3-electrical-level4-office1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level1-ramp-texture-uv2";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
@@ -216,9 +216,10 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.obstacleSegments=[];this.baseCollisionSegmentCount=0;this.level1Ramp=null;this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
+    if(this.game.level.id==="1")this.obstacleSegments=this.collisionSegments.slice(this.baseCollisionSegmentCount);
   }
   index(x,z){return z*this.gridSize()+x}
   gridSize(){return this.game.level.gridSize||CELLS}
@@ -608,7 +609,7 @@ class Chunk{
     const seenH=new Set(),seenV=new Set();
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
     const key=(x,z,s)=>s+"|"+x+"|"+z;
-    const addInstanced=(geometry,material,data)=>{if(!data.length)return;const mesh=new THREE.InstancedMesh(geometry,material,data.length);mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingBox();mesh.computeBoundingSphere();g.add(mesh)};
+    const addInstanced=(geometry,material,data)=>{if(!data.length)return;const mesh=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingBox();mesh.computeBoundingSphere();g.add(mesh)};
     const buildWallEdge=(x,z,side)=>{
       const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
       if(side==="north"){const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});}
@@ -641,9 +642,10 @@ class Chunk{
       }
     }
     this.collisionSegments=edges.map(e=>{const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;return e.side==="north"||e.side==="south"?{x1:px-cell/2,z1:e.side==="north"?pz-cell/2:pz+cell/2,x2:px+cell/2,z2:e.side==="north"?pz-cell/2:pz+cell/2}:{x1:e.side==="west"?px-cell/2:px+cell/2,z1:pz-cell/2,x2:e.side==="west"?px-cell/2:px+cell/2,z2:pz+cell/2}});
+    this.baseCollisionSegmentCount=this.collisionSegments.length;
     addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);
     if(level.id==="0"&&region==="red"){
-      const redFloor=new THREE.Mesh(new THREE.PlaneGeometry(size,size),lib.redFloor);
+      const redFloor=new THREE.Mesh(tileGeometryUV(new THREE.PlaneGeometry(size,size),lib.redFloor),lib.redFloor);
       redFloor.rotation.x=-Math.PI/2;
       redFloor.position.set(this.originX+size/2,.006,this.originZ+size/2);
       redFloor.renderOrder=1;
@@ -798,7 +800,7 @@ class Chunk{
         this.lightSources.push({position:new THREE.Vector3(px,2.8,pz-.7),color:level.id==="2"?0xa58aff:0x9cdb9a,baseIntensity:3.2,intensity:3.2,distance:7,decay:2});
       }else if(e.kind==="cave"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
-        const arch=new THREE.Mesh(new THREE.TorusGeometry(1.7,.22,10,24),lib.concrete);
+        const arch=new THREE.Mesh(tileGeometryUV(new THREE.TorusGeometry(1.7,.22,10,24),lib.concrete),lib.concrete);
         arch.position.set(px,1.45,pz);g.add(arch);
         box(g,new THREE.BoxGeometry(1.55,2.35,.14),lib.mahogany,px,1.18,pz-.08);
         box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px-.9,1.28,pz-.08);
@@ -809,7 +811,7 @@ class Chunk{
         this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.9),color:0xd8c28b,baseIntensity:3.4,intensity:3.4,distance:8,decay:2});
       }else if(e.kind==="ocean"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
-        const rim=new THREE.Mesh(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
+        const rim=new THREE.Mesh(tileGeometryUV(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
         const shaft=new THREE.Mesh(new THREE.CylinderGeometry(1.18,1.18,2.8,24,1,true),lib.dark);shaft.position.set(px,-1.35,pz);g.add(shaft);
         for(let i=0;i<7;i++)box(g,new THREE.BoxGeometry(1.1,.08,.08),lib.metal,px,-.35-i*.32,pz);
         this.exit.position=new THREE.Vector3(px,.82,pz);
@@ -906,8 +908,8 @@ class Chunk{
             const elbowEnd=pts[i+1].clone().addScaledVector(nextDirection,trim);
             const curve=new THREE.QuadraticBezierCurve3(elbowStart,pts[i+1],elbowEnd);
             const geometry=new THREE.TubeGeometry(curve,8,.105,10,false);
-            const uv=geometry.attributes.uv,curveLength=curve.getLength();
-            for(let v=0;v<uv.count;v++)uv.setY(v,uv.getY(v)*curveLength/.8);
+            const uv=geometry.attributes.uv,curveLength=curve.getLength(),circumference=Math.PI*.21;
+            for(let v=0;v<uv.count;v++)uv.setXY(v,uv.getX(v)*circumference/.8,uv.getY(v)*curveLength/.8);
             uv.needsUpdate=true;
             const elbow=new THREE.Mesh(geometry,rusted?rustMat:pipeMat);
             elbow.userData.pipeNetwork=true;g.add(elbow);pipeMeshes.push(elbow);
@@ -1048,7 +1050,7 @@ class Chunk{
       };
       const addPipeRun=(x1,z1,x2,z2,y=2.95,radius=.075,material=lib.metal)=>{
         const a=new THREE.Vector3(x1,y,z1),b=new THREE.Vector3(x2,y,z2),delta=b.clone().sub(a);
-        const pipe=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,delta.length(),8),material);
+        const pipe=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(radius,radius,delta.length(),8),material),material);
         pipe.position.copy(a).add(b).multiplyScalar(.5);
         pipe.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
         pipe.userData.level3Pipe=true;
@@ -1127,7 +1129,7 @@ class Chunk{
         box(generator,new THREE.BoxGeometry(4.8,1.8,2.8),lib.rustMetal,0,.98,0);
         box(generator,new THREE.BoxGeometry(4.25,.18,2.45),lib.metal,0,1.96,0);
         for(let fin=0;fin<13;fin++)box(generator,new THREE.BoxGeometry(.11,1.35,2.05),lib.metal,-2.0+fin*.33,1.05,-.1);
-        const rotor=new THREE.Mesh(new THREE.CylinderGeometry(.64,.64,1.6,18),lib.metal);
+        const rotor=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(.64,.64,1.6,18),lib.metal),lib.metal);
         rotor.rotation.z=Math.PI/2;rotor.position.set(0,2.34,0);generator.add(rotor);
         box(generator,new THREE.BoxGeometry(1.25,1.7,.7),lib.officePlastic,3.3,.88,-.65);
         for(let i=0;i<5;i++)box(generator,new THREE.BoxGeometry(.11,.11,.05),i%2?lib.indicator:lib.orangeLight,2.78+i*.22,1.28,-1.02);
@@ -1152,9 +1154,9 @@ class Chunk{
       }else if(this.zone==="boiler"){
         for(let i=0;i<3;i++){
           const bx=roomX-4+i*4,bz=roomZ;
-          const tank=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,3.1,16),lib.rustMetal);
+          const tank=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(1.05,1.05,3.1,16),lib.rustMetal),lib.rustMetal);
           tank.position.set(bx,1.65,bz);g.add(tank);
-          const cap=new THREE.Mesh(new THREE.SphereGeometry(1.04,14,8,0,Math.PI*2,0,Math.PI/2),lib.metal);
+          const cap=new THREE.Mesh(tileGeometryUV(new THREE.SphereGeometry(1.04,14,8,0,Math.PI*2,0,Math.PI/2),lib.metal),lib.metal);
           cap.position.set(bx,3.18,bz);g.add(cap);
           addPipeRun(bx,bz-1,bx,roomZ-6,2.45,.12,lib.rustMetal);
           this.collisionSegments.push({x1:bx-1.1,z1:bz-1.1,x2:bx+1.1,z2:bz-1.1},{x1:bx+1.1,z1:bz-1.1,x2:bx+1.1,z2:bz+1.1},{x1:bx+1.1,z1:bz+1.1,x2:bx-1.1,z2:bz+1.1},{x1:bx-1.1,z1:bz+1.1,x2:bx-1.1,z2:bz-1.1});
@@ -1167,7 +1169,7 @@ class Chunk{
           const capital=new THREE.Mesh(new THREE.CylinderGeometry(.68,.58,.2,12),lib.officePlastic);
           capital.position.set(roomX+px,3.48,roomZ+pz);g.add(capital);
         }
-        const plinth=new THREE.Mesh(new THREE.BoxGeometry(1.9,.5,1.9),lib.rustMetal);
+        const plinth=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(1.9,.5,1.9),lib.rustMetal),lib.rustMetal);
         plinth.position.set(roomX, .25,roomZ);g.add(plinth);
         const statue=new THREE.Mesh(new THREE.ConeGeometry(.7,2.25,8),lib.officePlastic);
         statue.position.set(roomX,1.62,roomZ);g.add(statue);
@@ -1437,7 +1439,7 @@ class Chunk{
       g.add(chandelier);
       this.lightSources.push({position:chandelier.position.clone(),color:0xffd6a0,baseIntensity:24,intensity:24,distance:14,decay:2});
       if(ballroom){
-        const table=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.25,.24,24),lib.officeWood);table.position.set(chandelier.position.x,.92,chandelier.position.z);g.add(table);
+        const table=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(1.35,1.25,.24,24),lib.officeWood),lib.officeWood);table.position.set(chandelier.position.x,.92,chandelier.position.z);g.add(table);
         for(let i=0;i<4;i++){
           const a=i/4*Math.PI*2,x=chandelier.position.x+Math.cos(a)*2.05,z=chandelier.position.z+Math.sin(a)*2.05;
           const chair=new THREE.Group();chair.position.set(x,0,z);
@@ -1449,10 +1451,10 @@ class Chunk{
       }
       if(cycleHash(this.seedKey(),this.cx*7+this.cz*3,0xB01)<.18){
         const boiler=new THREE.Group();boiler.position.set(this.originX+size*.72,0,this.originZ+size*.72);
-        const tank=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,3.1,16),lib.rustMetal);tank.position.y=1.58;boiler.add(tank);
-        const cap=new THREE.Mesh(new THREE.SphereGeometry(1.0,12,8,0,Math.PI*2,0,Math.PI/2),lib.metal);cap.position.y=3.13;boiler.add(cap);
+        const tank=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(1.0,1.0,3.1,16),lib.rustMetal),lib.rustMetal);tank.position.y=1.58;boiler.add(tank);
+        const cap=new THREE.Mesh(tileGeometryUV(new THREE.SphereGeometry(1.0,12,8,0,Math.PI*2,0,Math.PI/2),lib.metal),lib.metal);cap.position.y=3.13;boiler.add(cap);
         for(let pipe=0;pipe<3;pipe++){
-          const tube=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,3.8,10),lib.metal);tube.rotation.z=Math.PI/2;tube.position.set(0,2.6,-1.15+pipe*.48);boiler.add(tube);
+          const tube=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(.11,.11,3.8,10),lib.metal),lib.metal);tube.rotation.z=Math.PI/2;tube.position.set(0,2.6,-1.15+pipe*.48);boiler.add(tube);
         }
         g.add(boiler);this.lightSources.push({position:new THREE.Vector3(boiler.position.x,2.2,boiler.position.z),color:0xff9a55,baseIntensity:5,intensity:5,distance:9,decay:2});
       }
@@ -1508,7 +1510,7 @@ class Chunk{
       water.userData.timeUniform=waterUniforms.time;
       g.userData.animatedWaterMaterials=[water];
       const rng=new RNG(this.seedKey()^0x7a77),rockGeometry=new THREE.IcosahedronGeometry(1,1);
-      const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,24),rockDummy=new THREE.Object3D();
+      const rocks=new THREE.InstancedMesh(tileGeometryUV(rockGeometry,lib.concrete),lib.concrete,24),rockDummy=new THREE.Object3D();
       for(let i=0;i<24;i++){
         const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),scale=.8+rng.next()*2.1;
         rockDummy.position.set(x,-.65-rng.next()*2.8,z);rockDummy.scale.set(scale*1.45,scale*.62,scale*1.2);rockDummy.rotation.y=rng.next()*Math.PI*2;rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
@@ -1548,19 +1550,19 @@ class Chunk{
     }else if(level.id==="8"){
       // Cave systems: denser floor rock + ceiling spikes + ground stalagmites
       const rng=new RNG(this.seedKey()^0x8ca7e);
-      const boulders=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),lib.concrete,28),rockDummy=new THREE.Object3D();
+      const boulders=new THREE.InstancedMesh(tileGeometryUV(new THREE.IcosahedronGeometry(1,1),lib.concrete),lib.concrete,28),rockDummy=new THREE.Object3D();
       for(let i=0;i<28;i++){
         const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2),radius=.4+rng.next()*1.25;
         rockDummy.position.set(x,radius*.48,z);rockDummy.scale.set(radius*1.25,radius*.7,radius*.95);rockDummy.rotation.set(rng.next()*.4,rng.next()*Math.PI,rng.next()*.3);rockDummy.updateMatrix();boulders.setMatrixAt(i,rockDummy.matrix);
         if(radius>1.0){const hx=radius*1.05,hz=radius*.8;this.collisionSegments.push({x1:x-hx,z1:z-hz,x2:x+hx,z2:z-hz},{x1:x+hx,z1:z-hz,x2:x+hx,z2:z+hz},{x1:x+hx,z1:z+hz,x2:x-hx,z2:z+hz},{x1:x-hx,z1:z+hz,x2:x-hx,z2:z-hz})}
       }
-      const spikes=new THREE.InstancedMesh(new THREE.ConeGeometry(.4,1,7),lib.concrete,14),spikeDummy=new THREE.Object3D();
+      const spikes=new THREE.InstancedMesh(tileGeometryUV(new THREE.ConeGeometry(.4,1,7),lib.concrete),lib.concrete,14),spikeDummy=new THREE.Object3D();
       for(let i=0;i<14;i++){
         const x=this.originX+1.5+rng.next()*(size-3),z=this.originZ+1.5+rng.next()*(size-3),length=1+rng.next()*2.4;
         spikeDummy.position.set(x,level.wallHeight-length/2,z);spikeDummy.rotation.x=Math.PI;spikeDummy.scale.set(1,length,1);spikeDummy.updateMatrix();spikes.setMatrixAt(i,spikeDummy.matrix);
       }
       // Floor stalagmites
-      const stags=new THREE.InstancedMesh(new THREE.ConeGeometry(.28,1,6),lib.concrete,12),stagDummy=new THREE.Object3D();
+      const stags=new THREE.InstancedMesh(tileGeometryUV(new THREE.ConeGeometry(.28,1,6),lib.concrete),lib.concrete,12),stagDummy=new THREE.Object3D();
       for(let i=0;i<12;i++){
         const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4),h=.6+rng.next()*1.4;
         stagDummy.position.set(x,h/2,z);stagDummy.rotation.set(0,rng.next()*Math.PI,0);stagDummy.scale.set(.8+rng.next()*.5,h, .8+rng.next()*.5);stagDummy.updateMatrix();stags.setMatrixAt(i,stagDummy.matrix);
@@ -1584,7 +1586,7 @@ class Chunk{
         [this.originX+size*.82,this.originZ+size*.34],
         [this.originX+size*.97,this.originZ+size*.34]
       ];
-      const wallGeometry=new THREE.IcosahedronGeometry(1,1),wallInstances=new THREE.InstancedMesh(wallGeometry,lib.concrete,120);
+      const wallGeometry=tileGeometryUV(new THREE.IcosahedronGeometry(1,1),lib.concrete),wallInstances=new THREE.InstancedMesh(wallGeometry,lib.concrete,120);
       const wallDummy=new THREE.Object3D();let wallIndex=0;
       for(let segment=0;segment<road.length-1;segment++){
         const [ax,az]=road[segment],[bx,bz]=road[segment+1],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);
@@ -1604,7 +1606,7 @@ class Chunk{
       wallInstances.count=wallIndex;wallInstances.instanceMatrix.needsUpdate=true;g.add(wallInstances);
       for(let i=0;i<3;i++){
         const [x,z]=road[1+i*2],sign=new THREE.Group();sign.position.set(x,0,z);
-        const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.075,2.1,8),lib.rustMetal);post.position.y=1.05;sign.add(post);
+        const post=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(.055,.075,2.1,8),lib.rustMetal),lib.rustMetal);post.position.y=1.05;sign.add(post);
         box(sign,new THREE.BoxGeometry(.9,.42,.08),lib.hotelGold,0,2.05,0);
         box(sign,new THREE.BoxGeometry(.72,.26,.035),lib.dark,0,2.05,.055);
         box(sign,new THREE.BoxGeometry(.42,.035,.04),lib.indicator,0,2.05,.08);g.add(sign);
@@ -1623,7 +1625,7 @@ class Chunk{
       // Rainwater gathers in shallow, irregular patches on the unmarked road.
       for(let i=0;i<5;i++){
         const px=this.originX+size*(.12+rng.next()*.76),pz=this.originZ+size*(.5+(rng.next()-.5)*.12);
-        const puddle=new THREE.Mesh(new THREE.CircleGeometry(.8+rng.next()*1.5,18),lib.wetAsphalt);
+        const puddle=new THREE.Mesh(tileGeometryUV(new THREE.CircleGeometry(.8+rng.next()*1.5,18),lib.wetAsphalt),lib.wetAsphalt);
         puddle.rotation.x=-Math.PI/2;puddle.scale.set(1.8,.65,1);puddle.position.set(px,.038,pz);g.add(puddle);
       }
       const leafGeometry=new THREE.PlaneGeometry(.18,.1),leaves=new THREE.InstancedMesh(leafGeometry,lib.leaf,90),leafDummy=new THREE.Object3D();
@@ -1675,7 +1677,7 @@ class Chunk{
       }
       for(let i=0;i<5;i++){
         const x=this.originX+size*(.12+i*.19),z=this.originZ+size*(i%2?.46:.54);
-        const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,4.4,7),lib.metal);pole.position.set(x,2.2,z);g.add(pole);
+        const pole=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(.055,.085,4.4,7),lib.metal),lib.metal);pole.position.set(x,2.2,z);g.add(pole);
         box(g,new THREE.BoxGeometry(1.0,.08,.08),lib.metal,x+.45,4.28,z);
         const bulb=box(g,new THREE.BoxGeometry(.28,.12,.2),lib.dark,x+.9,4.22,z);bulb.userData.light=false;
         if(rng.next()<.28)this.lightSources.push({position:new THREE.Vector3(x+.9,4.15,z),color:0xd8e0d9,baseIntensity:7,intensity:7,distance:9,decay:2});
@@ -1794,13 +1796,13 @@ class Chunk{
       for(let x=firstX;x<this.originX+size-2;x+=spacing)for(let z=firstZ;z<this.originZ+size-2;z+=spacing){
         if(x<=this.originX+2||x>=this.originX+size-2||z<=this.originZ+2||z>=this.originZ+size-2)continue;
         const gx=Math.round(x/spacing),gz=Math.round(z/spacing),j=.7*(cycleHash(this.game.seed^0x8a12,gx,gz,0x17)-.5);
-        pillarData.push(new THREE.Matrix4().compose(new THREE.Vector3(x+j,level.wallHeight/2,z-j),q,new THREE.Vector3(1.15,1,1.15)));
-        baseData.push(new THREE.Matrix4().compose(new THREE.Vector3(x+j,.08,z-j),q,new THREE.Vector3(1.35,1,1.35)));
+        pillarData.push(new THREE.Matrix4().compose(new THREE.Vector3(x+j,level.wallHeight/2,z-j),q,new THREE.Vector3(1,1,1)));
+        baseData.push(new THREE.Matrix4().compose(new THREE.Vector3(x+j,.08,z-j),q,new THREE.Vector3(1,1,1)));
       }
-      const pg=new THREE.BoxGeometry(1.25,level.wallHeight,1.25),bg=new THREE.BoxGeometry(1.5,.16,1.5);
-      const addLocal=(geometry,material,data)=>{if(!data.length)return;const m=new THREE.InstancedMesh(geometry,material,data.length);m.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((v,i)=>m.setMatrixAt(i,v));m.instanceMatrix.needsUpdate=true;m.computeBoundingSphere();g.add(m)};
+      const pg=new THREE.BoxGeometry(1.4375,level.wallHeight,1.4375),bg=new THREE.BoxGeometry(2.025,.216,2.025);
+      const addLocal=(geometry,material,data)=>{if(!data.length)return;const m=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);m.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((v,i)=>m.setMatrixAt(i,v));m.instanceMatrix.needsUpdate=true;m.computeBoundingSphere();g.add(m)};
       addLocal(pg,lib.pillar,pillarData);addLocal(bg,lib.wall,baseData);
-      for(const m of pillarData){const px=m.elements[12],pz=m.elements[14],r=.64;this.collisionSegments.push({x1:px-r,z1:pz-r,x2:px+r,z2:pz-r},{x1:px+r,z1:pz-r,x2:px+r,z2:pz+r},{x1:px+r,z1:pz+r,x2:px-r,z2:pz+r},{x1:px-r,z1:pz+r,x2:px-r,z2:pz-r})}
+      for(const m of pillarData){const px=m.elements[12],pz=m.elements[14],r=.72;this.collisionSegments.push({x1:px-r,z1:pz-r,x2:px+r,z2:pz-r},{x1:px+r,z1:pz-r,x2:px+r,z2:pz+r},{x1:px+r,z1:pz+r,x2:px-r,z2:pz+r},{x1:px-r,z1:pz+r,x2:px-r,z2:pz-r})}
     }
 
     if(region==="holes"){
@@ -1987,20 +1989,20 @@ class Chunk{
       const y=2.05;
       let backing,emitter,lightPosition;
       if(face==="west"){
-        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x-.665,y,z);
-        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x-.735,y,z);
+        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x-.66,y,z);
+        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x-.7275,y,z);
         lightPosition=new THREE.Vector3(x-1.02,y,z);
       }else if(face==="east"){
-        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x+.665,y,z);
-        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x+.735,y,z);
+        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x+.66,y,z);
+        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x+.7275,y,z);
         lightPosition=new THREE.Vector3(x+1.02,y,z);
       }else if(face==="north"){
-        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z-.665);
-        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z-.735);
+        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z-.66);
+        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z-.7275);
         lightPosition=new THREE.Vector3(x,y,z-1.02);
       }else{
-        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z+.665);
-        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z+.735);
+        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z+.66);
+        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z+.7275);
         lightPosition=new THREE.Vector3(x,y,z+1.02);
       }
       emitter.userData.light=true;
@@ -2026,11 +2028,18 @@ class Chunk{
           const p=center(ix,iz);
           columns.push(new THREE.Matrix4().makeTranslation(p.x,level.wallHeight/2,p.z));
           bases.push(new THREE.Matrix4().makeTranslation(p.x,.08,p.z));
+          const half=.61;
+          this.collisionSegments.push(
+            {x1:p.x-half,z1:p.z-half,x2:p.x+half,z2:p.z-half},
+            {x1:p.x+half,z1:p.z-half,x2:p.x+half,z2:p.z+half},
+            {x1:p.x+half,z1:p.z+half,x2:p.x-half,z2:p.z+half},
+            {x1:p.x-half,z1:p.z+half,x2:p.x-half,z2:p.z-half}
+          );
         }
       }
 
       const addInst=(geometry,material,data)=>{
-        const mesh=new THREE.InstancedMesh(geometry,material,data.length);
+        const mesh=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
         data.forEach((m,i)=>mesh.setMatrixAt(i,m));
         mesh.instanceMatrix.needsUpdate=true;
@@ -2038,7 +2047,7 @@ class Chunk{
         mesh.computeBoundingSphere();
         g.add(mesh);
       };
-      addInst(pillarGeom,lib.concrete,columns);
+      addInst(pillarGeom,lib.level1Pillar,columns);
       addInst(baseGeom,lib.garageBase,bases);
 
       // The faded yellow band wraps the bottom of each square support column.
@@ -2093,24 +2102,38 @@ class Chunk{
       // A vehicle ramp rises to a small upper parking deck in the starting
       // garage. It is a concrete slab with retaining curbs and yellow edge paint.
       if(this.cx===0&&this.cz===0){
-        const rampStartX=this.originX+9,rampLength=22,rampZ=this.originZ+36;
-        const rise=2.35,angle=Math.atan2(rise,rampLength),centerX=rampStartX+rampLength/2,centerY=rise/2+.14*Math.cos(angle);
-        const ramp=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete);
+        const rampStartX=this.originX+9,rampLength=22,rampEndX=rampStartX+rampLength,rampZ=this.originZ+36;
+        const rise=2.35,angle=Math.atan2(rise,rampLength),centerX=rampStartX+rampLength/2;
+        const centerY=rise/2-.14*Math.cos(angle);
+        const deckLength=18,deckWidth=13.4,deckEndX=rampEndX+deckLength;
+        this.level1Ramp={startX:rampStartX,endX:rampEndX,endDeckX:deckEndX,z:rampZ,length:rampLength,rise,halfWidth:3.25,deckHalfWidth:deckWidth/2};
+        const ramp=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete),lib.concrete);
         ramp.position.set(centerX,centerY,rampZ);ramp.rotation.z=angle;
-        ramp.userData.level1ParkingRamp=true;g.add(ramp);
+        ramp.userData.level1ParkingRamp=true;ramp.userData.level1WalkableRamp=true;g.add(ramp);
         for(const side of [-1,1]){
           const rail=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.74,.25),lib.garageBase);
           rail.position.set(centerX,centerY+.48,rampZ+side*3.12);rail.rotation.z=angle;g.add(rail);
           const edgePaint=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.035,.035),lib.warningLine);
           edgePaint.position.set(centerX,centerY+.86,rampZ+side*2.94);edgePaint.rotation.z=angle;g.add(edgePaint);
+          this.collisionSegments.push({x1:rampStartX,z1:rampZ+side*3.12,x2:rampEndX,z2:rampZ+side*3.12});
         }
         for(const t of [.34,.68]){
-          const x=rampStartX+rampLength*t,h=Math.max(.35,rise*t);
+          const x=rampStartX+rampLength*t,h=Math.max(.18,rise*t-.28*Math.cos(angle));
           for(const side of [-1,1])box(g,new THREE.BoxGeometry(.38,h,.38),lib.concrete,x,h/2,rampZ+side*2.55);
         }
-        const upperDeck=new THREE.Mesh(new THREE.BoxGeometry(8,.28,7.2),lib.concrete);
-        upperDeck.position.set(rampStartX+rampLength+4,rise+.14,rampZ);
-        upperDeck.userData.level1ParkingRamp=true;g.add(upperDeck);
+        const upperDeck=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(deckLength,.28,deckWidth),lib.concrete),lib.concrete);
+        upperDeck.position.set(rampEndX+deckLength/2,rise-.14,rampZ);
+        upperDeck.userData.level1ParkingRamp=true;upperDeck.userData.level1WalkableDeck=true;g.add(upperDeck);
+        // The raised landing is a real upper parking deck, enclosed on its
+        // exposed edges while leaving the ramp approach completely open.
+        for(const side of [-1,1]){
+          const rail=new THREE.Mesh(new THREE.BoxGeometry(deckLength,.74,.22),lib.garageBase);
+          rail.position.set(rampEndX+deckLength/2,rise+.37,rampZ+side*(deckWidth/2-.11));g.add(rail);
+          this.collisionSegments.push({x1:rampEndX,z1:rampZ+side*(deckWidth/2-.11),x2:deckEndX,z2:rampZ+side*(deckWidth/2-.11)});
+        }
+        const endRail=new THREE.Mesh(new THREE.BoxGeometry(.22,.74,deckWidth),lib.garageBase);
+        endRail.position.set(deckEndX,rise+.37,rampZ);g.add(endRail);
+        this.collisionSegments.push({x1:deckEndX,z1:rampZ-deckWidth/2,x2:deckEndX,z2:rampZ+deckWidth/2});
       }
 
       // Abandoned vehicles are rare landmarks, kept clear of the chunk's central route.
@@ -2164,8 +2187,15 @@ class Chunk{
       for(const x of [this.originX+size*.18,this.originX+size*.82]){
         for(let z=12;z<size-8;z+=24){
           const px=x,pz=this.originZ+z;
-          box(g,new THREE.BoxGeometry(.72,level.wallHeight,.72),lib.concrete,px,level.wallHeight/2,pz);
+          box(g,new THREE.BoxGeometry(.72,level.wallHeight,.72),lib.level1Pillar,px,level.wallHeight/2,pz);
           box(g,new THREE.BoxGeometry(.94,.12,.94),lib.garageBase,px,.06,pz);
+          const half=.36;
+          this.collisionSegments.push(
+            {x1:px-half,z1:pz-half,x2:px+half,z2:pz-half},
+            {x1:px+half,z1:pz-half,x2:px+half,z2:pz+half},
+            {x1:px+half,z1:pz+half,x2:px-half,z2:pz+half},
+            {x1:px-half,z1:pz+half,x2:px-half,z2:pz-half}
+          );
           if(z%48===12)addPillarSideLight(px,pz,x<this.originX+size/2?"east":"west",28+next()*8);
         }
       }
@@ -2219,7 +2249,14 @@ class Chunk{
         const p=center(room.x+1,room.z+1);
         if(room.type==="pillars"){
           for(const [ox,oz] of [[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]]){
-            box(g,new THREE.BoxGeometry(.58,level.wallHeight,.58),lib.concrete,p.x+ox*1.15,.0+level.wallHeight/2,p.z+oz*1.15);
+            const px=p.x+ox*1.15,pz=p.z+oz*1.15,half=.29;
+            box(g,new THREE.BoxGeometry(.58,level.wallHeight,.58),lib.level1Pillar,px,level.wallHeight/2,pz);
+            this.collisionSegments.push(
+              {x1:px-half,z1:pz-half,x2:px+half,z2:pz-half},
+              {x1:px+half,z1:pz-half,x2:px+half,z2:pz+half},
+              {x1:px+half,z1:pz+half,x2:px-half,z2:pz+half},
+              {x1:px-half,z1:pz+half,x2:px-half,z2:pz-half}
+            );
           }
         }else{
           for(let i=0;i<2;i++){
@@ -2707,6 +2744,18 @@ class WorldStreamer{
     }
     return {x:direct.x,z:direct.z};
   }
+  walkSurfaceHeightAt(x,z){
+    if(this.game.level.id!=="1")return 0;
+    const ramp=this.chunkAt(x,z)?.level1Ramp;
+    if(!ramp)return 0;
+    if(Math.abs(z-ramp.z)<=ramp.halfWidth&&x>=ramp.startX-.08&&x<=ramp.endX+.08){
+      return ramp.rise*THREE.MathUtils.clamp((x-ramp.startX)/ramp.length,0,1);
+    }
+    if(x>=ramp.endX-.08&&x<=ramp.endDeckX+.08&&Math.abs(z-ramp.z)<=ramp.deckHalfWidth){
+      return ramp.rise;
+    }
+    return 0;
+  }
   update(dt){
     const p=this.game.player.position;
     this.ensureAround(p.x,p.z);
@@ -2787,7 +2836,22 @@ class WorldStreamer{
         if(mask&8)testSegment(minX,minZ,minX,maxZ);
       }
     }
-    if(this.game.level.id!=="1"){
+    if(this.game.level.id==="1"){
+      const offset=this.size/2,cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size),reach=wallRadius+.35;
+      for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+        if(dx<0&&x-chunk.originX>reach)continue;
+        if(dx>0&&chunk.originX+this.size-x>reach)continue;
+        if(dz<0&&z-chunk.originZ>reach)continue;
+        if(dz>0&&chunk.originZ+this.size-z>reach)continue;
+        const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
+        for(const seg of nearby?.obstacleSegments||[]){
+          const minX=Math.min(seg.x1,seg.x2)-reach,maxX=Math.max(seg.x1,seg.x2)+reach;
+          const minZ=Math.min(seg.z1,seg.z2)-reach,maxZ=Math.max(seg.z1,seg.z2)+reach;
+          if(x<minX||x>maxX||z<minZ||z>maxZ)continue;
+          testSegment(seg.x1,seg.z1,seg.x2,seg.z2);
+        }
+      }
+    }else{
       const offset=this.size/2;
       const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
       const reach=wallRadius+.35;
@@ -2988,7 +3052,7 @@ class Player{
     }else{
       this.inOcean=false;
       this.verticalVelocity=0;
-      this.position.y=this.eyeY;
+      this.position.y=this.eyeY+this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z);
       if(this.game.level.id==="7"&&this.game.scene.fog){
         this.game.scene.fog.color.setHex(0x718c98);
         this.game.scene.fog.density=.0028;
@@ -3813,8 +3877,9 @@ export class BackroomsGame{
         this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
       });
       this.world.ensureAround(0,0);
-      const spawn=this.level.id==="0"?this.world.level0SpawnPoint():this.world.findSafeSpawn(0,0,.36);
-      this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
+      const requested=this.level.id==="0"?this.world.level0SpawnPoint():{x:0,z:0};
+      const spawn=this.world.findSafeSpawn(requested.x,requested.z,.46);
+      this.player.position.set(spawn.x,this.player.eyeY+this.world.walkSurfaceHeightAt(spawn.x,spawn.z),spawn.z);
       this.worldReady=true;
       if(this.pendingStart)this.beginIntroReveal();
       worldLoad.catch(error=>{
@@ -4025,7 +4090,7 @@ export class BackroomsGame{
   start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
-    this.seed=(Math.random()*2147483647)|0;this.levelId="0";this.setLevel("0");this.player.reset();const spawn=this.world.level0SpawnPoint();this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
+    this.seed=(Math.random()*2147483647)|0;this.levelId="0";this.setLevel("0");this.player.reset();this.world.ensureAround(0,0);const requested=this.world.level0SpawnPoint(),spawn=this.world.findSafeSpawn(requested.x,requested.z,.46);this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
     this.running=true;this.paused=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.introActive=false;this.syncPageTitle();document.getElementById("hud").classList.remove("hidden");
     const mobileControls=document.getElementById("mobile-controls");
     if(this.isTouchLayout()){
@@ -4095,6 +4160,8 @@ export class BackroomsGame{
       this.player.position.set(0,this.player.eyeY,0);
     }
     this.world.ensureAround(this.player.position.x,this.player.position.z);
+    const spawn=this.world.findSafeSpawn(this.player.position.x,this.player.position.z,.46);
+    this.player.position.set(spawn.x,this.player.eyeY+this.world.walkSurfaceHeightAt(spawn.x,spawn.z),spawn.z);
     if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.level.id)) );
     this.toast("You slipped into "+this.level.number+".",3);
   }

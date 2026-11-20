@@ -53,6 +53,58 @@ export const BACKROOMS_PBR_SOURCES = Object.freeze({
 });
 
 const remoteTextureCache = new Map();
+const tiledGeometryCache = new WeakMap();
+
+/** Convert a mapped primitive's UVs from one stretched image to world-sized repeats. */
+export function tileGeometryUV(geometry,material){
+  const selected=Array.isArray(material)
+    ?material.find(entry=>entry?.userData?.backroomsUvTileSize)
+    :material;
+  const tileSize=selected?.userData?.backroomsUvTileSize;
+  if(!geometry?.isBufferGeometry||!tileSize)return geometry;
+  let variants=tiledGeometryCache.get(geometry);
+  if(!variants){variants=new Map();tiledGeometryCache.set(geometry,variants);}
+  if(variants.has(tileSize))return variants.get(tileSize);
+
+  const tiled=geometry.clone();
+  const positions=tiled.attributes.position,normals=tiled.attributes.normal,uvs=tiled.attributes.uv;
+  if(!positions||!normals||!uvs)return geometry;
+  const cylinder=/^(CylinderGeometry|ConeGeometry)$/.test(tiled.type);
+  const sphere=tiled.type==="SphereGeometry";
+  const params=tiled.parameters||{};
+  const radius=cylinder
+    ?Math.max(params.radiusTop??params.radius??0,params.radiusBottom??params.radius??0)
+    :params.radius||1;
+  const height=params.height||radius*2;
+  const circumference=Math.PI*2*radius;
+
+  for(let i=0;i<positions.count;i++){
+    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
+    const nx=Math.abs(normals.getX(i)),ny=Math.abs(normals.getY(i)),nz=Math.abs(normals.getZ(i));
+    let u,v;
+    if(cylinder&&ny<.85){
+      // Preserve the cylinder's seam-aware angular coordinate while scaling
+      // both circumference and height in metres.
+      u=uvs.getX(i)*circumference/tileSize;
+      v=(y+height/2)/tileSize;
+    }else if(sphere){
+      u=uvs.getX(i)*circumference/tileSize;
+      v=uvs.getY(i)*height/tileSize;
+    }else if(ny>nx&&ny>nz){
+      u=x/tileSize;v=z/tileSize;
+    }else if(nx>nz){
+      u=z/tileSize;v=y/tileSize;
+    }else{
+      u=x/tileSize;v=y/tileSize;
+    }
+    uvs.setXY(i,u,v);
+  }
+  uvs.needsUpdate=true;
+  tiled.userData.backroomsWorldTiled=true;
+  tiled.userData.backroomsUvTileSize=tileSize;
+  variants.set(tileSize,tiled);
+  return tiled;
+}
 
 function noise2d(x,y,s){
   let n=(Math.imul((x+s)|0,374761393)+Math.imul((y+s)|0,668265263))|0;
@@ -216,12 +268,16 @@ function yellowizeCarpetTexture(texture){
 
 async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength){
   try{
-    const texture=await loadRemoteTexture(url,color);
+    // Cache the downloaded source, but keep per-material UV repeat/offset state
+    // independent. A shared Texture lets floor tiling silently retile pillars.
+    const texture=(await loadRemoteTexture(url,color)).clone();
+    texture.userData.backroomsOwned=true;
+    texture.needsUpdate=true;
     // PBR maps use UVs beyond 0..1 on world-scaled walls and pipe geometry.
     // ClampToEdge silently smears the edge texel over those regions.
     texture.wrapS=THREE.RepeatWrapping;
     texture.wrapT=THREE.RepeatWrapping;
-    texture.repeat.set(repeat,repeat);
+    texture.repeat.set(1,1);
     const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:kind==="metalnessMap"?material.metalnessMap:material.normalMap;
     if(previous?.userData?.backroomsOwned)previous.dispose();
     if(kind==="map"){
@@ -345,7 +401,9 @@ export function createPBRMaterial({base,seed=1,rough=.9,metal=0,scale=4,normalSt
     map:tex(baseCanvas,true),roughnessMap:tex(roughCanvas,false),normalMap:tex(normalFromHeight(size,seed+41),false),
     normalScale:new THREE.Vector2(normalStrength,normalStrength)
   });
-  m.map.repeat.set(scale,scale);m.roughnessMap.repeat.set(scale,scale);m.normalMap.repeat.set(scale,scale);
+  // Geometry UVs carry real-world tiling; do not multiply every mapped
+  // surface by a second material-level repeat.
+  m.map.repeat.set(1,1);m.roughnessMap.repeat.set(1,1);m.normalMap.repeat.set(1,1);
   return m;
 }
 
@@ -463,9 +521,6 @@ export async function applyLevel1Assets(library,level,onProgress=()=>{}){
   const maps=[
     [library.floor,"map",LEVEL1_ASSET_SOURCES.concreteColor,true,3.2,.18,"Concrete floor"],
     [library.floor,"normalMap",LEVEL1_ASSET_SOURCES.concreteNormal,false,3.2,.22,"Concrete floor normal"],
-    [library.ceiling,"map",BACKROOMS_PBR_SOURCES.ceiling.color,true,2.4,.12,"Concrete ceiling panels"],
-    [library.ceiling,"roughnessMap",BACKROOMS_PBR_SOURCES.ceiling.rough,false,2.4,.12,"Concrete ceiling panel roughness"],
-    [library.ceiling,"normalMap",BACKROOMS_PBR_SOURCES.ceiling.normal,false,2.4,.14,"Concrete ceiling panel normal"],
     [library.concrete,"map",LEVEL1_ASSET_SOURCES.concreteColor,true,3.2,.18,"Concrete walls"],
     [library.concrete,"normalMap",LEVEL1_ASSET_SOURCES.concreteNormal,false,3.2,.22,"Concrete wall normal"],
     [library.maintenanceWall,"map",LEVEL1_ASSET_SOURCES.brickColor,true,2.4,.20,"White brick corridors"],
@@ -482,6 +537,28 @@ export async function applyLevel1Assets(library,level,onProgress=()=>{}){
     done++;
     onProgress(done/maps.length,"LOADING LEVEL 1 ASSETS",label);
   }));
+  // Level 1's roof slab and square columns use the same concrete stone as the
+  // supports, not Level 0's ceiling grid. Keep the pillar UV material at 1:1
+  // repeat so its geometry can encode the real world tile size.
+  for(const key of ["map","normalMap","roughnessMap"]){
+    const source=library.concrete[key];
+    if(!source)continue;
+    const pillarTexture=source.clone();
+    pillarTexture.userData.backroomsOwned=true;
+    pillarTexture.repeat.set(1,1);pillarTexture.offset.set(0,0);pillarTexture.needsUpdate=true;
+    library.level1Pillar[key]=pillarTexture;
+    const previousCeilingTexture=library.ceiling[key];
+    if(previousCeilingTexture?.userData?.backroomsOwned)previousCeilingTexture.dispose();
+    const ceilingTexture=source.clone();
+    ceilingTexture.userData.backroomsOwned=true;
+    ceilingTexture.repeat.set(1,1);ceilingTexture.offset.set(0,0);ceilingTexture.needsUpdate=true;
+    library.ceiling[key]=ceilingTexture;
+  }
+  library.level1Pillar.color.setHex(0xffffff);
+  library.ceiling.color.setHex(0xffffff);
+  library.ceiling.roughness=library.concrete.roughness;
+  library.ceiling.needsUpdate=true;
+  library.level1Pillar.needsUpdate=true;
   return true;
 }
 
@@ -505,6 +582,8 @@ export function disposeLibrary(library){
 export function makeLibrary(level){
   const ceiling=createPBRMaterial({base:level.id==="1"?0x767976:level.theme.ceiling,seed:89+Number(level.id),rough:level.id==="1"?.97:.9,scale:level.id==="1"?4:2,normalStrength:level.id==="1"?.22:.24});
   const floor=createPBRMaterial({base:level.id==="1"?0x666966:level.theme.floor,seed:17+Number(level.id),rough:.98,scale:5,normalStrength:.18});
+  const concrete=createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3});
+  const level1Pillar=concrete.clone();
   if(level.id==="0"){
     // The color texture is a brown, worn carpet; avoid multiplying it by the
     // old mustard-brown base tint, which made the entire floor nearly black.
@@ -528,13 +607,14 @@ export function makeLibrary(level){
   redWall.emissive=new THREE.Color(0x100000);
   redWall.emissiveIntensity=.018;
   redFloor.color.setHex(0x6b1717);
-  return {
+  const library = {
     floor,
     wall:createPBRMaterial({base:level.theme.wall,seed:29+Number(level.id),rough:level.theme.wallRough,scale:level.id==="0"?1:3.8,normalStrength:.35}),
     wall2:createPBRMaterial({base:level.theme.wall,seed:129+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.35}),
     wallBottom:createPBRMaterial({base:level.theme.wall,seed:129+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.08}),
     wallBottom2:createPBRMaterial({base:level.theme.wall,seed:131+Number(level.id),rough:level.theme.wallRough,scale:1,normalStrength:.08}),
-    concrete:createPBRMaterial({base:level.id==="1"?0xcfd0cb:level.theme.wall,seed:57+Number(level.id),rough:.97,scale:5.5,normalStrength:.3}),
+    concrete,
+    level1Pillar,
     maintenanceWall:createPBRMaterial({base:0xe4e3dc,seed:117+Number(level.id),rough:.9,scale:2.4,normalStrength:.28}),
     stairs:new THREE.MeshStandardMaterial({color:0x8b8d89,roughness:.88,metalness:0}),
     parkingLine:new THREE.MeshStandardMaterial({color:0xb5b8b4,roughness:.82,metalness:0}),
@@ -602,10 +682,24 @@ export function makeLibrary(level){
     officeWindowStreak:new THREE.MeshStandardMaterial({color:0xb8c4c7,roughness:.24,metalness:0,transparent:true,opacity:.56,depthWrite:false}),
     indicator:new THREE.MeshStandardMaterial({color:0xff8a3c,roughness:.35,metalness:.1,emissive:0xff5d14,emissiveIntensity:2.2})
   };
+  const worldUvSizes={
+    wall:2.4,wall2:2.4,wallBottom:2.4,wallBottom2:2.4,
+    redWall:2.4,manilaWall:2.4,concrete:2.4,level1Pillar:2.4,
+    maintenanceWall:1.4,brickWall:1.4,
+    metal:1.25,rustMetal:1.25,pole:1.2,pillar:1.2,
+    crate:.9,stairs:1.8,trim:1.0,trimTop:1.0,redFloor:2.4,
+    officeWood:1.8,mahogany:1.8,
+    asphalt:3.0,wetAsphalt:3.0,sidewalk:2.4,lawn:1.5,farmDirt:2.4
+  };
+  for(const [key,tileSize] of Object.entries(worldUvSizes)){
+    const material=library[key];
+    if(material)material.userData.backroomsUvTileSize=tileSize;
+  }
+  return library;
 }
 
 export function box(parent,geometry,material,x,y,z,rx=0,ry=0,rz=0){
-  const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);parent.add(m);return m;
+  const m=new THREE.Mesh(tileGeometryUV(geometry,material),material);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);parent.add(m);return m;
 }
 
 export function makePropSet(parent,level,library,rng,x,z){
@@ -614,7 +708,7 @@ export function makePropSet(parent,level,library,rng,x,z){
     box(parent,new THREE.BoxGeometry(.86,.06,.86),library.metal,x,.72,z);
   }
   if(rng()<level.pipeChance){
-    const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,4.4,8),library.metal);
+    const pipe=new THREE.Mesh(tileGeometryUV(new THREE.CylinderGeometry(.09,.09,4.4,8),library.metal),library.metal);
     pipe.rotation.z=Math.PI/2;pipe.position.set(x,2.7,z);parent.add(pipe);
   }
 }
