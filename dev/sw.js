@@ -1,17 +1,17 @@
-const CACHE_NAME="backrooms-assets-v54";
+const CACHE_NAME="backrooms-assets-v55";
 const CORE=[
   "index.html",
   "styles.css",
-  "src/main.js?v=20261120-page-title1",
-  "src/game.js?v=20261120-page-title1",
+  "src/main.js?v=20261120-level1-garage-polish1",
+  "src/game.js?v=20261120-level1-garage-polish1",
   "src/entity-models.js",
-  "src/assets.js?v=20261120-l2-pipe-uv-junctions2",
+  "src/assets.js?v=20261120-level1-garage-polish1",
   "src/level1-wet.js?v=20261120-l2-pipe-uv-junctions2",
   "src/input.js?v=20261120-l2-pipe-uv-junctions2",
   "src/levels.js?v=20261120-l2-pipe-uv-junctions2",
   "src/audio.js",
   "src/levels.js",
-  "src/admin.js",
+  "src/admin.js?v=20261120-level1-garage-polish1",
   "src/fixes.js",
   "favicon.svg"
 ];

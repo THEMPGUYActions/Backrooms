@@ -8,7 +8,7 @@ import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level7-ocean-sky-swim1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level7-ocean-sky-swim1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level1-garage-polish1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
@@ -1729,7 +1729,9 @@ class Chunk{
 
     const addLight=(x,z,rotation=0,scale=1,intensity=105)=>{
       const cableLength=.22;
-      const cableOffset=1.35*scale;
+      // Keep the ceiling suspension cables beyond the fixture housing so they
+      // terminate beside it instead of visibly passing through the light.
+      const cableOffset=2.08*scale;
       for(const side of [-1,1]){
         const cable=new THREE.Mesh(
           new THREE.CylinderGeometry(.022,.022,cableLength,8),
@@ -1783,6 +1785,35 @@ class Chunk{
       });
     };
 
+    const addPillarSideLight=(x,z,face,intensity=34)=>{
+      const y=2.05;
+      let backing,emitter,lightPosition;
+      if(face==="west"){
+        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x-.665,y,z);
+        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x-.735,y,z);
+        lightPosition=new THREE.Vector3(x-1.02,y,z);
+      }else if(face==="east"){
+        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x+.665,y,z);
+        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x+.735,y,z);
+        lightPosition=new THREE.Vector3(x+1.02,y,z);
+      }else if(face==="north"){
+        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z-.665);
+        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z-.735);
+        lightPosition=new THREE.Vector3(x,y,z-1.02);
+      }else{
+        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z+.665);
+        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z+.735);
+        lightPosition=new THREE.Vector3(x,y,z+1.02);
+      }
+      emitter.userData.light=true;
+      emitter.userData.level1PillarLight=true;
+      emitter.userData.mountFace=face;
+      emitter.userData.baseEmissive=2.35;
+      this.fixtures.push(emitter);
+      this.lightSources.push({position:lightPosition,color:0xf4f5f0,baseIntensity:intensity,intensity,distance:17,decay:2,fixture:emitter});
+      backing.userData.level1LightHousing=true;
+    };
+
     if(this.zone==="parking"){
       // 5x5 parking-column rhythm. This is the dominant Level 1 shape in
       // The Level 0 macro room 1: long sightlines with repeating square
@@ -1812,6 +1843,31 @@ class Chunk{
       addInst(pillarGeom,lib.concrete,columns);
       addInst(baseGeom,lib.garageBase,bases);
 
+      // The faded yellow band wraps the bottom of each square support column.
+      // Instance all four faces into one draw call, and mount lights on selected
+      // pillar sides rather than suspending every fixture in the cable runs.
+      const stripeGeometry=new THREE.BoxGeometry(1.25,.14,.035);
+      const stripeMatrices=[],stripeDummy=new THREE.Object3D();
+      for(let ix=1;ix<=8;ix+=2){
+        for(let iz=1;iz<=8;iz+=2){
+          const p=center(ix,iz);
+          for(const side of ["north","south","west","east"]){
+            stripeDummy.position.set(
+              p.x+(side==="west"?-.63:side==="east"?.63:0),
+              .39,
+              p.z+(side==="north"?-.63:side==="south"?.63:0)
+            );
+            stripeDummy.rotation.set(0,side==="west"||side==="east"?Math.PI/2:0,0);
+            stripeDummy.updateMatrix();stripeMatrices.push(stripeDummy.matrix.clone());
+          }
+          if((ix+iz)%2===0){
+            const face=next()<.5?(ix<5?"west":"east"):(iz<5?"north":"south");
+            addPillarSideLight(p.x,p.z,face,31+next()*9);
+          }
+        }
+      }
+      addInst(stripeGeometry,lib.warningLine,stripeMatrices);
+
       // Dark structural bands directly below the slab.
       for(let z=8;z<size;z+=16){
         box(
@@ -1824,30 +1880,39 @@ class Chunk{
         );
       }
 
-      // Long fluorescent rows between the structural bands.
-      for(let z=8;z<size;z+=16){
-        for(let x=8;x<size;x+=16){
-          const p=this.centerForLevel1Cell(x,z);
-          addLight(p.x,p.z,0,.92,98+next()*24);
+      // Faded yellow parking-bay outlines. Keep the paint chipped and low-contrast
+      // so it reads as old garage safety marking rather than a bright road grid.
+      const lineMat=lib.warningLine;
+      for(let x=8;x<size-8;x+=16){
+        const px=this.originX+x;
+        box(g,new THREE.BoxGeometry(.07,.014,7.6),lineMat,px,.014,this.originZ+16);
+        box(g,new THREE.BoxGeometry(.07,.014,7.6),lineMat,px,.014,this.originZ+48);
+        for(const z of [12,20,44,52]){
+          box(g,new THREE.BoxGeometry(4.8,.014,.07),lineMat,px+2.4,.014,this.originZ+z);
         }
       }
 
-      // A second perpendicular row in selected lanes creates the deep,
-      // repeating light pattern visible in the reference.
-      for(let x=16;x<size-4;x+=32){
-        for(let z=16;z<size-8;z+=16){
-          if(next()<.34)continue;
-          const p={x:this.originX+x,z:this.originZ+z};
-          addLight(p.x,p.z,Math.PI/2,.72,72+next()*20);
+      // A vehicle ramp rises to a small upper parking deck in the starting
+      // garage. It is a concrete slab with retaining curbs and yellow edge paint.
+      if(this.cx===0&&this.cz===0){
+        const rampStartX=this.originX+9,rampLength=22,rampZ=this.originZ+36;
+        const rise=2.35,angle=Math.atan2(rise,rampLength),centerX=rampStartX+rampLength/2,centerY=rise/2+.14*Math.cos(angle);
+        const ramp=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete);
+        ramp.position.set(centerX,centerY,rampZ);ramp.rotation.z=angle;
+        ramp.userData.level1ParkingRamp=true;g.add(ramp);
+        for(const side of [-1,1]){
+          const rail=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.74,.25),lib.garageBase);
+          rail.position.set(centerX,centerY+.48,rampZ+side*3.12);rail.rotation.z=angle;g.add(rail);
+          const edgePaint=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.035,.035),lib.warningLine);
+          edgePaint.position.set(centerX,centerY+.86,rampZ+side*2.94);edgePaint.rotation.z=angle;g.add(edgePaint);
         }
-      }
-
-      // Faded parking/traffic markings. Keep them extremely dark and thin so
-      // they read as garage infrastructure instead of a bright arcade floor.
-      const lineMat=lib.parkingLine;
-      for(let x=16;x<size-8;x+=16){
-        box(g,new THREE.BoxGeometry(.055,.012,5.6),lineMat,this.originX+x,.012,this.originZ+12);
-        if(next()<.7)box(g,new THREE.BoxGeometry(.055,.012,5.6),lineMat,this.originX+x,.012,this.originZ+44);
+        for(const t of [.34,.68]){
+          const x=rampStartX+rampLength*t,h=Math.max(.35,rise*t);
+          for(const side of [-1,1])box(g,new THREE.BoxGeometry(.38,h,.38),lib.concrete,x,h/2,rampZ+side*2.55);
+        }
+        const upperDeck=new THREE.Mesh(new THREE.BoxGeometry(8,.28,7.2),lib.concrete);
+        upperDeck.position.set(rampStartX+rampLength+4,rise+.14,rampZ);
+        upperDeck.userData.level1ParkingRamp=true;g.add(upperDeck);
       }
 
       // Abandoned vehicles are rare landmarks, kept clear of the chunk's central route.
@@ -1903,6 +1968,7 @@ class Chunk{
           const px=x,pz=this.originZ+z;
           box(g,new THREE.BoxGeometry(.72,level.wallHeight,.72),lib.concrete,px,level.wallHeight/2,pz);
           box(g,new THREE.BoxGeometry(.94,.12,.94),lib.garageBase,px,.06,pz);
+          if(z%48===12)addPillarSideLight(px,pz,x<this.originX+size/2?"east":"west",28+next()*8);
         }
       }
       for(let z=10;z<size-8;z+=18){
@@ -1967,14 +2033,17 @@ class Chunk{
       }
     }
 
-    // Condensation and tracked-in water vary by district but remain seed-stable.
-    const puddleCount=this.zone==="parking"?7:this.zone==="halls"?6:4;
-    const patchCount=this.zone==="corridors"?5:8;
+    // Damp concrete and standing water are distributed through the entire
+    // sector. Most puddles are long tracked-out streaks; others are compact,
+    // ragged pools. Each material gets one merged mesh per chunk to keep draw
+    // calls flat even with the higher puddle density.
+    const puddleCount=this.zone==="parking"?17:this.zone==="halls"?14:10;
+    const patchCount=this.zone==="parking"?14:this.zone==="halls"?12:8;
     const makeWetShape=(radiusX,radiusZ,points)=>{
       const shape=new THREE.Shape();
       for(let i=0;i<points;i++){
         const angle=i/points*Math.PI*2;
-        const irregular=.62+next()*.48;
+        const irregular=.72+next()*.42;
         const x=Math.cos(angle)*radiusX*irregular;
         const z=Math.sin(angle)*radiusZ*irregular;
         if(i===0)shape.moveTo(x,z);else shape.lineTo(x,z);
@@ -1982,27 +2051,55 @@ class Chunk{
       shape.closePath();
       return shape;
     };
+    const appendWetShape=(positions,radiusX,radiusZ,points,px,pz,rotation)=>{
+      const shapeGeometry=new THREE.ShapeGeometry(makeWetShape(radiusX,radiusZ,points),2);
+      const attribute=shapeGeometry.attributes.position;
+      const c=Math.cos(rotation),sn=Math.sin(rotation);
+      for(let vertex=0;vertex<attribute.count;vertex++){
+        const x=attribute.getX(vertex),z=attribute.getY(vertex);
+        const dx=x*c-z*sn,dz=x*sn+z*c;
+        // Geometry lives in a shared horizontal XY plane; its group rotates
+        // once to XZ, so negate local Y to preserve world-space Z orientation.
+        positions.push(px-this.originX+dx,-(pz-this.originZ+dz),0);
+      }
+      shapeGeometry.dispose();
+    };
+    const stainPositions=[],puddlePositions=[];
     for(let i=0;i<patchCount;i++){
-      const px=this.originX+5+next()*(size-10),pz=this.originZ+5+next()*(size-10);
-      const shape=makeWetShape(1.8+next()*4.8,1.1+next()*3.1,9+Math.floor(next()*5));
-      const patch=new THREE.Mesh(new THREE.ShapeGeometry(shape),lib.wetConcrete);
-      patch.rotation.x=-Math.PI/2;
-      patch.rotation.z=next()*Math.PI*2;
-      patch.position.set(px,.009+next()*.002,pz);
-      patch.renderOrder=1;
-      g.add(patch);
+      const px=this.originX+4+next()*(size-8),pz=this.originZ+4+next()*(size-8);
+      const radiusX=2.2+next()*5.0,radiusZ=.65+next()*2.8;
+      appendWetShape(stainPositions,radiusX,radiusZ,12+Math.floor(next()*7),px,pz,next()*Math.PI*2);
     }
     for(let i=0;i<puddleCount;i++){
-      const px=this.originX+5+next()*(size-10),pz=this.originZ+5+next()*(size-10);
-      const shape=makeWetShape(1.15+next()*2.9,.7+next()*1.9,11+Math.floor(next()*7));
-      const puddle=new THREE.Mesh(new THREE.ShapeGeometry(shape,2),lib.puddle);
-      puddle.rotation.x=-Math.PI/2;
-      puddle.rotation.z=next()*Math.PI*2;
-      puddle.position.set(px,.018,pz);
-      puddle.renderOrder=2;
-      puddle.userData.isLevel1Puddle=true;
-      puddle.layers.enable(1);
-      g.add(puddle);
+      const px=this.originX+4+next()*(size-8),pz=this.originZ+4+next()*(size-8);
+      const kind=next();
+      let radiusX,radiusZ;
+      if(kind<.48){
+        radiusX=2.6+next()*4.0;radiusZ=.22+next()*.62;
+      }else if(kind<.82){
+        radiusX=.85+next()*2.1;radiusZ=.55+next()*1.5;
+      }else{
+        radiusX=1.6+next()*3.2;radiusZ=1.15+next()*2.4;
+      }
+      appendWetShape(puddlePositions,radiusX,radiusZ,14+Math.floor(next()*9),px,pz,next()*Math.PI*2);
+    }
+    const makeMergedWetGeometry=positions=>{
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+    if(stainPositions.length){
+      const stainRoot=new THREE.Group();stainRoot.position.set(this.originX,.010,this.originZ);stainRoot.rotation.x=-Math.PI/2;
+      const stains=new THREE.Mesh(makeMergedWetGeometry(stainPositions),lib.wetConcrete);
+      stains.renderOrder=1;stains.userData.isLevel1WetConcrete=true;stains.userData.patchCount=patchCount;
+      stainRoot.add(stains);g.add(stainRoot);
+    }
+    if(puddlePositions.length){
+      const puddleRoot=new THREE.Group();puddleRoot.position.set(this.originX,.018,this.originZ);puddleRoot.rotation.x=-Math.PI/2;
+      const puddle=new THREE.Mesh(makeMergedWetGeometry(puddlePositions),lib.puddle);
+      puddle.renderOrder=2;puddle.userData.isLevel1Puddle=true;puddle.userData.puddleCount=puddleCount;
+      puddle.layers.set(1);puddleRoot.add(puddle);g.add(puddleRoot);
     }
   }
 
@@ -2188,8 +2285,8 @@ class WorldStreamer{
       this.library.floor.color.setHex(0x666a68);
       this.library.floor.roughness=.42;
       this.library.floor.metalness=.03;
-      this.library.ceiling.color.setHex(0x4e514f);
-      this.library.ceiling.roughness=.78;
+      this.library.ceiling.color.setHex(0xc5c8c5);
+      this.library.ceiling.roughness=.9;
       this.library.ceiling.metalness=0;
       this.library.concrete.color.setHex(0xaeb0ac);
       this.library.concrete.roughness=.84;
