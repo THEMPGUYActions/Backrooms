@@ -3360,6 +3360,7 @@ export class BackroomsGame{
     this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:queryFlag("admin"),god:false,noclip:false};
     this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.deathSequenceDuration=3.35;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
+    this.syncPageTitle();
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
     this.redZoneFontTimer=0;
     this.redZoneAudioToken=0;
@@ -3525,6 +3526,7 @@ export class BackroomsGame{
         this.running=true;
         this.paused=false;
         this.dead=false;
+        this.syncPageTitle();
         this.player.reset();
         document.getElementById("hud")?.classList.remove("hidden");
         document.getElementById("boot")?.classList.add("fade-out");
@@ -3648,6 +3650,7 @@ export class BackroomsGame{
     this.running=true;
     this.paused=false;
     this.dead=false;
+    this.syncPageTitle();
     this.player.reset();
     this.vhsPass.uniforms.intensity.value=.72;
     this.vhsPass.uniforms.tracking.value=.28;
@@ -3704,7 +3707,7 @@ export class BackroomsGame{
   restart(){
     document.getElementById("death").classList.add("hidden");document.getElementById("ending").classList.add("hidden");document.getElementById("pause").classList.add("hidden");
     this.seed=(Math.random()*2147483647)|0;this.levelId="0";this.setLevel("0");this.player.reset();const spawn=this.world.level0SpawnPoint();this.player.position.set(spawn.x,this.player.eyeY,spawn.z);
-    this.running=true;this.paused=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.introActive=false;document.getElementById("hud").classList.remove("hidden");
+    this.running=true;this.paused=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.introActive=false;this.syncPageTitle();document.getElementById("hud").classList.remove("hidden");
     const mobileControls=document.getElementById("mobile-controls");
     if(this.isTouchLayout()){
       mobileControls?.classList.remove("hidden");
@@ -3718,7 +3721,7 @@ export class BackroomsGame{
     this.toast(this.level.objective,2.4);
   }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);document.title="The Backrooms: Level "+this.level.id;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
@@ -3757,6 +3760,11 @@ export class BackroomsGame{
     this.player.velocity.set(0,0,0);this.player.verticalVelocity=0;this.player.inOcean=false;
     const recordingLevel=document.getElementById("recording-level");if(recordingLevel)recordingLevel.textContent=this.level.number;
     const pauseLevel=document.getElementById("pause-level");if(pauseLevel)pauseLevel.textContent=this.level.number;
+    this.syncPageTitle();
+  }
+  syncPageTitle(){
+    const title=this.running&&!this.introActive?"The Backrooms: Level "+this.level.id:"The Backrooms";
+    if(document.title!==title)document.title=title;
   }
   changeLevel(id){
     if(!id){this.ending();return}
@@ -3772,7 +3780,7 @@ export class BackroomsGame{
     this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
-  ending(){this.paused=true;this.running=false;document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
+  ending(){this.paused=true;this.running=false;this.syncPageTitle();document.getElementById("hud").classList.add("hidden");document.getElementById("ending").classList.remove("hidden");document.exitPointerLock?.()}
   die(copy){
     // Horror death sequence: jumpscare + analog tape death, no generic text menu.
     if(this.dead||this.deathSequenceActive)return;
@@ -4146,8 +4154,8 @@ export class BackroomsGame{
 
     if(t>=duration){
       this.introPlaying=false;
-      document.title="The Backrooms: Level "+this.level.id;
       this.running=true;this.paused=false;this.dead=false;
+      this.syncPageTitle();
       document.getElementById("hud").classList.remove("hidden");
       const mobileControls=document.getElementById("mobile-controls");
       if(this.isTouchLayout()){
