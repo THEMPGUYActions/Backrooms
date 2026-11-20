@@ -468,7 +468,11 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
 
 export async function applyLevelSpecificPBR(library,level,onProgress=()=>{}){
   const sets={
-    "4":[[library.floor,"office-carpet",3.1,.97,"Grey office carpet"]],
+    "4":[
+      [library.floor,"office-carpet",3.1,.97,"Grey office carpet"],
+      [library.officePlastic,BACKROOMS_PBR_SOURCES.paintedWall,2.4,.96,"Office painted drywall"],
+      [library.officeCeilingTile,BACKROOMS_PBR_SOURCES.ceiling,2.1,.97,"Suspended ceiling tiles"]
+    ],
     "5":[
       [library.floor,"hotel-carpet",3.2,.95,"Hotel patterned carpet"],
       [library.mahogany,"hotel-wood",1.8,.72,"Hotel mahogany"],
@@ -598,7 +602,7 @@ export function makeLibrary(level){
   ceiling.side=THREE.FrontSide;
   ceiling.color.setHex(level.theme.ceiling);
   ceiling.emissive=new THREE.Color(level.id==="0"?0x766b3e:level.id==="4"?0xd8d8d4:0x252725);
-  ceiling.emissiveIntensity=level.id==="0"?.022:level.id==="1"?0:level.id==="4"?.045:.028;
+  ceiling.emissiveIntensity=level.id==="0"?.022:level.id==="1"?0:level.id==="4"?.008:.028;
   if(level.id==="4"){
     floor.color.setHex(0x6e7074);
     floor.map=null;floor.normalMap=null;floor.roughnessMap=null;
@@ -676,10 +680,15 @@ export function makeLibrary(level){
     lawn:new THREE.MeshStandardMaterial({color:0x46513a,roughness:.99,metalness:0}),
     farmDirt:new THREE.MeshStandardMaterial({color:0x554a35,roughness:.98,metalness:0}),
     leaf:new THREE.MeshStandardMaterial({color:0x5b5b3e,roughness:.98,metalness:0}),
-    officePlastic:new THREE.MeshStandardMaterial({color:0xe8e8e4,roughness:.88,metalness:0}),
+    officePlastic:level.id==="4"?createPBRMaterial({base:0xe8e9e6,seed:444,rough:.96,scale:2.6,normalStrength:.14}):new THREE.MeshStandardMaterial({color:0xe8e8e4,roughness:.88,metalness:0}),
     officeColumn:new THREE.MeshStandardMaterial({color:0xf2f2ee,roughness:.9,metalness:0}),
-    officeCeilingTile:new THREE.MeshStandardMaterial({color:0xc9cdca,roughness:.94,metalness:0}),
-    officeCeilingLight:new THREE.MeshStandardMaterial({color:0xf4f5f0,roughness:.28,metalness:0,emissive:0xe5e9e6,emissiveIntensity:1.45}),
+    officeCeilingTile:level.id==="4"?createPBRMaterial({base:0xc9cdca,seed:445,rough:.97,scale:2.1,normalStrength:.12}):new THREE.MeshStandardMaterial({color:0xc9cdca,roughness:.94,metalness:0}),
+    officeCeilingLight:new THREE.MeshStandardMaterial({color:0xe7eae7,roughness:.32,metalness:0,emissive:0xb8c0bd,emissiveIntensity:.72}),
+    officeWindowBlackout:new THREE.MeshStandardMaterial({color:0x10191e,roughness:.98,metalness:0}),
+    officeBlind:new THREE.MeshStandardMaterial({color:0x737d80,roughness:.94,metalness:0}),
+    officeCeilingCavity:new THREE.MeshStandardMaterial({color:0x20272a,roughness:1,metalness:0}),
+    officeCarpetWear:new THREE.MeshStandardMaterial({color:0x46515a,roughness:1,metalness:0,transparent:true,opacity:.12,depthWrite:false,side:THREE.DoubleSide}),
+    officePaper:new THREE.MeshStandardMaterial({color:0xb9b9ae,roughness:.98,metalness:0,side:THREE.DoubleSide}),
     officeCubicle:new THREE.MeshStandardMaterial({color:0x737d7d,roughness:.92,metalness:0}),
     officeFileCabinet:new THREE.MeshStandardMaterial({color:0x7b8180,roughness:.76,metalness:.18}),
     officeWindowGlass:new THREE.MeshPhysicalMaterial({color:0x83939a,roughness:.2,metalness:.04,transparent:true,opacity:.76,clearcoat:.75,clearcoatRoughness:.12,depthWrite:false,side:THREE.DoubleSide}),
@@ -692,7 +701,7 @@ export function makeLibrary(level){
     maintenanceWall:1.4,brickWall:1.4,
     metal:1.25,rustMetal:1.25,pole:1.2,pillar:1.2,
     crate:.9,stairs:1.8,trim:1.0,trimTop:1.0,redFloor:2.4,
-    officeWood:1.8,mahogany:1.8,
+    officeWood:1.8,mahogany:1.8,officePlastic:2.4,officeCeilingTile:2.1,
     asphalt:3.0,wetAsphalt:3.0,sidewalk:2.4,lawn:1.5,farmDirt:2.4
   };
   for(const [key,tileSize] of Object.entries(worldUvSizes)){

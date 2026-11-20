@@ -7,13 +7,16 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level4-ceiling-lighting1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level0-spawn-ceiling-level3-uv1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level4-office-level1-multifloor1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level4-office-pbr1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
   return .02+Math.sin(x*.19+time*.72)*.13+Math.sin(z*.15-time*.61)*.08+Math.sin((x+z)*.09+time*.43)*.05;
 }
+
+const LEVEL1_UPPER_FLOOR_Y=3.0;
+const LEVEL1_FLOOR_SLAB_THICKNESS=.28;
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -333,6 +336,10 @@ class Chunk{
           }
         }
       }
+      // Keep the ramp approach aligned through streamed parking sectors.
+      const upperDeckLane=Math.floor(36/level.cellSize);
+      this.setEdge(cells-1,upperDeckLane,"east",true);
+      this.setEdge(0,upperDeckLane,"west",true);
     }else if(level.id==="0"){
       this.zone="maze";
       this.megaType=null;
@@ -598,8 +605,11 @@ class Chunk{
     const cells=this.gridSize();
     const g=this.group,level=this.game.level,lib=this.world.library,size=this.world.size,cell=level.cellSize;
     const wallThickness=level.id==="0"?.12:.18;
-    const safeWallHeight=level.wallHeight-.025;
+    const level1MultiFloor=level.id==="1";
+    const safeWallHeight=level1MultiFloor?LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025:level.wallHeight-.025;
     const safeWallY=safeWallHeight/2+.0125;
+    const upperWallHeight=level1MultiFloor?level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025:0;
+    const upperWallY=level1MultiFloor?LEVEL1_UPPER_FLOOR_Y+.0125+upperWallHeight/2:0;
     const hGeom=new THREE.BoxGeometry(cell,safeWallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,safeWallHeight,cell);
     const trimHGeom=level.id==="0"?new THREE.BoxGeometry(cell,.055,.035):new THREE.BoxGeometry(cell,.11,.12);
     const trimVGeom=level.id==="0"?new THREE.BoxGeometry(.035,.055,cell):new THREE.BoxGeometry(.12,.11,cell);
@@ -613,10 +623,10 @@ class Chunk{
     const addInstanced=(geometry,material,data)=>{if(!data.length)return;const mesh=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingBox();mesh.computeBoundingSphere();g.add(mesh)};
     const buildWallEdge=(x,z,side)=>{
       const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-      if(side==="north"){const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});}
-      else if(side==="south"){const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});}
-      else if(side==="west"){const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);pushMat(vData,px-cell/2,safeWallY,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
-      else{const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);pushMat(vData,px+cell/2,safeWallY,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
+      if(side==="north"){const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz-cell/2);if(level1MultiFloor)pushMat(hData,px,upperWallY,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});}
+      else if(side==="south"){const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz+cell/2);if(level1MultiFloor)pushMat(hData,px,upperWallY,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});}
+      else if(side==="west"){const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);pushMat(vData,px-cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(vData,px-cell/2,upperWallY,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
+      else{const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);pushMat(vData,px+cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(vData,px+cell/2,upperWallY,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
     };
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
       const mask=this.walls[this.index(x,z)];
@@ -1231,14 +1241,17 @@ class Chunk{
       const rng=new RNG(this.seedKey()^0x44aa);
       const colMat=lib.officeColumn||lib.officePlastic;
       const wallMat=lib.officePlastic;
-      const cx=this.originX+size/2,cz=this.originZ+size/2,doorWidth=1.65;
+      const cx=this.originX+size/2,cz=this.originZ+size/2,doorWidth=1.75;
+      let officeWindowIndex=0;
       const roomSpecs=[
-        {type:"open-office",x:.17,z:.17,w:.28,h:.28},
-        {type:"workroom",x:.55,z:.17,w:.28,h:.28},
-        {type:"meeting-room",x:.17,z:.55,w:.28,h:.28},
-        {type:"break-room",x:.55,z:.55,w:.28,h:.28},
-        {type:"copy-room",x:.37,z:.37,w:.26,h:.22},
-        {type:"empty-office",x:.37,z:.67,w:.26,h:.16}
+        {type:"empty-office",x:.08,z:.08,w:.23,h:.23},
+        {type:"open-office",x:.40,z:.08,w:.24,h:.22},
+        {type:"meeting-room",x:.72,z:.09,w:.20,h:.22},
+        {type:"workroom",x:.08,z:.43,w:.22,h:.18},
+        {type:"break-room",x:.40,z:.43,w:.22,h:.18},
+        {type:"copy-room",x:.73,z:.45,w:.19,h:.20},
+        {type:"records-room",x:.08,z:.72,w:.22,h:.18},
+        {type:"cubicle-room",x:.39,z:.72,w:.27,h:.16}
       ];
       const addOfficeWall=(x1,z1,x2,z2,height=3.35,material=wallMat)=>{
         const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz);
@@ -1261,16 +1274,21 @@ class Chunk{
         const windowGroup=new THREE.Group();
         windowGroup.position.set(alongZ?fixed:center,0,alongZ?center:fixed);
         windowGroup.rotation.y=rotation;
-        const pane=box(windowGroup,new THREE.BoxGeometry(3.05,1.42,.055),lib.officeWindowGlass,0,2.15,0);
+        const blackedOut=officeWindowIndex++%4!==0;
+        const pane=box(windowGroup,new THREE.BoxGeometry(3.05,1.42,.055),blackedOut?lib.officeWindowBlackout:lib.officeWindowGlass,0,2.15,0);
         pane.userData.isLevel4Window=true;
-        pane.userData.rainy=index%3!==1;
+        pane.userData.isLevel4BlackedOut=blackedOut;
+        pane.userData.rainy=!blackedOut&&index%3!==1;
+        if(blackedOut){
+          for(let slat=0;slat<5;slat++)box(windowGroup,new THREE.BoxGeometry(2.86,.035,.018),lib.officeBlind,0,1.64+slat*.23,.05);
+        }
         const frame=lib.officeColumn||lib.officeFileCabinet;
         box(windowGroup,new THREE.BoxGeometry(3.22,.12,.13),frame,0,1.42,0);
         box(windowGroup,new THREE.BoxGeometry(3.22,.12,.13),frame,0,2.88,0);
         for(const side of [-1,1])box(windowGroup,new THREE.BoxGeometry(.12,1.58,.13),frame,side*1.55,2.15,0);
-        if(index%3!==1){
-          for(let streak=0;streak<11;streak++){
-            const sx=-1.34+streak*.268;
+        if(!blackedOut&&index%3!==1){
+          for(let streak=0;streak<7;streak++){
+            const sx=-1.18+streak*.39;
             const drops=box(windowGroup,new THREE.BoxGeometry(.018,.76+rng.next()*.56,.012),lib.officeWindowStreak,sx,2.15+(rng.next()-.5)*.1,.045);
             drops.userData.isLevel4RainStreak=true;
           }
@@ -1281,10 +1299,11 @@ class Chunk{
         else this.collisionSegments.push({x1:center-1.55,z1:fixed,x2:center+1.55,z2:fixed});
       };
       const addOfficeBoundary=(axis,fixed,start,end)=>{
-        const span=end-start,openings=[
-          {center:start+span*.24,width:3.45,window:true},
-          {center:(start+end)/2,width:2.2,window:false},
-          {center:start+span*.76,width:3.45,window:true}
+        const span=end-start;
+        const openings=[
+          {center:start+span*(.18+rng.next()*.07),width:3.35,window:true},
+          {center:start+span*(.52+rng.next()*.10),width:1.95,window:false},
+          {center:start+span*(.80-rng.next()*.07),width:3.15,window:true}
         ].sort((a,b)=>a.center-b.center);
         let cursor=start,index=0;
         for(const opening of openings){
@@ -1303,19 +1322,25 @@ class Chunk{
       };
       for(const z of [this.originZ+.22,this.originZ+size-.22])addOfficeBoundary("x",z,this.originX+.2,this.originX+size-.2);
       for(const x of [this.originX+.22,this.originX+size-.22])addOfficeBoundary("z",x,this.originZ+.2,this.originZ+size-.2);
-      // Perimeter and internal office dividers create a readable connected plan.
-      addOfficePartition("z",this.originX+size*.50,this.originZ+1,this.originZ+size-1,this.originZ+size*.25,doorWidth);
-      addOfficePartition("x",this.originZ+size*.50,this.originX+1,this.originX+size-1,this.originX+size*.75,doorWidth);
-      addOfficePartition("z",this.originX+size*.25,this.originZ+1,this.originZ+size-1,this.originZ+size*.72,doorWidth);
-      addOfficePartition("z",this.originX+size*.75,this.originZ+1,this.originZ+size-1,this.originZ+size*.28,doorWidth);
-      addOfficePartition("x",this.originZ+size*.75,this.originX+1,this.originX+size-1,this.originX+size*.26,doorWidth);
-      addOfficePartition("x",this.originZ+size*.25,this.originX+1,this.originX+size-1,this.originX+size*.74,doorWidth);
+      // Staggered partitions form a connected sequence of offices rather than a single crosswall.
+      const xA=this.originX+size*(.33+(rng.next()-.5)*.035);
+      const xB=this.originX+size*(.68+(rng.next()-.5)*.035);
+      const zA=this.originZ+size*(.35+(rng.next()-.5)*.035);
+      const zB=this.originZ+size*(.65+(rng.next()-.5)*.035);
+      addOfficePartition("z",xA,this.originZ+size*.05,this.originZ+size*.44,this.originZ+size*.24,2.15);
+      addOfficePartition("z",xA,this.originZ+size*.56,this.originZ+size*.95,this.originZ+size*.78,2.0);
+      addOfficePartition("z",xB,this.originZ+size*.07,this.originZ+size*.49,this.originZ+size*.29,2.1);
+      addOfficePartition("z",xB,this.originZ+size*.59,this.originZ+size*.95,this.originZ+size*.76,1.95);
+      addOfficePartition("x",zA,this.originX+size*.05,xA-1,this.originX+size*.20,2.0);
+      addOfficePartition("x",zA,xA+2,xB-1,this.originX+size*.51,2.0);
+      addOfficePartition("x",zB,this.originX+size*.70,this.originX+size*.95,this.originX+size*.82,1.9);
+      addOfficePartition("x",this.originZ+size*.83,this.originX+size*.06,this.originX+size*.31,this.originX+size*.17,1.9);
 
       // White support columns at corridor intersections (batched and collidable).
       const columns=[];
       const columnDummy=new THREE.Object3D();
-      for(const x of [this.originX+size*.25,this.originX+size*.75]){
-        for(const z of [this.originZ+size*.25,this.originZ+size*.75]){
+      for(const x of [this.originX+size*.28,this.originX+size*.77]){
+        for(const z of [this.originZ+size*.23,this.originZ+size*.73]){
           columns.push({x,z});
           const half=.42;
           this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
@@ -1332,26 +1357,33 @@ class Chunk{
       let panelIndex=0;
       for(let z=this.originZ+3;z<this.originZ+size-2;z+=tileStep){
         for(let x=this.originX+3;x<this.originX+size-2;x+=tileStep){
-          tileDummy.position.set(x,level.wallHeight+.035,z);tileDummy.updateMatrix();tileMatrices.push(tileDummy.matrix.clone());
-          if((panelIndex++%5===0)&&rng.next()<.82){
+          const panel=panelIndex++;
+          const missing=rng.next()<.018;
+          if(missing){
+            const cavity=box(g,new THREE.BoxGeometry(tileSize*.96,.045,tileSize*.96),lib.officeCeilingCavity,x,level.wallHeight-.16,z);
+            cavity.userData.isLevel4MissingCeilingTile=true;
+          }else{
+            tileDummy.position.set(x,level.wallHeight+.035,z);tileDummy.updateMatrix();tileMatrices.push(tileDummy.matrix.clone());
+          }
+          if(panel%6===0&&!missing&&rng.next()<.68){
             tileDummy.position.set(x,level.wallHeight+.095,z);tileDummy.rotation.y=rng.next()<.5?0:Math.PI/2;tileDummy.updateMatrix();lightMatrices.push(tileDummy.matrix.clone());tileDummy.rotation.y=0;
           }
         }
       }
-      const tileMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(tileSize,.055,tileSize),lib.officeCeilingTile,tileMatrices.length);
+      const tileMesh=new THREE.InstancedMesh(tileGeometryUV(new THREE.BoxGeometry(tileSize,.055,tileSize),lib.officeCeilingTile),lib.officeCeilingTile,tileMatrices.length);
       tileMatrices.forEach((matrix,i)=>tileMesh.setMatrixAt(i,matrix));
       tileMesh.instanceMatrix.needsUpdate=true;tileMesh.userData.isLevel4CeilingPanels=true;g.add(tileMesh);
       if(lightMatrices.length){
         const litPanels=new THREE.InstancedMesh(new THREE.BoxGeometry(1.65,.035,.64),lib.officeCeilingLight,lightMatrices.length);
         lightMatrices.forEach((matrix,i)=>litPanels.setMatrixAt(i,matrix));
-        litPanels.instanceMatrix.needsUpdate=true;litPanels.userData.light=true;litPanels.userData.baseEmissive=1.45;litPanels.userData.isLevel4CeilingLights=true;
+        litPanels.instanceMatrix.needsUpdate=true;litPanels.userData.light=true;litPanels.userData.baseEmissive=.72;litPanels.userData.isLevel4CeilingLights=true;
         this.fixtures.push(litPanels);
         g.add(litPanels);
         // A small number of local sources support the panel rows without
         // creating one PointLight for every ceiling tile.
         for(let row=0;row<12;row++)for(let col=0;col<12;col++){
           const x=this.originX+size*(.0416666667+col/12),z=this.originZ+size*(.0416666667+row/12);
-          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xfff2df,baseIntensity:8000,intensity:8000,distance:40,cullRadius:42,decay:2,fixture:litPanels});
+          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xfff2df,baseIntensity:900,intensity:900,distance:30,cullRadius:32,decay:2,fixture:litPanels});
         }
       }
 
@@ -1381,45 +1413,59 @@ class Chunk{
       for(const room of roomSpecs){
         const x=this.originX+size*(room.x+room.w/2),z=this.originZ+size*(room.z+room.h/2);
         const marker=addRoomTag(room.type,x,z);
-        if(room.type==="workroom"||room.type==="open-office"){
-          for(let row=0;row<2;row++)for(let col=0;col<2;col++){
-            const dx=x-2.2+col*2.8,dz=z-1.6+row*3.0;
-            addDesk(dx,dz,0,true);addChair(dx,dz+1.05);
-          }
-          // Low cubicle dividers split the desks into small work bays.
-          for(const dx of [-1.0,1.8])box(g,new THREE.BoxGeometry(.08,1.45,5.1),lib.officeCubicle,x+dx, .725,z+.15);
-          for(const dz of [-1.45,1.75])box(g,new THREE.BoxGeometry(5.6,1.45,.08),lib.officeCubicle,x+.35,.725,z+dz);
+        if(room.type==="open-office"){
+          addDesk(x-2,z,0,true);addChair(x-1.6,z+1.05);
+          box(g,new THREE.BoxGeometry(.08,1.32,2.9),lib.officeCubicle,x+1.15,.66,z+.1);
+        }else if(room.type==="workroom"){
+          addDesk(x-.8,z+.2,0,true);addChair(x-.55,z+1.25);
+          box(g,new THREE.BoxGeometry(.88,1.75,.56),lib.officeFileCabinet,x+2.1,.875,z-.8);
         }else if(room.type==="meeting-room"){
-          box(g,new THREE.BoxGeometry(4.4,.12,1.55),lib.officeWood,x,.78,z);
-          for(let i=0;i<6;i++){
-            const side=i<3?-1:1,index=i%3;
-            const chair=new THREE.Group();chair.position.set(x+side*2.8,0,z-1+index);
-            box(chair,new THREE.BoxGeometry(.58,.1,.58),lib.officeCubicle,0,.48,0);
-            box(chair,new THREE.BoxGeometry(.58,.62,.08),lib.officeCubicle,0,.8,-.22);g.add(chair);
+          box(g,new THREE.BoxGeometry(3.8,.12,1.45),lib.officeWood,x,.78,z);
+          for(let i=0;i<4;i++){
+            const side=i<2?-1:1,index=i%2;
+            const chair=new THREE.Group();chair.position.set(x+side*2.35,0,z-.55+index*1.1);
+            box(chair,new THREE.BoxGeometry(.54,.09,.54),lib.officeCubicle,0,.48,0);
+            box(chair,new THREE.BoxGeometry(.54,.58,.08),lib.officeCubicle,0,.78,-.23);g.add(chair);
           }
         }else if(room.type==="break-room"){
-          box(g,new THREE.BoxGeometry(2.1,.12,.85),lib.officeWood,x,.78,z-2);
-          box(g,new THREE.BoxGeometry(.64,1.7,.55),lib.officePlastic,x-3,.85,z);
-          box(g,new THREE.BoxGeometry(.4,.36,.4),lib.water,x-3,1.78,z);
-          box(g,new THREE.BoxGeometry(.95,1.9,.85),lib.officeFileCabinet,x+3,.95,z);
-          for(const dx of [-1.3,1.3])addChair(x+dx,z+.75);
+          box(g,new THREE.BoxGeometry(2.0,.12,.72),lib.officeWood,x-1.4,.78,z-2.1);
+          box(g,new THREE.BoxGeometry(.64,1.75,.58),lib.officePlastic,x+2.3,.875,z-.8);
+          box(g,new THREE.BoxGeometry(.48,.32,.44),lib.water,x+2.3,1.92,z-.8);
+          box(g,new THREE.BoxGeometry(.92,2.05,.72),lib.officeFileCabinet,x-3,.1+1.025,z+.25);
+          box(g,new THREE.BoxGeometry(.62,.92,.035),lib.windowDark,x-3,1.12,z-.13);
         }else if(room.type==="copy-room"){
-          box(g,new THREE.BoxGeometry(1.1,.95,.88),lib.officePlastic,x,.65,z);
-          box(g,new THREE.BoxGeometry(1.16,.12,.92),lib.officeFileCabinet,x,1.15,z);
-          box(g,new THREE.BoxGeometry(.3,.08,.22),lib.dark,x,1.26,z);
-          addDesk(x+2,z+1,Math.PI/2,false);
-        }else if(room.type==="empty-office"){
-          addDesk(x-1.5,z,0,true);addChair(x-1.5,z+1.1);
-          box(g,new THREE.BoxGeometry(.88,1.7,.55),lib.officeFileCabinet,x+2,.85,z);
-        }else{
-          addDesk(x-1,z,0,true);addDesk(x+1,z+1.7,Math.PI/2,true);
+          box(g,new THREE.BoxGeometry(1.12,.94,.9),lib.officePlastic,x,.61,z);
+          box(g,new THREE.BoxGeometry(1.18,.12,.94),lib.officeFileCabinet,x,1.15,z);
+          box(g,new THREE.BoxGeometry(.3,.07,.2),lib.dark,x,1.25,z);
+          box(g,new THREE.BoxGeometry(.78,1.65,.52),lib.officeFileCabinet,x+2.2,.825,z+1.15);
+        }else if(room.type==="records-room"){
+          for(const dx of [-1.25,1.0]){
+            box(g,new THREE.BoxGeometry(.9,1.8,.52),lib.officeFileCabinet,x+dx,.9,z);
+            for(const y of [.48,1.0,1.52])box(g,new THREE.BoxGeometry(.72,.025,.04),lib.officeBlind,x+dx,y,z-.28);
+          }
+        }else if(room.type==="cubicle-room"){
+          for(const dx of [-1.4,1.0])box(g,new THREE.BoxGeometry(.08,1.38,3.2),lib.officeCubicle,x+dx,.69,z);
+          box(g,new THREE.BoxGeometry(3.1,1.38,.08),lib.officeCubicle,x,.69,z+1.5);
+          addDesk(x-.2,z-.8,0,true);addChair(x-.1,z+.25);
         }
-        marker.userData.roomFurnished=room.type!=="empty-office";
+        marker.userData.roomFurnished=!["empty-office","open-office"].includes(room.type);
       }
-      // Small interior hall signs and an exit-facing stairwell door landmark.
-      for(let i=0;i<5;i++){
-        const x=this.originX+size*(.16+i*.17);
-        const sign=box(g,new THREE.BoxGeometry(.65,.28,.035),lib.officeFileCabinet,x,2.65,this.originZ+size*.5);
+
+      // Small signs, worn carpet marks, and stray paperwork keep the rooms quiet rather than cluttered.
+      for(let i=0;i<4;i++){
+        const x=this.originX+size*(.18+(i%2)*.57),z=this.originZ+size*(.22+Math.floor(i/2)*.55);
+        const mark=new THREE.Mesh(new THREE.CircleGeometry(.55+rng.next()*.35,18),lib.officeCarpetWear);
+        mark.rotation.x=-Math.PI/2;mark.position.set(x,.008,z);mark.userData.isLevel4CarpetWear=true;g.add(mark);
+      }
+      for(let i=0;i<3;i++){
+        const paper=new THREE.Mesh(new THREE.PlaneGeometry(.42,.3),lib.officePaper);
+        paper.rotation.x=-Math.PI/2;paper.rotateZ(rng.next()*Math.PI*2);
+        paper.position.set(this.originX+size*(.18+rng.next()*.64),.014,this.originZ+size*(.18+rng.next()*.64));
+        paper.userData.isLevel4Paper=true;g.add(paper);
+      }
+      for(let i=0;i<3;i++){
+        const x=this.originX+size*(.17+i*.31),z=this.originZ+size*(.29+(i%2)*.38);
+        const sign=box(g,new THREE.BoxGeometry(.42,.2,.035),lib.officeBlind,x,2.72,z);
         sign.userData.level4OfficeSign=true;
       }
     }else if(level.id==="5"){
@@ -1976,107 +2022,79 @@ class Chunk{
       z:this.originZ+z*cell+cell/2
     });
 
+    if(this.zone!=="parking"){
+      const upperFloor=new THREE.Group();upperFloor.name="level1_upper_floor";
+      upperFloor.userData.isLevel1UpperFloor=true;
+      const slab=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(size,LEVEL1_FLOOR_SLAB_THICKNESS,size),lib.concrete),lib.concrete);
+      slab.position.set(this.originX+size/2,LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2,this.originZ+size/2);
+      slab.userData.isLevel1UpperFloorSlab=true;upperFloor.add(slab);g.add(upperFloor);
+    }
+
     const addLight=(x,z,rotation=0,scale=1,intensity=105)=>{
-      const cableLength=.22;
-      // Keep the ceiling suspension cables beyond the fixture housing so they
-      // terminate beside it instead of visibly passing through the light.
-      const cableOffset=2.08*scale;
-      for(const side of [-1,1]){
-        const cable=new THREE.Mesh(
-          new THREE.CylinderGeometry(.022,.022,cableLength,8),
-          lib.cable
-        );
-        cable.position.set(
-          x+Math.cos(rotation)*cableOffset*side,
-          level.wallHeight-cableLength/2-.035,
-          z+Math.sin(rotation)*cableOffset*side
-        );
-        g.add(cable);
+      const cableLength=.22,cableOffset=2.08*scale;
+      for(const floorOffset of [0,LEVEL1_UPPER_FLOOR_Y]){
+        const ceilingY=floorOffset+LEVEL1_UPPER_FLOOR_Y;
+        for(const side of [-1,1]){
+          const cable=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,cableLength,8),lib.cable);
+          cable.position.set(x+Math.cos(rotation)*cableOffset*side,ceilingY-cableLength/2-.035,z+Math.sin(rotation)*cableOffset*side);
+          g.add(cable);
+        }
+        const fixture=box(g,new THREE.BoxGeometry(3.65*scale,.07,.32*scale),lib.level1Light,x,ceilingY-.38,z,0,rotation,0);
+        fixture.userData.light=true;fixture.userData.baseEmissive=2.9;fixture.userData.level1Storey=floorOffset?2:1;
+        this.fixtures.push(fixture);
+        box(g,new THREE.BoxGeometry(3.95*scale,.16,.52*scale),lib.garageBeam,x,ceilingY-.27,z,0,rotation,0);
+        this.lightSources.push({position:new THREE.Vector3(x,ceilingY-.48,z),color:0xf4f4ee,baseIntensity:intensity,intensity,distance:34,decay:2,fixture});
       }
-
-      const fixture=box(
-        g,
-        new THREE.BoxGeometry(3.65*scale,.07,.32*scale),
-        lib.level1Light,
-        x,
-        level.wallHeight-.38,
-        z,
-        0,
-        rotation,
-        0
-      );
-      fixture.userData.light=true;
-      fixture.userData.baseEmissive=2.9;
-      this.fixtures.push(fixture);
-
-      // Dark recessed housing around the tube. The reference lights sit under
-      // broad ceiling beams rather than on a white Level 0 tile grid.
-      box(
-        g,
-        new THREE.BoxGeometry(3.95*scale,.16,.52*scale),
-        lib.garageBeam,
-        x,
-        level.wallHeight-.27,
-        z,
-        0,
-        rotation,
-        0
-      );
-
-      this.lightSources.push({
-        position:new THREE.Vector3(x,level.wallHeight-.48,z),
-        color:0xf4f4ee,
-        baseIntensity:intensity,
-        intensity,
-        distance:34,
-        decay:2,
-        fixture
-      });
     };
 
     const addPillarSideLight=(x,z,face,intensity=34)=>{
-      const y=2.05;
-      let backing,emitter,lightPosition;
-      if(face==="west"){
-        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x-.66,y,z);
-        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x-.7275,y,z);
-        lightPosition=new THREE.Vector3(x-1.02,y,z);
-      }else if(face==="east"){
-        backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x+.66,y,z);
-        emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x+.7275,y,z);
-        lightPosition=new THREE.Vector3(x+1.02,y,z);
-      }else if(face==="north"){
-        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z-.66);
-        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z-.7275);
-        lightPosition=new THREE.Vector3(x,y,z-1.02);
-      }else{
-        backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z+.66);
-        emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z+.7275);
-        lightPosition=new THREE.Vector3(x,y,z+1.02);
+      for(const floorOffset of [0,LEVEL1_UPPER_FLOOR_Y]){
+        const y=2.05+floorOffset;
+        let backing,emitter,lightPosition;
+        if(face==="west"){
+          backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x-.66,y,z);
+          emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x-.7275,y,z);
+          lightPosition=new THREE.Vector3(x-1.02,y,z);
+        }else if(face==="east"){
+          backing=box(g,new THREE.BoxGeometry(.10,1.48,.40),lib.garageBeam,x+.66,y,z);
+          emitter=box(g,new THREE.BoxGeometry(.035,1.22,.23),lib.level1Light,x+.7275,y,z);
+          lightPosition=new THREE.Vector3(x+1.02,y,z);
+        }else if(face==="north"){
+          backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z-.66);
+          emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z-.7275);
+          lightPosition=new THREE.Vector3(x,y,z-1.02);
+        }else{
+          backing=box(g,new THREE.BoxGeometry(.40,1.48,.10),lib.garageBeam,x,y,z+.66);
+          emitter=box(g,new THREE.BoxGeometry(.23,1.22,.035),lib.level1Light,x,y,z+.7275);
+          lightPosition=new THREE.Vector3(x,y,z+1.02);
+        }
+        emitter.userData.light=true;emitter.userData.level1PillarLight=true;
+        emitter.userData.level1Storey=floorOffset?2:1;
+        emitter.userData.mountFace=face;emitter.userData.baseEmissive=2.35;
+        this.fixtures.push(emitter);
+        this.lightSources.push({position:lightPosition,color:0xf4f5f0,baseIntensity:intensity,intensity,distance:17,decay:2,fixture:emitter});
+        backing.userData.level1LightHousing=true;
       }
-      emitter.userData.light=true;
-      emitter.userData.level1PillarLight=true;
-      emitter.userData.mountFace=face;
-      emitter.userData.baseEmissive=2.35;
-      this.fixtures.push(emitter);
-      this.lightSources.push({position:lightPosition,color:0xf4f5f0,baseIntensity:intensity,intensity,distance:17,decay:2,fixture:emitter});
-      backing.userData.level1LightHousing=true;
     };
 
     if(this.zone==="parking"){
       // 5x5 parking-column rhythm. This is the dominant Level 1 shape in
       // The Level 0 macro room 1: long sightlines with repeating square
       // concrete pillars and low structural beams.
-      const columnGeom=new THREE.BoxGeometry(1.22,level.wallHeight,.1);
-      const pillarGeom=new THREE.BoxGeometry(1.22,level.wallHeight,1.22);
+      const lowerStoreyHeight=LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025;
+      const upperStoreyHeight=level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025;
+      const upperStoreyStart=LEVEL1_UPPER_FLOOR_Y;
+      const pillarGeom=new THREE.BoxGeometry(1.22,lowerStoreyHeight,1.22);
       const baseGeom=new THREE.BoxGeometry(1.42,.16,1.42);
-      const columns=[],bases=[];
+      const columnsLower=[],columnsUpper=[],basesLower=[],basesUpper=[];
 
       for(let ix=1;ix<=8;ix+=2){
         for(let iz=1;iz<=8;iz+=2){
           const p=center(ix,iz);
-          columns.push(new THREE.Matrix4().makeTranslation(p.x,level.wallHeight/2,p.z));
-          bases.push(new THREE.Matrix4().makeTranslation(p.x,.08,p.z));
+          columnsLower.push(new THREE.Matrix4().makeTranslation(p.x,.0125+lowerStoreyHeight/2,p.z));
+          columnsUpper.push(new THREE.Matrix4().makeTranslation(p.x,upperStoreyStart+.0125+upperStoreyHeight/2,p.z));
+          basesLower.push(new THREE.Matrix4().makeTranslation(p.x,.08,p.z));
+          basesUpper.push(new THREE.Matrix4().makeTranslation(p.x,upperStoreyStart+.08,p.z));
           const half=.71;
           this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half});
           this.collisionSegments.push(
@@ -2097,8 +2115,10 @@ class Chunk{
         mesh.computeBoundingSphere();
         g.add(mesh);
       };
-      addInst(pillarGeom,lib.level1Pillar,columns);
-      addInst(baseGeom,lib.garageBase,bases);
+      addInst(pillarGeom,lib.level1Pillar,columnsLower);
+      addInst(pillarGeom,lib.level1Pillar,columnsUpper);
+      addInst(baseGeom,lib.garageBase,basesLower);
+      addInst(baseGeom,lib.garageBase,basesUpper);
 
       // The faded yellow band wraps the bottom of each square support column.
       // Instance all four faces into one draw call, and mount lights on selected
@@ -2115,6 +2135,8 @@ class Chunk{
               p.z+(side==="north"?-.63:side==="south"?.63:0)
             );
             stripeDummy.rotation.set(0,side==="west"||side==="east"?Math.PI/2:0,0);
+            stripeDummy.updateMatrix();stripeMatrices.push(stripeDummy.matrix.clone());
+            stripeDummy.position.y=LEVEL1_UPPER_FLOOR_Y+.39;
             stripeDummy.updateMatrix();stripeMatrices.push(stripeDummy.matrix.clone());
           }
           if((ix+iz)%2===0){
@@ -2135,61 +2157,65 @@ class Chunk{
           level.wallHeight-.55,
           this.originZ+z
         );
+        box(g,new THREE.BoxGeometry(size,.42,.58),lib.garageBeam,this.originX+size/2,LEVEL1_UPPER_FLOOR_Y-.55,this.originZ+z);
       }
 
-      // Faded yellow parking-bay outlines. Keep the paint chipped and low-contrast
-      // so it reads as old garage safety marking rather than a bright road grid.
+      // Faded bay markings repeat on both concrete decks.
       const lineMat=lib.warningLine;
       for(let x=8;x<size-8;x+=16){
         const px=this.originX+x;
-        box(g,new THREE.BoxGeometry(.07,.014,7.6),lineMat,px,.014,this.originZ+16);
-        box(g,new THREE.BoxGeometry(.07,.014,7.6),lineMat,px,.014,this.originZ+48);
-        for(const z of [12,20,44,52]){
-          box(g,new THREE.BoxGeometry(4.8,.014,.07),lineMat,px+2.4,.014,this.originZ+z);
+        for(const floorY of [0,LEVEL1_UPPER_FLOOR_Y]){
+          const paintY=floorY+.014;
+          box(g,new THREE.BoxGeometry(.07,.014,7.6),lineMat,px,paintY,this.originZ+16);
+          box(g,new THREE.BoxGeometry(.07,.014,7.6),lineMat,px,paintY,this.originZ+48);
+          for(const z of [12,20,44,52])box(g,new THREE.BoxGeometry(4.8,.014,.07),lineMat,px+2.4,paintY,this.originZ+z);
         }
       }
 
-      // A vehicle ramp rises to a small upper parking deck in the starting
-      // garage. It is a concrete slab with retaining curbs and yellow edge paint.
-      if(this.cx===0&&this.cz===0){
-        const rampStartX=this.originX+9,rampLength=22,rampEndX=rampStartX+rampLength,rampZ=this.originZ+36;
-        const rise=2.35,angle=Math.atan2(rise,rampLength),centerX=rampStartX+rampLength/2;
-        const centerY=rise/2-.14*Math.cos(angle);
-        const deckLength=18,deckWidth=13.4,deckEndX=rampEndX+deckLength;
-        this.level1Ramp={startX:rampStartX,endX:rampEndX,endDeckX:deckEndX,z:rampZ,length:rampLength,rise,halfWidth:3.25,deckHalfWidth:deckWidth/2};
-        const ramp=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete),lib.concrete);
-        ramp.position.set(centerX,centerY,rampZ);ramp.rotation.z=angle;
-        ramp.userData.level1ParkingRamp=true;ramp.userData.level1WalkableRamp=true;g.add(ramp);
-        for(const side of [-1,1]){
-          const rail=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.74,.25),lib.garageBase);
-          rail.position.set(centerX,centerY+.48,rampZ+side*3.12);rail.rotation.z=angle;g.add(rail);
-          const edgePaint=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.035,.035),lib.warningLine);
-          edgePaint.position.set(centerX,centerY+.86,rampZ+side*2.94);edgePaint.rotation.z=angle;g.add(edgePaint);
-          this.collisionSegments.push({x1:rampStartX,z1:rampZ+side*3.12,x2:rampEndX,z2:rampZ+side*3.12});
-        }
-        for(const t of [.34,.68]){
-          const x=rampStartX+rampLength*t,h=Math.max(.18,rise*t-.28*Math.cos(angle));
-          for(const side of [-1,1])box(g,new THREE.BoxGeometry(.38,h,.38),lib.concrete,x,h/2,rampZ+side*2.55);
-        }
-        const upperDeck=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(deckLength,.28,deckWidth),lib.concrete),lib.concrete);
-        upperDeck.position.set(rampEndX+deckLength/2,rise-.14,rampZ);
-        upperDeck.userData.level1ParkingRamp=true;upperDeck.userData.level1WalkableDeck=true;g.add(upperDeck);
-        // The raised landing is a real upper parking deck, enclosed on its
-        // exposed edges while leaving the ramp approach completely open.
-        for(const side of [-1,1]){
-          const rail=new THREE.Mesh(new THREE.BoxGeometry(deckLength,.74,.22),lib.garageBase);
-          rail.position.set(rampEndX+deckLength/2,rise+.37,rampZ+side*(deckWidth/2-.11));g.add(rail);
-          this.collisionSegments.push({x1:rampEndX,z1:rampZ+side*(deckWidth/2-.11),x2:deckEndX,z2:rampZ+side*(deckWidth/2-.11)});
-        }
-        const endRail=new THREE.Mesh(new THREE.BoxGeometry(.22,.74,deckWidth),lib.garageBase);
-        endRail.position.set(deckEndX,rise+.37,rampZ);g.add(endRail);
-        this.collisionSegments.push({x1:deckEndX,z1:rampZ-deckWidth/2,x2:deckEndX,z2:rampZ+deckWidth/2});
+      // A continuous upper storey spans the chunk. The ramp passes through a
+      // real rectangular opening and meets the upper parking deck flush.
+      const rampStartX=this.originX+9,rampLength=22,rampEndX=rampStartX+rampLength,rampZ=this.originZ+36;
+      const rise=LEVEL1_UPPER_FLOOR_Y,angle=Math.atan2(rise,rampLength),centerX=rampStartX+rampLength/2;
+      const centerY=rise/2-.14*Math.cos(angle),openingHalfWidth=3.42;
+      const chunkEndX=this.originX+size,chunkEndZ=this.originZ+size;
+      this.level1Ramp={startX:rampStartX,endX:rampEndX,endDeckX:chunkEndX,z:rampZ,length:rampLength,rise,halfWidth:3.25,deckHalfWidth:size/2};
+      const upperDeck=new THREE.Group();upperDeck.name="level1_upper_floor";
+      upperDeck.userData.level1ParkingRamp=true;upperDeck.userData.level1WalkableDeck=true;
+      upperDeck.userData.isLevel1UpperFloor=true;
+      upperDeck.userData.level1UpperFloorOpening={minX:rampStartX,maxX:rampEndX,minZ:rampZ-openingHalfWidth,maxZ:rampZ+openingHalfWidth};
+      const addUpperSlab=(x,z,width,depth)=>{
+        if(width<=.01||depth<=.01)return;
+        const slab=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(width,LEVEL1_FLOOR_SLAB_THICKNESS,depth),lib.concrete),lib.concrete);
+        slab.position.set(x,LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2,z);
+        slab.userData.isLevel1UpperFloorSlab=true;upperDeck.add(slab);
+      };
+      const nearDepth=rampZ-openingHalfWidth-this.originZ;
+      const farStart=rampZ+openingHalfWidth;
+      addUpperSlab((this.originX+rampStartX)/2,this.originZ+size/2,rampStartX-this.originX,size);
+      addUpperSlab((rampEndX+chunkEndX)/2,this.originZ+size/2,chunkEndX-rampEndX,size);
+      addUpperSlab((rampStartX+rampEndX)/2,this.originZ+nearDepth/2,rampLength,nearDepth);
+      addUpperSlab((rampStartX+rampEndX)/2,(farStart+chunkEndZ)/2,rampLength,chunkEndZ-farStart);
+      const ramp=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete),lib.concrete);
+      ramp.position.set(centerX,centerY,rampZ);ramp.rotation.z=angle;
+      ramp.userData.level1ParkingRamp=true;ramp.userData.level1WalkableRamp=true;upperDeck.add(ramp);
+      for(const side of [-1,1]){
+        const rail=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.74,.25),lib.garageBase);
+        rail.position.set(centerX,centerY+.48,rampZ+side*3.12);rail.rotation.z=angle;upperDeck.add(rail);
+        const edgePaint=new THREE.Mesh(new THREE.BoxGeometry(rampLength,.035,.035),lib.warningLine);
+        edgePaint.position.set(centerX,centerY+.86,rampZ+side*2.94);edgePaint.rotation.z=angle;upperDeck.add(edgePaint);
+        this.collisionSegments.push({x1:rampStartX,z1:rampZ+side*3.12,x2:rampEndX,z2:rampZ+side*3.12});
       }
+      for(const t of [.34,.68]){
+        const x=rampStartX+rampLength*t,h=Math.max(.18,rise*t-.28*Math.cos(angle));
+        for(const side of [-1,1])box(upperDeck,new THREE.BoxGeometry(.38,h,.38),lib.concrete,x,h/2,rampZ+side*2.55);
+      }
+      g.add(upperDeck);
 
       // Abandoned vehicles are rare landmarks, kept clear of the chunk's central route.
       const carCount=next()<.42?1:next()<.18?2:0;
       for(let i=0;i<carCount;i++){
         const px=this.originX+12+next()*(size-24),pz=this.originZ+12+next()*(size-24);
+        if(this.level1Ramp&&Math.abs(pz-this.level1Ramp.z)<5&&px>this.level1Ramp.startX-2&&px<this.level1Ramp.endX+5)continue;
         if(Math.hypot(px-(this.originX+size/2),pz-(this.originZ+size/2))<8)continue;
         const car=new THREE.Group();car.position.set(px,0,pz);
         box(car,new THREE.BoxGeometry(1.82,.62,3.75),lib.garageBase,0,.72,0);
@@ -2220,7 +2246,16 @@ class Chunk{
       const addHallWall=(x1,z1,x2,z2,height=3.25,material=lib.concrete)=>{
         const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz);
         if(length<.3)return;
-        box(g,new THREE.BoxGeometry(length,height,.18),material,(x1+x2)/2,height/2,(z1+z2)/2,0,-Math.atan2(dz,dx),0);
+        const rotation=-Math.atan2(dz,dx);
+        if(height>=3.2){
+          const lowerHeight=LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025;
+          const upperHeight=level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025;
+          box(g,new THREE.BoxGeometry(length,lowerHeight,.18),material,(x1+x2)/2,.0125+lowerHeight/2,(z1+z2)/2,0,rotation,0);
+          box(g,new THREE.BoxGeometry(length,upperHeight,.18),material,(x1+x2)/2,LEVEL1_UPPER_FLOOR_Y+.0125+upperHeight/2,(z1+z2)/2,0,rotation,0);
+        }else{
+          const partitionHeight=Math.min(height,LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025);
+          box(g,new THREE.BoxGeometry(length,partitionHeight,.18),material,(x1+x2)/2,partitionHeight/2,(z1+z2)/2,0,rotation,0);
+        }
         this.collisionSegments.push({x1,z1,x2,z2});
       };
       const left=this.originX+size*.32,right=this.originX+size*.68;
@@ -2230,15 +2265,19 @@ class Chunk{
         addHallWall(x,near,x,near+size*.34);
         addHallWall(x,near+size*.49,x,far);
       }
-      addHallWall(this.originX+size*.12,this.originZ+size*.5,left-1,this.originZ+size*.5,2.9);
+      addHallWall(this.originX+size*.12,this.originZ+size*.5,left-1,this.originZ+size*.5,LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025);
       addHallWall(right+1,this.originZ+size*.5,this.originX+size*.88,this.originZ+size*.5,2.9);
 
       // Repeating columns and overhead fluorescent rows give the halls scale.
       for(const x of [this.originX+size*.18,this.originX+size*.82]){
         for(let z=12;z<size-8;z+=24){
           const px=x,pz=this.originZ+z;
-          box(g,new THREE.BoxGeometry(.72,level.wallHeight,.72),lib.level1Pillar,px,level.wallHeight/2,pz);
+          const lowerHeight=LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025;
+          const upperHeight=level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025;
+          box(g,new THREE.BoxGeometry(.72,lowerHeight,.72),lib.level1Pillar,px,.0125+lowerHeight/2,pz);
+          box(g,new THREE.BoxGeometry(.72,upperHeight,.72),lib.level1Pillar,px,LEVEL1_UPPER_FLOOR_Y+.0125+upperHeight/2,pz);
           box(g,new THREE.BoxGeometry(.94,.12,.94),lib.garageBase,px,.06,pz);
+          box(g,new THREE.BoxGeometry(.94,.12,.94),lib.garageBase,px,LEVEL1_UPPER_FLOOR_Y+.06,pz);
           const half=.47;
           this.solidRects.push({minX:px-half,maxX:px+half,minZ:pz-half,maxZ:pz+half});
           this.collisionSegments.push(
@@ -2301,7 +2340,10 @@ class Chunk{
         if(room.type==="pillars"){
           for(const [ox,oz] of [[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]]){
             const px=p.x+ox*1.15,pz=p.z+oz*1.15,half=.29;
-            box(g,new THREE.BoxGeometry(.58,level.wallHeight,.58),lib.level1Pillar,px,level.wallHeight/2,pz);
+            const lowerHeight=LEVEL1_UPPER_FLOOR_Y-LEVEL1_FLOOR_SLAB_THICKNESS/2-.025;
+            const upperHeight=level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025;
+            box(g,new THREE.BoxGeometry(.58,lowerHeight,.58),lib.level1Pillar,px,.0125+lowerHeight/2,pz);
+            box(g,new THREE.BoxGeometry(.58,upperHeight,.58),lib.level1Pillar,px,LEVEL1_UPPER_FLOOR_Y+.0125+upperHeight/2,pz);
             this.solidRects.push({minX:px-.34,maxX:px+.34,minZ:pz-.34,maxZ:pz+.34});
             this.collisionSegments.push(
               {x1:px-half,z1:pz-half,x2:px+half,z2:pz-half},
@@ -2603,6 +2645,7 @@ class WorldStreamer{
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
       if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
+      if(this.ceilingSurface)this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
       this.updateSurfaceTiling();
       this.updateWallTextureTiling();
     })();
@@ -2856,17 +2899,13 @@ class WorldStreamer{
     // get a finite location if a malformed chunk has no walkable surface.
     return {x,z};
   }
-  walkSurfaceHeightAt(x,z){
+  walkSurfaceHeightAt(x,z,floor=this.game.player?.parkingFloor??0){
     if(this.game.level.id!=="1")return 0;
     const ramp=this.chunkAt(x,z)?.level1Ramp;
-    if(!ramp)return 0;
-    if(Math.abs(z-ramp.z)<=ramp.halfWidth&&x>=ramp.startX-.08&&x<=ramp.endX+.08){
+    if(ramp&&Math.abs(z-ramp.z)<=ramp.halfWidth&&x>=ramp.startX-.08&&x<=ramp.endX+.08){
       return ramp.rise*THREE.MathUtils.clamp((x-ramp.startX)/ramp.length,0,1);
     }
-    if(x>=ramp.endX-.08&&x<=ramp.endDeckX+.08&&Math.abs(z-ramp.z)<=ramp.deckHalfWidth){
-      return ramp.rise;
-    }
-    return 0;
+    return floor>=1?LEVEL1_UPPER_FLOOR_Y:0;
   }
   update(dt){
     const p=this.game.player.position;
@@ -2878,6 +2917,7 @@ class WorldStreamer{
   }
 
   updateVisibility(dt){
+    if(this.ceilingSurface)this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
     const camera=this.game.camera;
     camera.updateMatrixWorld();
     const frustum=new THREE.Frustum().setFromProjectionMatrix(
@@ -3106,7 +3146,7 @@ class Player{
     this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.velocity=new THREE.Vector3();this.verticalVelocity=0;this.yaw=0;this.pitch=0;
     this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;
     this.flashlight=true;this.flashBattery=100;
-    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;this.redFlashBoost=1;this.inOcean=false;
+    this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;this.redFlashBoost=1;this.inOcean=false;this.parkingFloor=0;
     this.viewYaw=0;this.viewPitch=0;
   }
   reset(){
@@ -3115,6 +3155,7 @@ class Player{
     this.health=this.stamina=this.hydration=this.sanity=100;this.flashBattery=100;
     this.flashlight=this.game.startFlash;
     this.inOcean=false;
+    this.parkingFloor=0;
     this.flashWarmup=1.15;
     this.redFlashBoost=1;
     this.game.camera.fov=62;this.game.camera.updateProjectionMatrix();
@@ -3176,7 +3217,14 @@ class Player{
     }else{
       this.inOcean=false;
       this.verticalVelocity=0;
-      this.position.y=this.eyeY+this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z);
+      if(this.game.level.id==="1"){
+        const ramp=this.game.world.chunkAt(this.position.x,this.position.z)?.level1Ramp;
+        if(ramp&&Math.abs(this.position.z-ramp.z)<=ramp.halfWidth){
+          if(this.parkingFloor===0&&this.position.x>=ramp.endX-.05)this.parkingFloor=1;
+          else if(this.parkingFloor===1&&this.position.x<=ramp.startX+.05)this.parkingFloor=0;
+        }
+      }else this.parkingFloor=0;
+      this.position.y=this.eyeY+this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z,this.parkingFloor);
       if(this.game.level.id==="7"&&this.game.scene.fog){
         this.game.scene.fog.color.setHex(0x718c98);
         this.game.scene.fog.density=.0028;
@@ -4213,7 +4261,7 @@ export class BackroomsGame{
   }
   resizeLocalLightPool(){
     const touch=isTouchControlsDevice();
-    const desired=this.level.id==="4"?(touch?18:32):this.level.id==="0"?(touch?8:14):(touch?14:24);
+    const desired=this.level.id==="4"?(touch?14:24):this.level.id==="0"?(touch?8:14):(touch?14:24);
     while(this.localLights.length<desired){
       const light=new THREE.PointLight(0xffffff,0,0,2);
       light.name="dynamic_fluorescent_"+this.localLights.length;
@@ -4229,7 +4277,7 @@ export class BackroomsGame{
     this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0xb3bbb5:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x7d898b:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
     this.sky.visible=openSky&&! ["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
@@ -4275,6 +4323,7 @@ export class BackroomsGame{
     if(!id){this.ending();return}
     this.audio.exit();
     this.setLevel(id);
+    this.player.parkingFloor=0;
     if(String(id)==="1"){
       this.player.position.set(0,this.player.eyeY,0);
     }else{

@@ -136,15 +136,15 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-4",
     next: "5",
     theme: {
-      // Pale gray corporate walls, cool carpet, and a tiled suspended ceiling.
-      wall: 0xd9dcd9,
-      wallRough: 0.9,
-      floor: 0x737b80,
-      ceiling: 0xdde0dc,
+      // Clean white drywall, cool gray-blue carpet, and a suspended office ceiling.
+      wall: 0xe1e3e1,
+      wallRough: 0.94,
+      floor: 0x737e86,
+      ceiling: 0xd5d9d8,
       fog: 0xd5dde0,
       accent: 0x8299a4,
-      light: 0xfff5e8,
-      ambient: 0xf0f4f0
+      light: 0xf1f3f1,
+      ambient: 0xa3adaf
     },
     cellSize: 12.0,
     wallHeight: 3.6,
@@ -156,7 +156,7 @@ export const LEVELS = {
     exitStyle: "green",
     exitAfterChunks: 5,
     objective: "Find the stairwell through the empty offices. Check the water stations and leave the blacked-out windows alone.",
-    safe: true, ambientIntensity: 2, fogDensity: 0
+    safe: true, ambientIntensity: 0.86, fogDensity: 0
   },
   "5": {
     id: "5", number: "LEVEL 5", name: "TERROR HOTEL",
