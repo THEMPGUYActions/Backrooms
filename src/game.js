@@ -3978,10 +3978,22 @@ export class BackroomsGame{
         catch(error){console.warn("[Backrooms] Shader prewarm skipped; shaders will compile on first use:",error)}
       }
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      this.setLoadingProgress(1,"WORLD READY","The recording is ready.");
+      if(loading){
+        await new Promise(resolve=>{
+          const finish=event=>{
+            if(event.target!==loading||event.propertyName!=="opacity")return;
+            loading.removeEventListener("transitionend",finish);
+            resolve();
+          };
+          loading.addEventListener("transitionend",finish);
+          loading.classList.add("hidden");
+          const durations=getComputedStyle(loading).transitionDuration.split(",").map(value=>value.trim()).map(value=>value.endsWith("ms")?parseFloat(value):parseFloat(value)*1000);
+          if(!durations.some(value=>value>0))requestAnimationFrame(()=>{loading.removeEventListener("transitionend",finish);resolve()});
+        });
+      }
       this.worldReady=true;
       this.preloadComplete=true;
-      this.setLoadingProgress(1,"WORLD READY","The recording is ready.");
-      loading?.classList.add("hidden");
       document.getElementById("boot")?.classList.add("intro-ready");
       this.armAudioGateFallback?.();
       if(this.pendingStart)this.beginIntroReveal();
