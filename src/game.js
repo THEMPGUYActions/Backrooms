@@ -4,12 +4,16 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20261120-l2-pipe-uv-junctions2";
-import { Level1Reflection } from "./level1-wet.js?v=20261120-l2-pipe-uv-junctions2";
+import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
+import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-l2-pipe-uv-junctions2";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-l2-pipe-uv-junctions2";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level7-ocean-sky-swim1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level7-ocean-sky-swim1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
+
+function oceanSurfaceHeight(x,z,time){
+  return .045+Math.sin(x*.19+time*.55)*.075+Math.sin(z*.15-time*.42)*.045+Math.sin((x+z)*.09+time*.31)*.028;
+}
 
 const VHSShader={
   name:"BackroomsVHS",
@@ -1286,17 +1290,24 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.72,2.15,.08),lib.dark,x,1.25,z-.08);
       }
     }else if(level.id==="7"){
-      const water=lib.water.clone();water.color.setHex(0x316a78);water.opacity=.78;water.roughness=.13;water.metalness=.025;water.depthWrite=false;
+      const water=lib.water.clone();
+      water.color.setHex(0x3b8290);water.opacity=.84;water.roughness=.19;water.metalness=.015;
+      water.side=THREE.DoubleSide;water.depthWrite=false;
+      const waterUniforms={time:{value:0},offset:{value:new THREE.Vector2(this.originX+size/2,this.originZ+size/2)}};
       water.onBeforeCompile=shader=>{
-        shader.uniforms.uBackroomsTime={value:0};
+        shader.uniforms.uBackroomsTime=waterUniforms.time;
+        shader.uniforms.uBackroomsWaterOffset=waterUniforms.offset;
+        shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;\nuniform vec2 uBackroomsWaterOffset;");
+        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nvec2 waterP=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nfloat waterDx=.01425*cos(waterP.x*.19+uBackroomsTime*.55)+.00405*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.31);\nfloat waterDz=.00675*cos(waterP.y*.15-uBackroomsTime*.42)+.00405*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.31);\nobjectNormal=normalize(vec3(-waterDx,waterDz,1.0));");
+        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nvec2 waterWorld=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\ntransformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.55)*.075+sin(waterWorld.y*.15-uBackroomsTime*.42)*.045+sin((waterWorld.x+waterWorld.y)*.09+uBackroomsTime*.31)*.028;");
+        shader.fragmentShader=shader.fragmentShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;");
+        shader.fragmentShader=shader.fragmentShader.replace("#include <color_fragment>","#include <color_fragment>\nfloat surfaceGlint=pow(max(0.0,sin(gl_FragCoord.x*.017+gl_FragCoord.y*.011+uBackroomsTime*.8)),12.0)*.075;\ndiffuseColor.rgb*=.96+surfaceGlint;");
         water.userData.timeUniform=shader.uniforms.uBackroomsTime;
-        shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;");
-        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nfloat waveDx=.02016*cos(position.x*.72+uBackroomsTime*.65)+.0054*cos((position.x+position.y)*.45+uBackroomsTime*.34);\nfloat waveDy=.0198*cos(position.y*1.1-uBackroomsTime*.48)+.0054*cos((position.x+position.y)*.45+uBackroomsTime*.34);\nobjectNormal=normalize(vec3(-waveDx,-waveDy,1.0));");
-        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\ntransformed.z+=sin(position.x*.72+uBackroomsTime*.65)*.028+sin(position.y*1.1-uBackroomsTime*.48)*.018+sin((position.x+position.y)*.45+uBackroomsTime*.34)*.012;");
       };
-      water.customProgramCacheKey=()=>"backrooms-level7-water-waves-v1";
-      water.needsUpdate=true;
-      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,32,32),water);surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
+      water.customProgramCacheKey=()=>"backrooms-level7-world-waves-v2";water.needsUpdate=true;
+      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,64,64),water);
+      surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
+      water.userData.timeUniform=waterUniforms.time;
       g.userData.animatedWaterMaterials=[water];
       const rng=new RNG(this.seedKey()^0x7a77),rockGeometry=new THREE.IcosahedronGeometry(1,1);
       const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,24),rockDummy=new THREE.Object3D();
@@ -1308,15 +1319,20 @@ class Chunk{
       // Furnished flooded entrance room built sideways into the ocean ceiling.
       if(this.cx===0&&this.cz===0){
         const room=new THREE.Group();
-        box(room,new THREE.BoxGeometry(8.6,.16,8.6),lib.officeWood,0,.10,0);
+        box(room,new THREE.BoxGeometry(8.6,.16,8.6),lib.concrete,0,.10,0);
         box(room,new THREE.BoxGeometry(8.6,3.1,.18),lib.concrete,0,1.65,-4.25);
         box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,-4.25,1.65,0);
         box(room,new THREE.BoxGeometry(.18,3.1,8.6),lib.concrete,4.25,1.65,0);
         box(room,new THREE.BoxGeometry(2.8,3.1,.18),lib.concrete,-2.85,1.65,4.25);
         box(room,new THREE.BoxGeometry(2.8,3.1,.18),lib.concrete,2.85,1.65,4.25);
         box(room,new THREE.BoxGeometry(2.9,.22,.2),lib.concrete,0,3.1,4.25);
-        const puddle=new THREE.Mesh(new THREE.PlaneGeometry(7.7,7.7),lib.water.clone());
-        puddle.rotation.x=-Math.PI/2;puddle.position.set(0,.19,0);puddle.material.opacity=.34;room.add(puddle);
+        const roomWater=water.clone();
+        roomWater.opacity=.46;
+        roomWater.onBeforeCompile=water.onBeforeCompile;
+        roomWater.customProgramCacheKey=water.customProgramCacheKey;
+        roomWater.userData.timeUniform=waterUniforms.time;
+        const puddle=new THREE.Mesh(new THREE.PlaneGeometry(7.7,7.7,24,24),roomWater);
+        puddle.rotation.x=-Math.PI/2;puddle.position.set(0,.19,0);room.add(puddle);
         box(room,new THREE.BoxGeometry(1.5,2.25,.38),lib.officeWood,-3.15,1.28,-.35);
         for(let shelf=0;shelf<4;shelf++)box(room,new THREE.BoxGeometry(1.38,.055,.34),lib.trim,-3.15,.48+shelf*.48,-.12);
         const chair=new THREE.Group();chair.position.set(2.25,0,-1.1);
@@ -2653,28 +2669,25 @@ class Player{
     const nowInOcean=this.game.level.id==="7"&&(Math.abs(this.position.x)>4.5||this.position.z>4.5||this.position.z< -4.5);
     if(nowInOcean){
       if(!this.inOcean){
-        this.inOcean=true;
-        this.verticalVelocity=0;
-        this.game.toast("Swimming: WASD to move, SPACE to surface, CTRL to dive.",4);
+        this.inOcean=true;this.verticalVelocity=0;
+        this.game.toast("Swimming: WASD to move, SPACE to surface, CTRL to dive. Look up or down to steer.",4);
       }
-      const surfaceY=.045;
-      const bodyBottom=this.position.y-1.0;
-      const submerged=THREE.MathUtils.clamp((surfaceY-bodyBottom)/1.0,0,1);
+      const surfaceY=oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime);
+      const bodyBottom=this.position.y-1.55;
+      const submerged=THREE.MathUtils.clamp((surfaceY-bodyBottom)/1.67,0,1);
       const swimInput=(input.wantsAscend()?1:0)-(input.wantsDive()?1:0);
+      const forwardStroke=-mv.y*Math.sin(this.pitch);
       const gravity=-9.81;
-      const buoyancy=9.81*1.25*submerged;
-      const waterDrag=-this.verticalVelocity*2.6;
-      this.verticalVelocity=THREE.MathUtils.clamp(this.verticalVelocity+(gravity+buoyancy+waterDrag+swimInput*8.5)*dt,-4.2,4.2);
-      this.position.y=THREE.MathUtils.clamp(this.position.y+this.verticalVelocity*dt,-12,2.5);
-      if(this.position.y<=-12&&this.verticalVelocity<0)this.verticalVelocity=0;
-      const depthBlend=THREE.MathUtils.clamp((surfaceY+.04-this.position.y)/2.2,0,1);
+      const buoyancy=9.81*1.28*submerged;
+      const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8);
+      const swimForce=swimInput*6.4+forwardStroke*3.2;
+      this.verticalVelocity=THREE.MathUtils.clamp(this.verticalVelocity+(gravity+buoyancy+waterDrag+swimForce)*dt,-3.1,3.0);
+      this.position.y=THREE.MathUtils.clamp(this.position.y+this.verticalVelocity*dt,-24,surfaceY+1.25);
+      if(this.position.y>=surfaceY+1.25&&this.verticalVelocity>0)this.verticalVelocity=Math.min(0,this.verticalVelocity);
+      const depthBlend=THREE.MathUtils.clamp((surfaceY+.08-this.position.y)/4.8,0,1);
       if(this.game.scene.fog){
-        this.game.scene.fog.color.setRGB(
-          THREE.MathUtils.lerp(.44,.006,depthBlend),
-          THREE.MathUtils.lerp(.55,.09,depthBlend),
-          THREE.MathUtils.lerp(.60,.13,depthBlend)
-        );
-        this.game.scene.fog.density=.0028+depthBlend*.028;
+        this.game.scene.fog.color.setRGB(THREE.MathUtils.lerp(.54,.008,depthBlend),THREE.MathUtils.lerp(.66,.12,depthBlend),THREE.MathUtils.lerp(.70,.18,depthBlend));
+        this.game.scene.fog.density=.0022+depthBlend*.018;
       }
     }else{
       this.inOcean=false;
@@ -2730,7 +2743,7 @@ class Player{
     const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.11;
     const side=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
     const cameraTarget=this.position.clone().addScaledVector(side,bobX);
-    cameraTarget.y=this.position.y+bobY+breathing+shakeY+(this.inOcean?Math.sin(this.game.gameTime*2.2)*.012:0);
+    cameraTarget.y=this.position.y+bobY+breathing+shakeY+(this.inOcean?Math.sin(this.game.gameTime*1.7)*.025+this.verticalVelocity*.012:0);
     this.game.camera.position.lerp(cameraTarget,1-Math.exp(-dt*18));
 
     const targetFov=THREE.MathUtils.clamp(62+Math.hypot(this.velocity.x,this.velocity.z)*.72,62,67);
@@ -3371,6 +3384,14 @@ export class BackroomsGame{
     this.sky.material.depthTest=false;
     this.sky.visible=false;
     this.scene.add(this.sky);
+    const oceanSkyMaterial=new THREE.ShaderMaterial({
+      uniforms:{zenith:{value:new THREE.Color(0x527f94)},horizon:{value:new THREE.Color(0xb8c9c9)},sunDirection:{value:new THREE.Vector3(-.68,.66,.46).normalize()},sunColor:{value:new THREE.Color(0xffe6c7)}},
+      vertexShader:"varying vec3 vSkyDirection;void main(){vSkyDirection=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+      fragmentShader:"varying vec3 vSkyDirection;uniform vec3 zenith;uniform vec3 horizon;uniform vec3 sunDirection;uniform vec3 sunColor;void main(){vec3 d=normalize(vSkyDirection);float h=clamp(d.y,0.0,1.0);vec3 sky=mix(horizon,zenith,pow(h,.72));float sun=max(dot(d,normalize(sunDirection)),0.0);sky+=sunColor*pow(sun,48.0)*.24;sky=mix(sky,horizon,exp(-abs(d.y)*8.0)*.18);gl_FragColor=vec4(sky,1.0);\n#include <colorspace_fragment>}",
+      side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false
+    });
+    this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(210,48,32),oceanSkyMaterial);
+    this.oceanSky.renderOrder=-100;this.oceanSky.visible=false;this.scene.add(this.oceanSky);
     const cloudMaterial=new THREE.ShaderMaterial({
       uniforms:{time:{value:0},coverage:{value:.56},opacity:{value:.55},cloudColor:{value:new THREE.Color(0xc3c8c8)}},
       vertexShader:"varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
@@ -3379,7 +3400,7 @@ export class BackroomsGame{
         "float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}",
         "float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x),mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x),f.y);}",
         "float fbm(vec2 p){float v=0.0,a=.5;for(int i=0;i<4;i++){v+=noise(p)*a;p*=2.03;a*=.5;}return v;}",
-        "void main(){vec2 uv=vec2(vUv.x*2.0+time*.000018,vUv.y);float n=fbm(uv*vec2(18.0,8.0));float detail=fbm(uv*vec2(39.0,17.0)+vec2(3.7,8.1));float field=mix(n,detail,.24);float cloud=smoothstep(coverage,coverage+.2,field);float horizon=smoothstep(.02,.24,vUv.y)*(1.0-smoothstep(.88,1.0,vUv.y));float alpha=cloud*opacity*horizon;gl_FragColor=vec4(cloudColor,alpha);}",
+        "void main(){vec2 uv=vec2(vUv.x*2.0+time*.00045,vUv.y);float n=fbm(uv*vec2(18.0,8.0));float detail=fbm(uv*vec2(39.0,17.0)+vec2(3.7,8.1));float field=mix(n,detail,.24);float cloud=smoothstep(coverage,coverage+.2,field);float horizon=smoothstep(.02,.24,vUv.y)*(1.0-smoothstep(.88,1.0,vUv.y));float alpha=cloud*opacity*horizon;gl_FragColor=vec4(cloudColor,alpha);}",
         "#include <tonemapping_fragment>",
         "#include <colorspace_fragment>"
       ].join("\n"),
@@ -3702,19 +3723,26 @@ export class BackroomsGame{
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
-    this.sky.visible=openSky;
-    this.cloudLayer.visible=this.level.id==="9"||this.level.id==="10";
+    this.sky.visible=openSky&&this.level.id!=="7";
+    this.oceanSky.visible=this.level.id==="7";
+    this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
+    this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4:(this.level.theme.fog??0x000000));
+    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
+    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.78:.42;
+    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
     const skyUniforms=this.sky.material.uniforms;
     skyUniforms.turbidity.value=this.level.id==="10"?16:this.level.id==="9"?11:7;
     skyUniforms.rayleigh.value=this.level.id==="10"?.45:this.level.id==="9"?.22:2.2;
     skyUniforms.mieCoefficient.value=this.level.id==="10"?.018:this.level.id==="9"?.012:.004;
     skyUniforms.mieDirectionalG.value=this.level.id==="10"?.72:.82;
     skyUniforms.sunPosition.value.set(0,this.level.id==="9"?-.18:this.level.id==="10"?.22:.28,-1).normalize();
-    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="10"?.48:.63;
-    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="10"?.78:.42;
-    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="10"?0xb5b9b7:0x343e4b);
-    this.daylight.color.setHex(this.level.id==="9"?0x8499bd:0xe4edf0);
-    this.daylight.position.set(-35,this.level.id==="9"?-18:80,24);
+    if(this.level.id!=="7"){
+      this.cloudLayer.material.uniforms.coverage.value=this.level.id==="10"?.48:.63;
+      this.cloudLayer.material.uniforms.opacity.value=this.level.id==="10"?.78:.42;
+      this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="10"?0xb5b9b7:0x343e4b);
+    }
+    this.daylight.color.setHex(this.level.id==="9"?0x8499bd:this.level.id==="7"?0xb9d5df:0xe4edf0);
+    this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:80,24);
     this.daylight.intensity=this.level.id==="10"?.48:this.level.id==="7"?.62:this.level.id==="9"?.035:0;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
@@ -4219,8 +4247,9 @@ export class BackroomsGame{
   }
 
   render(){
-    if(this.sky.visible){
-      this.sky.position.copy(this.camera.position);
+    if(this.sky.visible)this.sky.position.copy(this.camera.position);
+    if(this.oceanSky.visible)this.oceanSky.position.copy(this.camera.position);
+    if(this.cloudLayer.visible){
       this.cloudLayer.position.copy(this.camera.position);
       this.cloudLayer.material.uniforms.time.value=this.gameTime;
     }

@@ -401,11 +401,14 @@ async function checkGameplayPhysicsAndRendering(){
   for(const token of ['import { Sky } from "three/addons/objects/Sky.js"',"this.sky=new Sky()","this.cloudLayer=new THREE.Mesh","skyUniforms.turbidity.value","this.daylight.intensity=this.level.id==="]){
     if(!game.includes(token))fail("Atmospheric sky setup missing: "+token);
   }
-  for(const token of ["this.velocity=new THREE.Vector3()","const buoyancy=9.81*1.25*submerged","const waterDrag=-this.verticalVelocity*2.6","input.wantsAscend()?1:0","input.wantsDive()?1:0"]){
+  for(const token of ["this.velocity=new THREE.Vector3()","function oceanSurfaceHeight(x,z,time)","const buoyancy=9.81*1.28*submerged","const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8)","const forwardStroke=-mv.y*Math.sin(this.pitch)","input.wantsAscend()?1:0","input.wantsDive()?1:0"]){
     if(!game.includes(token))fail("Player physics contract missing: "+token);
   }
   if(game.includes("Math.sin(this.pitch)*swimInput"))fail("Swimming must not be controlled by camera pitch");
-  if(!game.includes("new THREE.PlaneGeometry(size,size,32,32)"))fail("Level 7 water surface must be subdivided for wave displacement");
+  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(210,48,32),oceanSkyMaterial)",'this.oceanSky.visible=this.level.id==="7"','this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10"',"new THREE.PlaneGeometry(size,size,64,64)","backrooms-level7-world-waves-v2","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.55)*.075","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
+    if(!game.includes(token))fail("Level 7 sky, animated water, or buoyancy surface coupling missing: "+token);
+  }
+  if(!game.includes('this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4'))fail("Level 7 needs a non-black fallback sky background");
   if(!input.includes("wantsAscend(){")||!input.includes("wantsDive(){"))fail("Explicit surface/dive input actions are missing");
   if(!html.includes('id="mobile-swim-up"')||!html.includes('id="mobile-swim-down"'))fail("Mobile swimming controls are missing");
   if(!css.includes("#mobile-controls.level-seven .touch-button.swim"))fail("Mobile swimming controls must be scoped to Level 7");
