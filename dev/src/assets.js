@@ -217,6 +217,10 @@ function yellowizeCarpetTexture(texture){
 async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength){
   try{
     const texture=await loadRemoteTexture(url,color);
+    // PBR maps use UVs beyond 0..1 on world-scaled walls and pipe geometry.
+    // ClampToEdge silently smears the edge texel over those regions.
+    texture.wrapS=THREE.RepeatWrapping;
+    texture.wrapT=THREE.RepeatWrapping;
     texture.repeat.set(repeat,repeat);
     const previous=kind==="map"?material.map:kind==="roughnessMap"?material.roughnessMap:kind==="metalnessMap"?material.metalnessMap:material.normalMap;
     if(previous?.userData?.backroomsOwned)previous.dispose();
