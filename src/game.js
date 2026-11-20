@@ -4,11 +4,11 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20261120-physics-sky-water1";
-import { Level1Reflection } from "./level1-wet.js?v=20261120-physics-sky-water1";
+import { InputManager } from "./input.js?v=20261120-l2-pipe-uv-junctions2";
+import { Level1Reflection } from "./level1-wet.js?v=20261120-l2-pipe-uv-junctions2";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-physics-sky-water1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-physics-sky-water1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-l2-pipe-uv-junctions2";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-l2-pipe-uv-junctions2";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -865,67 +865,42 @@ class Chunk{
         addUtilityWall(this.originX,z,cx-door/2,z);
         addUtilityWall(cx+door/2,z,this.originX+size,z);
       }
-      // Offset maintenance bays and diagonal returns replace the old repeated
-      // square-cell partitions with a readable, irregular utility-hall layout.
-      for(const sideX of [-1,1])for(const sideZ of [-1,1]){
-        const bx=cx+sideX*size*.29,bz=cz+sideZ*size*.29,w=3.6,h=3.1;
-        const openX=bx-sideX*w/2,backX=bx+sideX*w/2;
-        const openZ=bz-sideZ*h/2,backZ=bz+sideZ*h/2;
-        addUtilityWall(openX,openZ,backX,openZ);
-        addUtilityWall(backX,openZ,backX,backZ);
-        addUtilityWall(backX,backZ,openX,backZ);
-        addUtilityWall(openX,backZ,openX,bz+sideZ*.35);
-        const returnX=bx+sideX*(w/2+1.1),returnZ=bz+sideZ*(h/2+1.1);
-        addUtilityWall(backX,backZ,returnX,returnZ,2.65,lib.rustMetal);
-      }
-      // Level 2's tunnel plan kinks at 45-degree angles instead of repeating
-      // square rooms. The short diagonal returns preserve the walkable spine.
-      for(const sx of [-1,1])for(const sz of [-1,1]){
-        const ax=cx+sx*9,az=cz+sz*8,bx=cx+sx*15,bz=cz+sz*14,cx2=cx+sx*21,cz2=cz+sz*14;
-        addUtilityWall(ax,az,bx,bz,2.85,lib.wall2);
-        addUtilityWall(bx,bz,cx2,cz2,2.85,lib.brickWall);
-        addUtilityWall(cx2,cz2,cx+sx*25,cz+sz*18,2.65,lib.rustMetal);
-      }
-      // Pump skids, pressure vessels and oil drums break up the long service runs.
-      for(let i=0;i<4;i++){
-        const side=i%2?1:-1,px=cx+side*(12+Math.floor(i/2)*15),pz=cz+(i<2?-1:1)*23;
-        const pump=new THREE.Group();pump.position.set(px,0,pz);
-        box(pump,new THREE.BoxGeometry(1.45,.42,1.05),lib.rustMetal,0,.22,0);
-        const tank=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,1.45,12),i%2?lib.metal:lib.rustMetal);
-        tank.position.set(0,1.0,0);pump.add(tank);
-        const motor=box(pump,new THREE.BoxGeometry(.72,.55,.7),lib.metal,.72,.5,0);
-        const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.06,12),lib.dark);
-        gauge.rotation.x=Math.PI/2;gauge.position.set(.25,1.45,-.37);pump.add(gauge);
-        const wheel=new THREE.Mesh(new THREE.TorusGeometry(.2,.035,6,14),lib.hotelGold);
-        wheel.position.set(-.42,1.18,-.43);pump.add(wheel);
-        g.add(pump);
-        const hx=.95,hz=.72;this.collisionSegments.push(
-          {x1:px-hx,z1:pz-hz,x2:px+hx,z2:pz-hz},{x1:px+hx,z1:pz-hz,x2:px+hx,z2:pz+hz},
-          {x1:px+hx,z1:pz+hz,x2:px-hx,z2:pz+hz},{x1:px-hx,z1:pz+hz,x2:px-hx,z2:pz-hz}
-        );
-      }
-      for(let i=0;i<3;i++){
-        const x=cx-18+i*18,z=cz+(i%2?28:-28);
-        const drum=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.9,12),lib.rustMetal);
-        drum.position.set(x,.47,z);g.add(drum);
-      }
+      // Irregular utility-bay walls are generated from the chunk seed and kept
+      // behind the main service corridor, with no diagonal wall across a route.
+      const baySeed=this.seedKey()^0x2b71;
+      const baySide=cycleHash(baySeed,this.cx,this.cz,0x22)<.5?-1:1;
+      const bayOffset=cycleHash(baySeed,this.cx,this.cz,0x23)<.5?-.29:.29;
+      const bayX=cx+baySide*size*.29,bayZ=cz+bayOffset*size;
+      const bayW=3.2+cycleHash(baySeed,this.cx,this.cz,0x24)*1.6;
+      const bayH=2.8+cycleHash(baySeed,this.cx,this.cz,0x25)*1.4;
+      addUtilityWall(bayX-bayW/2,bayZ-bayH/2,bayX+bayW/2,bayZ-bayH/2,2.7,lib.wall2);
+      addUtilityWall(bayX+bayW/2,bayZ-bayH/2,bayX+bayW/2,bayZ+bayH/2,2.7,lib.wall2);
+      addUtilityWall(bayX+bayW/2,bayZ+bayH/2,bayX-bayW/2,bayZ+bayH/2,2.7,lib.wall2);
+      // Compact equipment is placed inside the generated maintenance bay,
+      // rather than scattered into the four-way passage.
+      const pumpX=bayX+baySide*.45,pumpZ=bayZ;
+      const pump=new THREE.Group();pump.position.set(pumpX,0,pumpZ);
+      box(pump,new THREE.BoxGeometry(.95,.34,.72),lib.rustMetal,0,.17,0);
+      const vessel=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.9,12),lib.metal);
+      vessel.position.set(0,.78,0);pump.add(vessel);g.add(pump);
       // Main service lines follow the corridor walls. Each bend is a curved
       // elbow, and each riser branches directly from a horizontal main.
-      const pipeGeometry=new THREE.CylinderGeometry(.105,.105,1,12);
-      const pipeCapacity=192;
-      const cleanPipes=new THREE.InstancedMesh(pipeGeometry,pipeMat,pipeCapacity);
-      const rustPipes=new THREE.InstancedMesh(pipeGeometry,rustMat,pipeCapacity);
-      cleanPipes.userData.pipeNetwork=true;rustPipes.userData.pipeNetwork=true;
-      const pipeDummy=new THREE.Object3D(),pipeAxis=new THREE.Vector3(0,1,0);
-      let cleanCount=0,rustCount=0;
+      const pipeMeshes=[];
       const addPipeSegment=(start,end,rusted=false)=>{
         const direction=new THREE.Vector3().subVectors(end,start),length=direction.length();
         if(length<.12)return;
-        pipeDummy.position.copy(start).add(end).multiplyScalar(.5);
-        pipeDummy.quaternion.setFromUnitVectors(pipeAxis,direction.normalize());
-        pipeDummy.scale.set(1,length,1);pipeDummy.updateMatrix();
-        if(rusted&&rustCount<pipeCapacity)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
-        else if(cleanCount<pipeCapacity)cleanPipes.setMatrixAt(cleanCount++,pipeDummy.matrix);
+        const geometry=new THREE.CylinderGeometry(.105,.105,length,12,1);
+        const positions=geometry.attributes.position,uvs=geometry.attributes.uv;
+        const circumference=Math.PI*.21;
+        for(let i=0;i<positions.count;i++){
+          const y=positions.getY(i);
+          uvs.setXY(i,uvs.getX(i)*circumference/.8,(y+length/2)/.8);
+        }
+        uvs.needsUpdate=true;
+        const mesh=new THREE.Mesh(geometry,rusted?rustMat:pipeMat);
+        mesh.position.copy(start).add(end).multiplyScalar(.5);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
+        mesh.userData.pipeNetwork=true;g.add(mesh);pipeMeshes.push(mesh);
       };
       const addPipeRoute=(points,rusted=false)=>{
         const pts=points.map(point=>new THREE.Vector3(...point)),trim=.22;
@@ -939,26 +914,35 @@ class Chunk{
             const elbowStart=pts[i+1].clone().addScaledVector(direction,-trim);
             const elbowEnd=pts[i+1].clone().addScaledVector(nextDirection,trim);
             const curve=new THREE.QuadraticBezierCurve3(elbowStart,pts[i+1],elbowEnd);
-            g.add(new THREE.Mesh(new THREE.TubeGeometry(curve,8,.105,10,false),rusted?rustMat:pipeMat));
+            const geometry=new THREE.TubeGeometry(curve,8,.105,10,false);
+            const uv=geometry.attributes.uv,curveLength=curve.getLength();
+            for(let v=0;v<uv.count;v++)uv.setY(v,uv.getY(v)*curveLength/.8);
+            uv.needsUpdate=true;
+            const elbow=new THREE.Mesh(geometry,rusted?rustMat:pipeMat);
+            elbow.userData.pipeNetwork=true;g.add(elbow);pipeMeshes.push(elbow);
           }
         }
       };
       const yNorthSouth=2.78,yEastWest=2.58;
-      addPipeRoute([[cx-1.38,yNorthSouth,this.originZ+1.1],[cx-1.38,yNorthSouth,cz-1.38],[cx-1.38,yNorthSouth,cz+1.38],[cx-1.38,yNorthSouth,this.originZ+size-1.1]]);
-      addPipeRoute([[cx+1.38,yNorthSouth,this.originZ+1.1],[cx+1.38,yNorthSouth,cz-1.38],[cx+1.38,yNorthSouth,cz+1.38],[cx+1.38,yNorthSouth,this.originZ+size-1.1]],true);
-      addPipeRoute([[this.originX+1.1,yEastWest,cz-1.38],[cx-1.38,yEastWest,cz-1.38],[cx+1.38,yEastWest,cz-1.38],[this.originX+size-1.1,yEastWest,cz-1.38]],true);
-      addPipeRoute([[this.originX+1.1,yEastWest,cz+1.38],[cx-1.38,yEastWest,cz+1.38],[cx+1.38,yEastWest,cz+1.38],[this.originX+size-1.1,yEastWest,cz+1.38]]);
-      addPipeRoute([[cx-1.72,1.12,this.originZ+2.0],[cx-1.72,1.12,cz],[cx-1.72,1.12,this.originZ+size-2.0]],true);
-      addPipeRoute([[cx+1.72,1.02,this.originZ+2.0],[cx+1.72,1.02,cz],[cx+1.72,1.02,this.originZ+size-2.0]]);
-      // Four vertical drops connect the upper mains to low wall valves.
-      for(let i=0;i<4;i++){
-        const side=i%2?1:-1,z=cz+(i<2?-1:1)*11.5,x=cx+side*1.38;
-        const top=new THREE.Vector3(x,yNorthSouth,z),bottom=new THREE.Vector3(x,.36,z);
-        addPipeSegment(top,bottom,i%2===1);
-        const tee=new THREE.Mesh(new THREE.SphereGeometry(.145,10,8),i%2===1?rustMat:pipeMat);
-        tee.position.copy(top);g.add(tee);
-        const collar=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,8,14),lib.handle);
-        collar.position.set(x,1.18,z);collar.rotation.x=Math.PI/2;g.add(collar);
+      // Keep the central crossing clear: overhead mains stop at the junction
+      // and branch around it instead of running through the opening.
+      const branchGap=3.1;
+      for(const side of [-1,1]){
+        const x=cx+side*1.38;
+        addPipeRoute([[x,yNorthSouth,this.originZ+1.1],[x,yNorthSouth,cz-branchGap]],side>0);
+        addPipeRoute([[x,yNorthSouth,cz+branchGap],[x,yNorthSouth,this.originZ+size-1.1]],side>0);
+        const z=cz+side*1.38;
+        addPipeRoute([[this.originX+1.1,yEastWest,z],[cx-branchGap,yEastWest,z]],side<0);
+        addPipeRoute([[cx+branchGap,yEastWest,z],[this.originX+size-1.1,yEastWest,z]],side<0);
+      }
+      // A few local risers connect the overhead mains to wall-mounted valves;
+      // they are placed in service alcoves, never across the walkable junction.
+      // Short drops are tucked against the side walls in maintenance bays.
+      for(const [side,zOffset] of [[-1,-12],[1,12]]){
+        const x=cx+side*1.38,z=cz+zOffset;
+        addPipeSegment(new THREE.Vector3(x,yNorthSouth,z),new THREE.Vector3(x,.42,z),side>0);
+        const tee=new THREE.Mesh(new THREE.SphereGeometry(.145,10,8),side>0?rustMat:pipeMat);
+        tee.position.set(x,yNorthSouth,z);g.add(tee);
         const wheel=new THREE.Mesh(new THREE.TorusGeometry(.18,.035,8,16),lib.handle);
         wheel.position.set(x,.88,z+.13);g.add(wheel);
       }
@@ -991,35 +975,19 @@ class Chunk{
         if(Math.abs(x-cx)<5)continue;
         addFrame(x,cz,false);addTunnelLight(x,cz,false,fixtureIndex++);
       }
-      const ledge=new THREE.Mesh(new THREE.BoxGeometry(.62,.38,size-3),lib.concrete);
-      ledge.position.set(cx-1.38,.19,cz);g.add(ledge);
-      this.collisionSegments.push({x1:cx-1.69,z1:this.originZ+1.5,x2:cx-.99,z2:this.originZ+1.5},{x1:cx-.99,z1:this.originZ+1.5,x2:cx-.99,z2:this.originZ+size-1.5},{x1:cx-.99,z1:this.originZ+size-1.5,x2:cx-1.69,z2:this.originZ+size-1.5},{x1:cx-1.69,z1:this.originZ+size-1.5,x2:cx-1.69,z2:this.originZ+1.5});
-      const drain=new THREE.Mesh(new THREE.BoxGeometry(.24,.08,size-4),lib.dark);
-      drain.position.set(cx+1.48,-.035,cz);g.add(drain);
+      // Keep the junction floor continuous and unobstructed. Drain grates are
+      // flush with the walking surface and have no collision volume.
+      const drain=new THREE.Mesh(new THREE.BoxGeometry(.24,.018,size-4),lib.dark);
+      drain.position.set(cx+1.48,.012,cz);g.add(drain);
       for(let i=0;i<7;i++){
         const z=this.originZ+4+i*7;
-        box(g,new THREE.BoxGeometry(.32,.035,.62),lib.metal,cx+1.48,.012,z);
+        box(g,new THREE.BoxGeometry(.32,.012,.62),lib.metal,cx+1.48,.022,z);
       }
-      cleanPipes.count=cleanCount;rustPipes.count=rustCount;
-      cleanPipes.instanceMatrix.needsUpdate=true;rustPipes.instanceMatrix.needsUpdate=true;
-      cleanPipes.computeBoundingSphere();rustPipes.computeBoundingSphere();
-      g.add(cleanPipes,rustPipes);
-      // Valve wheels, pressure gauges and low service vents sit in the bays.
-      for(let i=0;i<8;i++){
-        const x=this.originX+cell*(1+rng.next()*Math.max(1,cells-2)),z=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
-        if(i<5){
-          const valve=new THREE.Mesh(new THREE.TorusGeometry(.19,.035,6,14),lib.handle);
-          valve.position.set(x,2.12+rng.next()*.32,z);valve.rotation.x=Math.PI/2;g.add(valve);
-          const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.055,12),lib.dark);
-          gauge.position.set(x+.24,2.35,z);gauge.rotation.x=Math.PI/2;g.add(gauge);
-        }else{
-          const vent=new THREE.Group();vent.position.set(x,0,z);
-          box(vent,new THREE.BoxGeometry(.92,.12,.72),lib.rustMetal,0,.12,0);
-          const riser=new THREE.Mesh(new THREE.CylinderGeometry(.16,.19,.62,10),lib.metal);riser.position.y=.48;vent.add(riser);
-          const cap=new THREE.Mesh(new THREE.CylinderGeometry(.24,.18,.12,10),lib.rustMetal);cap.position.y=.85;vent.add(cap);g.add(vent);
-          const half=.46;this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
-        }
-      }
+      // A wall-mounted pressure gauge and handwheel finish the service bay.
+      const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.055,16),lib.dark);
+      gauge.position.set(pumpX,.0,pumpZ-.42);gauge.rotation.x=Math.PI/2;g.add(gauge);
+      const valve=new THREE.Mesh(new THREE.TorusGeometry(.18,.035,8,16),lib.handle);
+      valve.position.set(pumpX,.92,pumpZ-.43);valve.rotation.x=Math.PI/2;g.add(valve);
       // Floor drains and painted service markings make the corridors read as
       // maintained infrastructure instead of an empty maze with pipes.
       for(let i=0;i<6;i++){
