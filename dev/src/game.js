@@ -15,7 +15,7 @@ function oceanSurfaceHeight(x,z,time){
   return .02+Math.sin(x*.19+time*.72)*.13+Math.sin(z*.15-time*.61)*.08+Math.sin((x+z)*.09+time*.43)*.05;
 }
 
-const LEVEL1_UPPER_FLOOR_Y=3.0;
+const LEVEL1_UPPER_FLOOR_Y=LEVELS["1"].wallHeight/2;
 const LEVEL1_FLOOR_SLAB_THICKNESS=.28;
 
 const VHSShader={
@@ -611,10 +611,12 @@ class Chunk{
     const upperWallHeight=level1MultiFloor?level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025:0;
     const upperWallY=level1MultiFloor?LEVEL1_UPPER_FLOOR_Y+.0125+upperWallHeight/2:0;
     const hGeom=new THREE.BoxGeometry(cell,safeWallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,safeWallHeight,cell);
+    const upperHGeom=level1MultiFloor?new THREE.BoxGeometry(cell,upperWallHeight,wallThickness):null;
+    const upperVGeom=level1MultiFloor?new THREE.BoxGeometry(wallThickness,upperWallHeight,cell):null;
     const trimHGeom=level.id==="0"?new THREE.BoxGeometry(cell,.055,.035):new THREE.BoxGeometry(cell,.11,.12);
     const trimVGeom=level.id==="0"?new THREE.BoxGeometry(.035,.055,cell):new THREE.BoxGeometry(.12,.11,cell);
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
-    const hData=[],vData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
+    const hData=[],vData=[],upperHData=[],upperVData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
     const region=level.id==="0"?(this.level0Region?.type||"maze"):"";
     const wallMaterial=level.id==="1"?lib.concrete:region==="red"?lib.redWall:lib.wall;
     const seenH=new Set(),seenV=new Set();
@@ -623,10 +625,10 @@ class Chunk{
     const addInstanced=(geometry,material,data)=>{if(!data.length)return;const mesh=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingBox();mesh.computeBoundingSphere();g.add(mesh)};
     const buildWallEdge=(x,z,side)=>{
       const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-      if(side==="north"){const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz-cell/2);if(level1MultiFloor)pushMat(hData,px,upperWallY,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});}
-      else if(side==="south"){const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz+cell/2);if(level1MultiFloor)pushMat(hData,px,upperWallY,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});}
-      else if(side==="west"){const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);pushMat(vData,px-cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(vData,px-cell/2,upperWallY,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
-      else{const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);pushMat(vData,px+cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(vData,px+cell/2,upperWallY,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
+      if(side==="north"){const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz-cell/2);if(level1MultiFloor)pushMat(upperHData,px,upperWallY,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});}
+      else if(side==="south"){const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz+cell/2);if(level1MultiFloor)pushMat(upperHData,px,upperWallY,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});}
+      else if(side==="west"){const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);pushMat(vData,px-cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(upperVData,px-cell/2,upperWallY,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
+      else{const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);pushMat(vData,px+cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(upperVData,px+cell/2,upperWallY,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
     };
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
       const mask=this.walls[this.index(x,z)];
@@ -655,6 +657,7 @@ class Chunk{
     this.collisionSegments=edges.map(e=>{const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;return e.side==="north"||e.side==="south"?{x1:px-cell/2,z1:e.side==="north"?pz-cell/2:pz+cell/2,x2:px+cell/2,z2:e.side==="north"?pz-cell/2:pz+cell/2}:{x1:e.side==="west"?px-cell/2:px+cell/2,z1:pz-cell/2,x2:e.side==="west"?px-cell/2:px+cell/2,z2:pz+cell/2}});
     this.baseCollisionSegmentCount=this.collisionSegments.length;
     addInstanced(hGeom,wallMaterial,hData);addInstanced(vGeom,wallMaterial,vData);
+    if(level1MultiFloor){addInstanced(upperHGeom,wallMaterial,upperHData);addInstanced(upperVGeom,wallMaterial,upperVData)}
     if(level.id==="0"&&region==="red"){
       const redFloor=new THREE.Mesh(tileGeometryUV(new THREE.PlaneGeometry(size,size),lib.redFloor),lib.redFloor);
       redFloor.rotation.x=-Math.PI/2;
@@ -2085,6 +2088,7 @@ class Chunk{
       const upperStoreyHeight=level.wallHeight-LEVEL1_UPPER_FLOOR_Y-.025;
       const upperStoreyStart=LEVEL1_UPPER_FLOOR_Y;
       const pillarGeom=new THREE.BoxGeometry(1.22,lowerStoreyHeight,1.22);
+      const upperPillarGeom=new THREE.BoxGeometry(1.22,upperStoreyHeight,1.22);
       const baseGeom=new THREE.BoxGeometry(1.42,.16,1.42);
       const columnsLower=[],columnsUpper=[],basesLower=[],basesUpper=[];
 
@@ -2116,7 +2120,7 @@ class Chunk{
         g.add(mesh);
       };
       addInst(pillarGeom,lib.level1Pillar,columnsLower);
-      addInst(pillarGeom,lib.level1Pillar,columnsUpper);
+      addInst(upperPillarGeom,lib.level1Pillar,columnsUpper);
       addInst(baseGeom,lib.garageBase,basesLower);
       addInst(baseGeom,lib.garageBase,basesUpper);
 
@@ -2174,7 +2178,7 @@ class Chunk{
 
       // A continuous upper storey spans the chunk. The ramp passes through a
       // real rectangular opening and meets the upper parking deck flush.
-      const rampStartX=this.originX+9,rampLength=22,rampEndX=rampStartX+rampLength,rampZ=this.originZ+36;
+      const rampStartX=this.originX+9,rampLength=40,rampEndX=rampStartX+rampLength,rampZ=this.originZ+36;
       const rise=LEVEL1_UPPER_FLOOR_Y,angle=Math.atan2(rise,rampLength),centerX=rampStartX+rampLength/2;
       const centerY=rise/2-.14*Math.cos(angle),openingHalfWidth=3.42;
       const chunkEndX=this.originX+size,chunkEndZ=this.originZ+size;
