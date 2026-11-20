@@ -7,8 +7,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level7-ocean-sky-swim1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level1-garage-polish1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level3-electrical-level4-office1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level3-electrical-level4-office1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
@@ -433,6 +433,11 @@ class Chunk{
         // Industrial levels use authored corridor geometry, not the old
         // cell-by-cell maze wall fallback.
         this.walls.fill(0);
+        if(level.id==="3"){
+          const roomRoll=cycleHash(this.seedKey()^0x31e1,this.cx*17+this.cz*31,0x3a);
+          this.zone=this.cx===0&&this.cz===0?"generator":roomRoll<.28?"generator":roomRoll<.50?"assembly":roomRoll<.72?"boiler":roomRoll<.88?"sanctum":"corridors";
+          this.level3RoomType=this.zone;
+        }
       }else if(level.id==="4"){
         // Abandoned office is an open floor plate with sparse partitions,
         // not a yellow-maze of sealed cells.
@@ -973,207 +978,400 @@ class Chunk{
       // props and collision geometry so all four exits remain unobstructed.
     }else if(level.id==="3"){
       const rng=new RNG(this.seedKey()^0x31e1);
-      const addStationWall=(x1,z1,x2,z2,height=3.45,material=lib.rustMetal)=>{
-        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+      const cx=this.originX+size/2,cz=this.originZ+size/2;
+      const brick=lib.brickWall||lib.rustMetal;
+      const addStationWall=(x1,z1,x2,z2,height=3.35,material=brick)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz);
         if(length<.3)return;
-        box(g,new THREE.BoxGeometry(length,height,.2),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        box(g,new THREE.BoxGeometry(length,height,.22),material,(x1+x2)/2,height/2,(z1+z2)/2,0,-Math.atan2(dz,dx),0);
         this.collisionSegments.push({x1,z1,x2,z2});
       };
-      const cx=this.originX+size/2,cz=this.originZ+size/2;
-      // The station is a single tall machinery hall. These short partitions
-      // form switchgear galleries without rebuilding the abandoned square maze.
-      for(const side of [-1,1]){
-        const z=cz+side*size*.28;
-        addStationWall(this.originX+size*.12,z,cx-3,z,3.15,lib.officePlastic);
-        addStationWall(cx+3,z,this.originX+size*.88,z,3.15,lib.officePlastic);
-        for(const x of [.22,.78]){
-          const px=this.originX+size*x;
-          addStationWall(px,z+side*2.2,px,z+side*5.2,2.9,lib.rustMetal);
+      const addDivider=(axis,fixed,start,end,opening,openingWidth=1.55,height=3.35,material=brick)=>{
+        const lo=opening-openingWidth/2,hi=opening+openingWidth/2;
+        if(axis==="x"){
+          if(lo>start)addStationWall(start,fixed,lo,fixed,height,material);
+          if(hi<end)addStationWall(hi,fixed,end,fixed,height,material);
+        }else{
+          if(lo>start)addStationWall(fixed,start,fixed,lo,height,material);
+          if(hi<end)addStationWall(fixed,hi,fixed,end,height,material);
         }
-      }
-      // Switchgear cabinets are arranged as two banks with walkable aisles.
-      for(let bank=0;bank<2;bank++)for(let i=0;i<4;i++){
-        const px=this.originX+size*(bank?.76:.24),pz=this.originZ+size*(.18+i*.2),cabinet=new THREE.Group();
-        cabinet.position.set(px,0,pz);
-        box(cabinet,new THREE.BoxGeometry(1.25,2.35,.98),lib.officePlastic,0,1.18,0);
-        box(cabinet,new THREE.BoxGeometry(1.08,2.02,.07),lib.rustMetal,0,1.18,-.54);
-        for(let row=0;row<4;row++){
-          box(cabinet,new THREE.BoxGeometry(.52,.04,.04),lib.handle,0,.55+row*.37,-.59);
-          const lamp=box(cabinet,new THREE.BoxGeometry(.1,.1,.05),row%2?lib.indicator:lib.orangeLight,.39,.55+row*.37,-.6);
+      };
+      const addGate=(x,z,alongX=true)=>{
+        const length=3.9,depth=.18,half=length/2;
+        const gate=new THREE.Group();
+        gate.position.set(x,0,z);
+        if(!alongX)gate.rotation.y=Math.PI/2;
+        for(const side of [-1,1]){
+          const post=box(gate,new THREE.BoxGeometry(.17,2.85,.17),lib.rustMetal,side*half,1.425,0);
+          post.userData.level3GatePart=true;
+        }
+        for(let i=0;i<9;i++){
+          const bar=box(gate,new THREE.BoxGeometry(.075,2.55,.075),lib.metal,-half+.48+i*.49,1.34,0);
+          bar.userData.level3GatePart=true;
+        }
+        for(const y of [.42,1.32,2.28]){
+          const cross=box(gate,new THREE.BoxGeometry(length,.12,.12),lib.rustMetal,0,y,0);
+          cross.userData.level3GatePart=true;
+        }
+        gate.userData.isLevel3BarredGate=true;
+        gate.userData.roomType="blocked-utility-passage";
+        g.add(gate);
+        if(alongX)this.collisionSegments.push({x1:x-half,z1:z-depth,x2:x+half,z2:z+depth});
+        else this.collisionSegments.push({x1:x-depth,z1:z-half,x2:x+depth,z2:z+half});
+      };
+      const addPanel=(x,z,rotation=0,large=false)=>{
+        const panel=new THREE.Group();
+        panel.position.set(x,0,z);
+        panel.rotation.y=rotation;
+        const width=large?1.35:.9,height=large?1.85:1.15;
+        box(panel,new THREE.BoxGeometry(width,height,.16),lib.rustMetal,0,1.4,0);
+        box(panel,new THREE.BoxGeometry(width-.14,height-.16,.045),lib.dark,0,1.4,.105);
+        for(let row=0;row<(large?5:3);row++){
+          const yy=.82+row*(large?.27:.36);
+          box(panel,new THREE.BoxGeometry(width*.55,.045,.035),lib.handle,-.08,yy,.14);
+          const lamp=box(panel,new THREE.BoxGeometry(.095,.095,.05),row%3===0?lib.orangeLight:lib.indicator,width*.33,yy,.145);
           lamp.userData.light=true;
+          lamp.userData.level3PanelIndicator=true;
         }
-        g.add(cabinet);
-        const hx=.63,hz=.49;this.collisionSegments.push({x1:px-hx,z1:pz-hz,x2:px+hx,z2:pz-hz},{x1:px+hx,z1:pz-hz,x2:px+hx,z2:pz+hz},{x1:px+hx,z1:pz+hz,x2:px-hx,z2:pz+hz},{x1:px-hx,z1:pz+hz,x2:px-hx,z2:pz-hz});
-        this.lightSources.push({position:new THREE.Vector3(px,1.9,pz-.72),color:0xff9d5b,baseIntensity:2.2,intensity:2.2,distance:5,decay:2});
-      }
-      // Transformer banks and bus bars occupy the rear service aisles.
-      for(const px of [.36,.64]){
-        const bx=this.originX+size*px,bz=this.originZ+size*.48,unit=new THREE.Group();unit.position.set(bx,0,bz);
-        box(unit,new THREE.BoxGeometry(2.7,2.9,2.0),lib.rustMetal,0,1.45,0);
-        for(let fin=0;fin<9;fin++)box(unit,new THREE.BoxGeometry(.1,2.2,1.12),lib.metal,-1.12+fin*.28,1.45,-1.08);
-        box(unit,new THREE.BoxGeometry(.72,.5,.08),lib.dark,0,1.9,-1.04);
-        for(let lamp=0;lamp<3;lamp++)box(unit,new THREE.BoxGeometry(.12,.12,.07),lamp===1?lib.orangeLight:lib.indicator,-.22+lamp*.22,1.9,-1.1);
-        g.add(unit);
-        this.collisionSegments.push({x1:bx-1.35,z1:bz-1,x2:bx+1.35,z2:bz-1},{x1:bx+1.35,z1:bz-1,x2:bx+1.35,z2:bz+1},{x1:bx+1.35,z1:bz+1,x2:bx-1.35,z2:bz+1},{x1:bx-1.35,z1:bz+1,x2:bx-1.35,z2:bz-1});
-        this.lightSources.push({position:new THREE.Vector3(bx,2.15,bz-1.2),color:0xffa15b,baseIntensity:4.2,intensity:4.2,distance:9,decay:2});
-      }
-      // Overhead busbars, cable ladders and warning-yellow floor lanes.
-      for(let row=0;row<3;row++){
-        const z=this.originZ+size*(.24+row*.26);
-        const bus=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,size*.78,8),lib.metal);
-        bus.rotation.z=Math.PI/2;bus.position.set(cx,level.wallHeight-.72,z);g.add(bus);
-        for(let x=0;x<7;x++)box(g,new THREE.BoxGeometry(.1,.09,.16),lib.rustMetal,this.originX+size*(.12+x*.125),level.wallHeight-.88,z);
-        for(const side of [-1,1])box(g,new THREE.BoxGeometry(size*.78,.035,.11),lib.orangeLight,cx,.035,z+side*1.75);
-      }
-      // Generator alternators and control cabinets make this a power station,
-      // not just a corridor with electrical boxes.
-      for(let unitIndex=0;unitIndex<2;unitIndex++){
-        const gx=this.originX+size*(unitIndex?.82:.18),gz=this.originZ+size*.72,generator=new THREE.Group();
-        generator.position.set(gx,0,gz);
-        box(generator,new THREE.BoxGeometry(3.8,1.65,2.6),lib.rustMetal,0,.95,0);
-        box(generator,new THREE.BoxGeometry(3.35,.16,2.25),lib.metal,0,1.83,0);
-        for(let fin=0;fin<10;fin++)box(generator,new THREE.BoxGeometry(.1,1.3,1.8),lib.metal,-1.55+fin*.34,.98,-.08);
-        const alternator=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,1.3,16),lib.metal);
-        alternator.rotation.z=Math.PI/2;alternator.position.set(0,2.15,0);generator.add(alternator);
-        for(let lamp=0;lamp<4;lamp++){
-          const led=box(generator,new THREE.BoxGeometry(.14,.12,.05),lamp===1?lib.indicator:lib.orangeLight,-.48+lamp*.32,1.35,-1.34);
-          led.userData.light=true;
+        for(let i=0;i<3;i++){
+          const cable=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,1.8+i*.35,6),lib.cable);
+          cable.position.set(-width*.28+i*.25,2.8,.04);panel.add(cable);
         }
+        panel.userData.level3ElectricalPanel=true;
+        g.add(panel);
+        const halfX=width*.58,halfZ=.2,c=Math.cos(rotation),sn=Math.sin(rotation);
+        const corners=[[-halfX,-halfZ],[halfX,-halfZ],[halfX,halfZ],[-halfX,halfZ]].map(([dx,dz])=>({x:x+dx*c+dz*sn,z:z-dx*sn+dz*c}));
+        for(let i=0;i<4;i++){
+          const a=corners[i],b=corners[(i+1)%4];
+          this.collisionSegments.push({x1:a.x,z1:a.z,x2:b.x,z2:b.z});
+        }
+      };
+      const addPipeRun=(x1,z1,x2,z2,y=2.95,radius=.075,material=lib.metal)=>{
+        const a=new THREE.Vector3(x1,y,z1),b=new THREE.Vector3(x2,y,z2),delta=b.clone().sub(a);
+        const pipe=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,delta.length(),8),material);
+        pipe.position.copy(a).add(b).multiplyScalar(.5);
+        pipe.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
+        pipe.userData.level3Pipe=true;
+        g.add(pipe);
+        const hangerCount=Math.max(2,Math.floor(delta.length()/10));
+        for(let i=1;i<hangerCount;i++){
+          const t=i/hangerCount;
+          box(g,new THREE.BoxGeometry(.07,.42,.07),lib.rustMetal,x1+(x2-x1)*t,y+.25,z1+(z2-z1)*t);
+        }
+      };
+      const addCorridorLight=(x,z,index)=>{
+        const fixture=box(g,new THREE.BoxGeometry(1.55,.06,.34),lib.light,x,level.wallHeight+.035,z,0,index%2?Math.PI/2:0,0);
+        fixture.material=lib.light.clone();
+        fixture.material.color.setHex(index%4===0?0xe4d5bd:0xf2eee5);
+        fixture.material.emissive.setHex(0xe0cba7);
+        fixture.material.emissiveIntensity=index%4===0?.78:1.05;
+        fixture.userData.light=true;
+        fixture.userData.baseEmissive=fixture.material.emissiveIntensity;
+        fixture.userData.level3Fluorescent=true;
+        this.fixtures.push(fixture);
+        this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.4,z),color:0xd9c8aa,baseIntensity:18+index%3*2,intensity:18+index%3*2,distance:14,decay:2,fixture});
+      };
+      // An open four-way circulation spine ties every streamed sector together.
+      // Brick dividers create side rooms without sealing chunk connections.
+      const left=this.originX+size*.29,right=this.originX+size*.71;
+      const near=this.originZ+size*.29,far=this.originZ+size*.71;
+      addDivider("z",left,this.originZ+1.2,this.originZ+size-1.2,cz,1.9);
+      addDivider("z",right,this.originZ+1.2,this.originZ+size-1.2,cz,1.9);
+      addDivider("x",near,this.originX+1.2,this.originX+size-1.2,cx,1.9);
+      addDivider("x",far,this.originX+1.2,this.originX+size-1.2,cx,1.9);
+      for(const x of [this.originX+size*.13,this.originX+size*.87]){
+        addDivider("z",x,this.originZ+size*.12,this.originZ+size*.88,cz,4.2,3.2,brick);
+      }
+      for(const z of [this.originZ+size*.13,this.originZ+size*.87]){
+        addDivider("x",z,this.originX+size*.12,this.originX+size*.88,cx,4.2,3.2,brick);
+      }
+      // Inner cross-links are deliberately broken by narrow door openings.
+      addDivider("z",cx-9,this.originZ+size*.13,this.originZ+size*.87,cz+size*.12,1.8,3.0,brick);
+      addDivider("z",cx+9,this.originZ+size*.13,this.originZ+size*.87,cz-size*.12,1.8,3.0,brick);
+      addDivider("x",cz-9,this.originX+size*.13,this.originX+size*.87,cx-size*.12,1.8,3.0,brick);
+      addDivider("x",cz+9,this.originX+size*.13,this.originX+size*.87,cx+size*.12,1.8,3.0,brick);
+
+      // Rusted, barred utility passages sit off the navigable service spine.
+      addGate(this.originX+size*.50,this.originZ+size*.13,true);
+      addGate(this.originX+size*.13,this.originZ+size*.50,false);
+      addGate(this.originX+size*.87,this.originZ+size*.50,false);
+
+      // Cable trays, junction boxes and insulated pipes trace the corridors.
+      for(const offset of [-2.35,2.35]){
+        addPipeRun(this.originX+1.2,cz+offset,this.originX+size-1.2,cz+offset,3.12,.075,lib.metal);
+        addPipeRun(cx+offset,this.originZ+1.2,cx+offset,this.originZ+size-1.2,3.18,.095,lib.rustMetal);
+        box(g,new THREE.BoxGeometry(size-2.4,.07,.12),lib.rustMetal,cx,3.28,cz+offset);
+      }
+      for(let i=0;i<7;i++){
+        const x=this.originX+8+i*14.5,z=cz+(i%2?2.35:-2.35);
+        addPanel(x,z,i%2?Math.PI/2:0,i%3===0);
+      }
+      for(let i=0;i<8;i++){
+        const z=this.originZ+8+i*14.0,x=cx+(i%2?2.35:-2.35);
+        addPanel(x,z,0,i%3===1);
+      }
+      let fixtureIndex=0;
+      for(let i=0;i<7;i++){
+        addCorridorLight(this.originX+10+i*14.2,cz,fixtureIndex++);
+        addCorridorLight(cx,this.originZ+10+i*14.2,fixtureIndex++);
+      }
+
+      const roomX=cx+size*.24,roomZ=cz+size*.24;
+      const roomGroup=new THREE.Group();
+      roomGroup.userData.isLevel3SpecialRoom=true;
+      roomGroup.userData.level3RoomType=this.zone;
+      roomGroup.position.set(roomX,0,roomZ);
+      if(this.zone==="generator"){
+        // Generator room: large alternator, ribbed housings, control desk and conduit.
+        const generator=new THREE.Group();generator.position.set(roomX,0,roomZ);
+        box(generator,new THREE.BoxGeometry(4.8,1.8,2.8),lib.rustMetal,0,.98,0);
+        box(generator,new THREE.BoxGeometry(4.25,.18,2.45),lib.metal,0,1.96,0);
+        for(let fin=0;fin<13;fin++)box(generator,new THREE.BoxGeometry(.11,1.35,2.05),lib.metal,-2.0+fin*.33,1.05,-.1);
+        const rotor=new THREE.Mesh(new THREE.CylinderGeometry(.64,.64,1.6,18),lib.metal);
+        rotor.rotation.z=Math.PI/2;rotor.position.set(0,2.34,0);generator.add(rotor);
+        box(generator,new THREE.BoxGeometry(1.25,1.7,.7),lib.officePlastic,3.3,.88,-.65);
+        for(let i=0;i<5;i++)box(generator,new THREE.BoxGeometry(.11,.11,.05),i%2?lib.indicator:lib.orangeLight,2.78+i*.22,1.28,-1.02);
+        generator.userData.level3RoomType="generator";
         g.add(generator);
-        this.collisionSegments.push(
-          {x1:gx-1.9,z1:gz-1.3,x2:gx+1.9,z2:gz-1.3},{x1:gx+1.9,z1:gz-1.3,x2:gx+1.9,z2:gz+1.3},
-          {x1:gx+1.9,z1:gz+1.3,x2:gx-1.9,z2:gz+1.3},{x1:gx-1.9,z1:gz+1.3,x2:gx-1.9,z2:gz-1.3}
-        );
-        this.lightSources.push({position:new THREE.Vector3(gx,2.1,gz),color:0xffa15b,baseIntensity:7,intensity:7,distance:11,decay:2});
-      }
-      // Cable trenches and insulated floor crossings lead between machine banks.
-      for(let row=0;row<3;row++){
-        const z=this.originZ+size*(.28+row*.2);
-        box(g,new THREE.BoxGeometry(size*.72,.08,.48),lib.dark,cx,.04,z);
-        for(let cable=0;cable<5; cable++){
-          const line=box(g,new THREE.BoxGeometry(size*.68,.025,.035),cable%2?lib.indicator:lib.orangeLight,cx,.095,z-.16+cable*.08);
-          line.userData.light=false;
+        const gx=roomX,gz=roomZ;
+        this.collisionSegments.push({x1:gx-2.5,z1:gz-1.5,x2:gx+2.5,z2:gz-1.5},{x1:gx+2.5,z1:gz-1.5,x2:gx+2.5,z2:gz+1.5},{x1:gx+2.5,z1:gz+1.5,x2:gx-2.5,z2:gz+1.5},{x1:gx-2.5,z1:gz+1.5,x2:gx-2.5,z2:gz-1.5});
+      }else if(this.zone==="assembly"){
+        const beltZ=roomZ;
+        for(const offset of [-2.3,2.3]){
+          const belt=new THREE.Group();belt.position.set(roomX,0,beltZ+offset);
+          box(belt,new THREE.BoxGeometry(9.2,.2,1.4),lib.metal,0,.72,0);
+          box(belt,new THREE.BoxGeometry(8.8,.07,1.1),lib.dark,0,.86,0);
+          for(let roller=0;roller<15;roller++){
+            const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,1.2,8),lib.handle);
+            wheel.rotation.z=Math.PI/2;wheel.position.set(-4.25+roller*.61,.58,0);belt.add(wheel);
+          }
+          for(let crate=0;crate<3;crate++)box(belt,new THREE.BoxGeometry(.62,.54,.48),lib.crate,-2.6+crate*2.4,1.22,.12);
+          belt.userData.level3AssemblyLine=true;g.add(belt);
+          this.collisionSegments.push({x1:roomX-4.7,z1:beltZ+offset-.78,x2:roomX+4.7,z2:beltZ+offset-.78},{x1:roomX+4.7,z1:beltZ+offset-.78,x2:roomX+4.7,z2:beltZ+offset+.78},{x1:roomX+4.7,z1:beltZ+offset+.78,x2:roomX-4.7,z2:beltZ+offset+.78},{x1:roomX-4.7,z1:beltZ+offset+.78,x2:roomX-4.7,z2:beltZ+offset-.78});
         }
+      }else if(this.zone==="boiler"){
+        for(let i=0;i<3;i++){
+          const bx=roomX-4+i*4,bz=roomZ;
+          const tank=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,3.1,16),lib.rustMetal);
+          tank.position.set(bx,1.65,bz);g.add(tank);
+          const cap=new THREE.Mesh(new THREE.SphereGeometry(1.04,14,8,0,Math.PI*2,0,Math.PI/2),lib.metal);
+          cap.position.set(bx,3.18,bz);g.add(cap);
+          addPipeRun(bx,bz-1,bx,roomZ-6,2.45,.12,lib.rustMetal);
+          this.collisionSegments.push({x1:bx-1.1,z1:bz-1.1,x2:bx+1.1,z2:bz-1.1},{x1:bx+1.1,z1:bz-1.1,x2:bx+1.1,z2:bz+1.1},{x1:bx+1.1,z1:bz+1.1,x2:bx-1.1,z2:bz+1.1},{x1:bx-1.1,z1:bz+1.1,x2:bx-1.1,z2:bz-1.1});
+        }
+      }else if(this.zone==="sanctum"){
+        // A darker, atypical chamber with Greco-Roman pillars and a worn statue.
+        const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.42,.54,3.45,12),lib.officePlastic);
+        for(const px of [-4.7,4.7])for(const pz of [-4.7,4.7]){
+          const copy=pillar.clone();copy.position.set(roomX+px,1.72,roomZ+pz);g.add(copy);
+          const capital=new THREE.Mesh(new THREE.CylinderGeometry(.68,.58,.2,12),lib.officePlastic);
+          capital.position.set(roomX+px,3.48,roomZ+pz);g.add(capital);
+        }
+        const plinth=new THREE.Mesh(new THREE.BoxGeometry(1.9,.5,1.9),lib.rustMetal);
+        plinth.position.set(roomX, .25,roomZ);g.add(plinth);
+        const statue=new THREE.Mesh(new THREE.ConeGeometry(.7,2.25,8),lib.officePlastic);
+        statue.position.set(roomX,1.62,roomZ);g.add(statue);
+        const stained=new THREE.Mesh(new THREE.PlaneGeometry(3.2,2.2),lib.windowDark);
+        stained.position.set(roomX,2.25,roomZ-6.8);g.add(stained);
+      }else{
+        const storage=new THREE.Group();storage.position.set(roomX,0,roomZ);
+        for(let i=0;i<4;i++){
+          box(storage,new THREE.BoxGeometry(.09,2.35,.09),lib.metal,-2.1+i*1.4,1.18,0);
+          box(storage,new THREE.BoxGeometry(1.4,.08,.42),lib.rustMetal,-1.4+i*1.4,.7,0);
+          box(storage,new THREE.BoxGeometry(1.2,.5,.7),lib.crate,-1.4+i*1.4,1.05,.08);
+        }
+        g.add(storage);
       }
-
-      // A slow conveyor occupies one side bay, not the central walking aisle.
-      const beltX=this.originX+size*.5,beltZ=this.originZ+size*.84,belt=new THREE.Group();belt.position.set(beltX,0,beltZ);
-      box(belt,new THREE.BoxGeometry(7.2,.22,1.35),lib.metal,0,.62,0);
-      box(belt,new THREE.BoxGeometry(6.95,.08,1.02),lib.dark,0,.78,0);
-      for(let roller=0;roller<11;roller++){
-        const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,1.2,8),lib.handle);
-        wheel.rotation.z=Math.PI/2;wheel.position.set(-3.2+roller*.64,.48,0);belt.add(wheel);
-      }
-      g.add(belt);
-      const beltHalfX=3.6,beltHalfZ=.675;this.collisionSegments.push({x1:beltX-beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ-beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ-beltHalfZ,x2:beltX+beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX+beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ+beltHalfZ},{x1:beltX-beltHalfX,z1:beltZ+beltHalfZ,x2:beltX-beltHalfX,z2:beltZ-beltHalfZ});
+      roomGroup.userData.level3RoomType=this.zone;
+      g.add(roomGroup);
+      this.rooms.push({x:Math.floor(cells*.72),z:Math.floor(cells*.72),w:3,h:3,type:this.zone});
+      // The side-room doorway is visibly marked but not sealed; the gate props
+      // above are separate dead-end passages, never chunk-to-chunk blockers.
     }else if(level.id==="4"){
-      // Level 4 canon (wiki + Escape the Backrooms reference):
-      // empty commercial office — white columns, grey carpet, drop-ceiling
-      // fluorescents, sparse desks. Open sightlines. NOT a yellow maze.
       const rng=new RNG(this.seedKey()^0x44aa);
-      const colMat=lib.officeColumn||lib.pillar||lib.officePlastic;
+      const colMat=lib.officeColumn||lib.officePlastic;
       const wallMat=lib.officePlastic;
-      const door=1.4;
-      const cx=this.originX+size/2,cz=this.originZ+size/2;
-
-      const addOfficeWall=(x1,z1,x2,z2,height=level.wallHeight,material=wallMat)=>{
-        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
+      const cx=this.originX+size/2,cz=this.originZ+size/2,doorWidth=1.65;
+      const roomSpecs=[
+        {type:"open-office",x:.17,z:.17,w:.28,h:.28},
+        {type:"workroom",x:.55,z:.17,w:.28,h:.28},
+        {type:"meeting-room",x:.17,z:.55,w:.28,h:.28},
+        {type:"break-room",x:.55,z:.55,w:.28,h:.28},
+        {type:"copy-room",x:.37,z:.37,w:.26,h:.22},
+        {type:"empty-office",x:.37,z:.67,w:.26,h:.16}
+      ];
+      const addOfficeWall=(x1,z1,x2,z2,height=3.35,material=wallMat)=>{
+        const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz);
         if(length<.25)return;
-        box(g,new THREE.BoxGeometry(length,height,.14),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        box(g,new THREE.BoxGeometry(length,height,.15),material,(x1+x2)/2,height/2,(z1+z2)/2,0,-Math.atan2(dz,dx),0);
         this.collisionSegments.push({x1,z1,x2,z2});
       };
-
-      // Perimeter with door gaps so streamed chunks connect
-      const o0x=this.originX+.2,o0z=this.originZ+.2,o1x=this.originX+size-.2,o1z=this.originZ+size-.2;
-      addOfficeWall(o0x,o0z,cx-door/2,o0z);
-      addOfficeWall(cx+door/2,o0z,o1x,o0z);
-      addOfficeWall(o0x,o1z,cx-door/2,o1z);
-      addOfficeWall(cx+door/2,o1z,o1x,o1z);
-      addOfficeWall(o0x,o0z,o0x,cz-door/2);
-      addOfficeWall(o0x,cz+door/2,o0x,o1z);
-      addOfficeWall(o1x,o0z,o1x,cz-door/2);
-      addOfficeWall(o1x,cz+door/2,o1x,o1z);
-
-      // Sparse structural columns are instanced. The old 6 m grid created
-      // more than 3,800 collision edges in one chunk and made the office feel
-      // like a parking garage instead of an open commercial floor plate.
-      const spacing=Math.max(16,cell*1.5),columnPositions=[];
-      for(let z=this.originZ+spacing;z<this.originZ+size-spacing*.45;z+=spacing){
-        for(let x=this.originX+spacing;x<this.originX+size-spacing*.45;x+=spacing)columnPositions.push({x,z});
+      const addOfficePartition=(axis,fixed,start,end,opening,width=doorWidth,height=3.35)=>{
+        const a=opening-width/2,b=opening+width/2;
+        if(axis==="z"){
+          if(a>start)addOfficeWall(fixed,start,fixed,a,height);
+          if(b<end)addOfficeWall(fixed,b,fixed,end,height);
+        }else{
+          if(a>start)addOfficeWall(start,fixed,a,fixed,height);
+          if(b<end)addOfficeWall(b,fixed,end,fixed,height);
+        }
+      };
+      // Connected cross-hallways continue cleanly through every streamed edge.
+      for(const x of [this.originX+.22,this.originX+size-.22]){
+        const opening=cz;
+        addOfficePartition("z",x,this.originZ+.2,this.originZ+size-.2,opening,2.0,level.wallHeight);
       }
-      const columnDummy=new THREE.Object3D();
-      const columnMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,columnPositions.length);
-      const baseMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.95,.1,.95),colMat,columnPositions.length);
-      const capMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.95,.1,.95),colMat,columnPositions.length);
-      columnPositions.forEach((p,i)=>{
-        columnDummy.position.set(p.x,level.wallHeight/2,p.z);columnDummy.updateMatrix();columnMesh.setMatrixAt(i,columnDummy.matrix);
-        columnDummy.position.set(p.x,.05,p.z);columnDummy.updateMatrix();baseMesh.setMatrixAt(i,columnDummy.matrix);
-        columnDummy.position.set(p.x,level.wallHeight-.05,p.z);columnDummy.updateMatrix();capMesh.setMatrixAt(i,columnDummy.matrix);
-        const hr=.48;this.collisionSegments.push(
-          {x1:p.x-hr,z1:p.z-hr,x2:p.x+hr,z2:p.z-hr},{x1:p.x+hr,z1:p.z-hr,x2:p.x+hr,z2:p.z+hr},
-          {x1:p.x+hr,z1:p.z+hr,x2:p.x-hr,z2:p.z+hr},{x1:p.x-hr,z1:p.z+hr,x2:p.x-hr,z2:p.z-hr}
-        );
-      });
-      columnMesh.instanceMatrix.needsUpdate=true;baseMesh.instanceMatrix.needsUpdate=true;capMesh.instanceMatrix.needsUpdate=true;
-      g.add(columnMesh,baseMesh,capMesh);
+      for(const z of [this.originZ+.22,this.originZ+size-.22]){
+        addOfficePartition("x",z,this.originX+.2,this.originX+size-.2,cx,2.0,level.wallHeight);
+      }
+      // Perimeter and internal office dividers create a readable connected plan.
+      addOfficePartition("z",this.originX+size*.50,this.originZ+1,this.originZ+size-1,this.originZ+size*.25,doorWidth);
+      addOfficePartition("x",this.originZ+size*.50,this.originX+1,this.originX+size-1,this.originX+size*.75,doorWidth);
+      addOfficePartition("z",this.originX+size*.25,this.originZ+1,this.originZ+size-1,this.originZ+size*.72,doorWidth);
+      addOfficePartition("z",this.originX+size*.75,this.originZ+1,this.originZ+size-1,this.originZ+size*.28,doorWidth);
+      addOfficePartition("x",this.originZ+size*.75,this.originX+1,this.originX+size-1,this.originX+size*.26,doorWidth);
+      addOfficePartition("x",this.originZ+size*.25,this.originX+1,this.originX+size-1,this.originX+size*.74,doorWidth);
 
-      // Dense fluorescent panel grid (drop ceiling)
-      for(let z=this.originZ+2.2;z<this.originZ+size-1.5;z+=3.0){
-        for(let x=this.originX+2.2;x<this.originX+size-1.5;x+=3.0){
-          if(rng.next()>.82)continue;
-          const mat=lib.light.clone();mat.emissiveIntensity=2.6;
-          const fixture=box(g,new THREE.BoxGeometry(1.4,.04,.58),mat,x,level.wallHeight-.06,z,0,rng.next()<.5?0:Math.PI/2,0);
-          fixture.userData.light=true;fixture.userData.baseEmissive=2.6;this.fixtures.push(fixture);
-          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.18,z),color:0xf4f6fa,baseIntensity:110,intensity:110,distance:16,decay:2,fixture});
+      // White support columns at corridor intersections (batched and collidable).
+      const columns=[];
+      const columnDummy=new THREE.Object3D();
+      for(const x of [this.originX+size*.25,this.originX+size*.75]){
+        for(const z of [this.originZ+size*.25,this.originZ+size*.75]){
+          columns.push({x,z});
+          const half=.42;
+          this.collisionSegments.push({x1:x-half,z1:z-half,x2:x+half,z2:z-half},{x1:x+half,z1:z-half,x2:x+half,z2:z+half},{x1:x+half,z1:z+half,x2:x-half,z2:z+half},{x1:x-half,z1:z+half,x2:x-half,z2:z-half});
+        }
+      }
+      const columnMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.72,level.wallHeight,.72),colMat,columns.length);
+      columns.forEach((p,i)=>{columnDummy.position.set(p.x,level.wallHeight/2,p.z);columnDummy.updateMatrix();columnMesh.setMatrixAt(i,columnDummy.matrix)});
+      columnMesh.instanceMatrix.needsUpdate=true;columnMesh.userData.isLevel4Columns=true;g.add(columnMesh);
+
+      // Drop-ceiling panels are instanced in two large batches, not thousands of meshes.
+      const tileMatrices=[],lightMatrices=[];
+      const tileDummy=new THREE.Object3D();
+      const tileStep=6,tileSize=5.9;
+      let panelIndex=0;
+      for(let z=this.originZ+3;z<this.originZ+size-2;z+=tileStep){
+        for(let x=this.originX+3;x<this.originX+size-2;x+=tileStep){
+          tileDummy.position.set(x,level.wallHeight+.035,z);tileDummy.updateMatrix();tileMatrices.push(tileDummy.matrix.clone());
+          if((panelIndex++%5===0)&&rng.next()<.82){
+            tileDummy.position.set(x,level.wallHeight+.095,z);tileDummy.rotation.y=rng.next()<.5?0:Math.PI/2;tileDummy.updateMatrix();lightMatrices.push(tileDummy.matrix.clone());tileDummy.rotation.y=0;
+          }
+        }
+      }
+      const tileMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(tileSize,.055,tileSize),lib.officeCeilingTile,tileMatrices.length);
+      tileMatrices.forEach((matrix,i)=>tileMesh.setMatrixAt(i,matrix));
+      tileMesh.instanceMatrix.needsUpdate=true;tileMesh.userData.isLevel4CeilingPanels=true;g.add(tileMesh);
+      if(lightMatrices.length){
+        const litPanels=new THREE.InstancedMesh(new THREE.BoxGeometry(1.65,.035,.64),lib.officeCeilingLight,lightMatrices.length);
+        lightMatrices.forEach((matrix,i)=>litPanels.setMatrixAt(i,matrix));
+        litPanels.instanceMatrix.needsUpdate=true;litPanels.userData.light=true;litPanels.userData.baseEmissive=1.45;litPanels.userData.isLevel4CeilingLights=true;
+        this.fixtures.push(litPanels);
+        g.add(litPanels);
+        // A small number of local sources support the panel rows without
+        // creating one PointLight for every ceiling tile.
+        for(let i=0;i<8;i++){
+          const x=this.originX+size*(.12+(i%4)*.25),z=this.originZ+size*(i<4?.25:.75);
+          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xe4e8e6,baseIntensity:13,intensity:13,distance:15,decay:2,fixture:litPanels});
         }
       }
 
-      // Sparse workroom alcoves with desks (furniture is rare in large areas)
-      for(let i=0;i<2;i++){
-        const ax=this.originX+size*(.2+i*.4),az=this.originZ+size*.8;
-        addOfficeWall(ax-2.5,az-2.3,ax+2.5,az-2.3,level.wallHeight*.95);
-        addOfficeWall(ax-2.5,az-2.3,ax-2.5,az+2.1,level.wallHeight*.95);
-        addOfficeWall(ax+2.5,az-2.3,ax+2.5,az+2.1,level.wallHeight*.95);
-        const desk=new THREE.Group();desk.position.set(ax,0,az-.4);
-        box(desk,new THREE.BoxGeometry(1.5,.1,.7),lib.officeWood,0,.76,0);
-        for(const [lx,lz] of [[-.6,-.25],[.6,-.25],[-.6,.25],[.6,.25]])box(desk,new THREE.BoxGeometry(.07,.76,.07),lib.officeWood,lx,.38,lz);
-        box(desk,new THREE.BoxGeometry(.48,.4,.35),lib.dark,0,1.05,-.05);
+      // Windows line the outer office walls. Most have opaque blinds/dark glass;
+      // occasional panes show the rainy, foggy exterior described by Fandom.
+      const addOfficeWindow=(x,z,rotation,index)=>{
+        const windowGroup=new THREE.Group();windowGroup.position.set(x,2.18,z);windowGroup.rotation.y=rotation;
+        const rainy=index%5===0;
+        const pane=box(windowGroup,new THREE.BoxGeometry(2.75,1.42,.035),rainy?lib.officeWindowGlass:lib.windowDark,0,0,0);
+        pane.userData.isLevel4Window=true;pane.userData.rainy=rainy;
+        for(const y of [-.76,.76])box(windowGroup,new THREE.BoxGeometry(2.95,.08,.1),lib.officeFileCabinet,0,y,0);
+        for(const xSide of [-1.43,1.43])box(windowGroup,new THREE.BoxGeometry(.08,1.58,.1),lib.officeFileCabinet,xSide,0,0);
+        if(rainy){
+          for(let streak=0;streak<9;streak++){
+            const sx=-1.25+streak*.31;
+            const drops=box(windowGroup,new THREE.BoxGeometry(.018,.8+rng.next()*.42,.012),lib.officeWindowStreak,sx,(rng.next()-.5)*.1,.03);
+            drops.userData.isLevel4RainStreak=true;
+          }
+        }
+        windowGroup.userData.isLevel4Window=true;
+        g.add(windowGroup);
+      };
+      let windowIndex=0;
+      for(const side of ["north","south","east","west"]){
+        for(const t of [.24,.76]){
+          const x=side==="west"?this.originX+.24:side==="east"?this.originX+size-.24:this.originX+size*t;
+          const z=side==="north"?this.originZ+.24:side==="south"?this.originZ+size-.24:this.originZ+size*t;
+          addOfficeWindow(x,z,side==="west"||side==="east"?Math.PI/2:0,windowIndex++);
+        }
+      }
+
+      const addDesk=(x,z,rotation=0,monitor=true)=>{
+        const desk=new THREE.Group();desk.position.set(x,0,z);desk.rotation.y=rotation;
+        box(desk,new THREE.BoxGeometry(1.7,.09,.78),lib.officeWood,0,.76,0);
+        for(const dx of [-.72,.72])for(const dz of [-.29,.29])box(desk,new THREE.BoxGeometry(.065,.74,.065),lib.officeFileCabinet,dx,.37,dz);
+        if(monitor){
+          box(desk,new THREE.BoxGeometry(.58,.42,.055),lib.dark,0,1.04,-.23);
+          box(desk,new THREE.BoxGeometry(.72,.055,.42),lib.officeFileCabinet,0,.82,-.23);
+        }
         g.add(desk);
-        const chair=new THREE.Group();chair.position.set(ax,0,az+.75);
-        box(chair,new THREE.BoxGeometry(.55,.08,.55),lib.officeWood,0,.46,0);
-        box(chair,new THREE.BoxGeometry(.55,.5,.08),lib.officeWood,0,.75,-.22);
+        this.collisionSegments.push({x1:x-.9,z1:z-.48,x2:x+.9,z2:z-.48},{x1:x+.9,z1:z-.48,x2:x+.9,z2:z+.48},{x1:x+.9,z1:z+.48,x2:x-.9,z2:z+.48},{x1:x-.9,z1:z+.48,x2:x-.9,z2:z-.48});
+      };
+      const addChair=(x,z)=>{
+        const chair=new THREE.Group();chair.position.set(x,0,z);
+        box(chair,new THREE.BoxGeometry(.54,.09,.54),lib.officeCubicle,0,.48,0);
+        box(chair,new THREE.BoxGeometry(.54,.58,.08),lib.officeCubicle,0,.78,-.23);
         g.add(chair);
+      };
+      const addRoomTag=(type,x,z)=>{
+        const marker=new THREE.Group();marker.position.set(x,0,z);
+        marker.userData.isLevel4OfficeRoom=true;marker.userData.level4RoomType=type;
+        g.add(marker);this.rooms.push({x:Math.floor((x-this.originX)/cell),z:Math.floor((z-this.originZ)/cell),w:2,h:2,type});
+        return marker;
+      };
+      for(const room of roomSpecs){
+        const x=this.originX+size*(room.x+room.w/2),z=this.originZ+size*(room.z+room.h/2);
+        const marker=addRoomTag(room.type,x,z);
+        if(room.type==="workroom"||room.type==="open-office"){
+          for(let row=0;row<2;row++)for(let col=0;col<2;col++){
+            const dx=x-2.2+col*2.8,dz=z-1.6+row*3.0;
+            addDesk(dx,dz,0,true);addChair(dx,dz+1.05);
+          }
+          // Low cubicle dividers split the desks into small work bays.
+          for(const dx of [-1.0,1.8])box(g,new THREE.BoxGeometry(.08,1.45,5.1),lib.officeCubicle,x+dx, .725,z+.15);
+          for(const dz of [-1.45,1.75])box(g,new THREE.BoxGeometry(5.6,1.45,.08),lib.officeCubicle,x+.35,.725,z+dz);
+        }else if(room.type==="meeting-room"){
+          box(g,new THREE.BoxGeometry(4.4,.12,1.55),lib.officeWood,x,.78,z);
+          for(let i=0;i<6;i++){
+            const side=i<3?-1:1,index=i%3;
+            const chair=new THREE.Group();chair.position.set(x+side*2.8,0,z-1+index);
+            box(chair,new THREE.BoxGeometry(.58,.1,.58),lib.officeCubicle,0,.48,0);
+            box(chair,new THREE.BoxGeometry(.58,.62,.08),lib.officeCubicle,0,.8,-.22);g.add(chair);
+          }
+        }else if(room.type==="break-room"){
+          box(g,new THREE.BoxGeometry(2.1,.12,.85),lib.officeWood,x,.78,z-2);
+          box(g,new THREE.BoxGeometry(.64,1.7,.55),lib.officePlastic,x-3,.85,z);
+          box(g,new THREE.BoxGeometry(.4,.36,.4),lib.water,x-3,1.78,z);
+          box(g,new THREE.BoxGeometry(.95,1.9,.85),lib.officeFileCabinet,x+3,.95,z);
+          for(const dx of [-1.3,1.3])addChair(x+dx,z+.75);
+        }else if(room.type==="copy-room"){
+          box(g,new THREE.BoxGeometry(1.1,.95,.88),lib.officePlastic,x,.65,z);
+          box(g,new THREE.BoxGeometry(1.16,.12,.92),lib.officeFileCabinet,x,1.15,z);
+          box(g,new THREE.BoxGeometry(.3,.08,.22),lib.dark,x,1.26,z);
+          addDesk(x+2,z+1,Math.PI/2,false);
+        }else if(room.type==="empty-office"){
+          addDesk(x-1.5,z,0,true);addChair(x-1.5,z+1.1);
+          box(g,new THREE.BoxGeometry(.88,1.7,.55),lib.officeFileCabinet,x+2,.85,z);
+        }else{
+          addDesk(x-1,z,0,true);addDesk(x+1,z+1.7,Math.PI/2,true);
+        }
+        marker.userData.roomFurnished=room.type!=="empty-office";
       }
-
-      // 1-3 free desks on the open plate
-      for(let i=0;i<1+rng.int(0,2);i++){
-        const ox=this.originX+size*(.28+rng.next()*.45),oz=this.originZ+size*(.28+rng.next()*.3);
-        const desk=new THREE.Group();desk.position.set(ox,0,oz);desk.rotation.y=rng.next()<.5?0:Math.PI/2;
-        box(desk,new THREE.BoxGeometry(1.4,.1,.65),lib.officeWood,0,.76,0);
-        for(const [lx,lz] of [[-.55,-.22],[.55,-.22],[-.55,.22],[.55,.22]])box(desk,new THREE.BoxGeometry(.07,.76,.07),lib.officeWood,lx,.38,lz);
-        g.add(desk);
-        const half=.85;this.collisionSegments.push(
-          {x1:ox-half,z1:oz-half,x2:ox+half,z2:oz-half},{x1:ox+half,z1:oz-half,x2:ox+half,z2:oz+half},
-          {x1:ox+half,z1:oz+half,x2:ox-half,z2:oz+half},{x1:ox-half,z1:oz+half,x2:ox-half,z2:oz-half}
-        );
+      // Small interior hall signs and an exit-facing stairwell door landmark.
+      for(let i=0;i<5;i++){
+        const x=this.originX+size*(.16+i*.17);
+        const sign=box(g,new THREE.BoxGeometry(.65,.28,.035),lib.officeFileCabinet,x,2.65,this.originZ+size*.5);
+        sign.userData.level4OfficeSign=true;
       }
-
-      // Blacked-out windows (canon traps)
-      for(const [wx,wz,rot] of [[cx,this.originZ+.25,0],[cx,this.originZ+size-.25,0],[this.originX+.25,cz,Math.PI/2],[this.originX+size-.25,cz,Math.PI/2]]){
-        const wg=new THREE.Group();wg.position.set(wx,2.05,wz);wg.rotation.y=rot;
-        box(wg,new THREE.BoxGeometry(2.8,1.4,.04),lib.windowDark,0,0,0);
-        box(wg,new THREE.BoxGeometry(2.9,.08,.06),lib.trim,0,.72,0);
-        box(wg,new THREE.BoxGeometry(2.9,.08,.06),lib.trim,0,-.72,0);
-        g.add(wg);
-      }
-
-      // Water cooler
-      if(rng.next()<.75){
-        const vx=this.originX+size*.14,vz=this.originZ+size*.38;
-        box(g,new THREE.BoxGeometry(.55,1.35,.45),lib.officePlastic,vx,.68,vz);
-        box(g,new THREE.BoxGeometry(.32,.32,.32),lib.water,vx,1.55,vz);
-      }
-        }else if(level.id==="5"){
+    }else if(level.id==="5"){
       const rng=new RNG(this.seedKey()^0x5a11);
       // 1930s hotel: more tables, lamps, lobby chairs, and side cabinets.
       for(let i=0;i<3+rng.int(0,2);i++){
@@ -2433,7 +2631,8 @@ class WorldStreamer{
       const k=this.key(cx+dx,cz+dz);
       if(!this.chunks.has(k)){
         const c=new Chunk(this,cx+dx,cz+dz);this.chunks.set(k,c);this.game.scene.add(c.group);changed=true;
-        if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<.055)c.entitySpawn=true;
+        const entityChance=this.game.level.id==="3"?.13:this.game.level.id==="4"?.012:.055;
+        if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&c.level3RoomType!=="sanctum"&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<entityChance)c.entitySpawn=true;
       }
     }
     for(const [k,c] of this.chunks){
@@ -3237,7 +3436,7 @@ class EntityManager{
     const e={
       key:key||"manual:"+(++this.serial),type,def,group,state:"idle",cool:0,age:0,motion:0,
       lastSeen:null,lastHeard:null,lastPlayerX:this.game.player.position.x,lastPlayerZ:this.game.player.position.z,
-      stalkSeed:Math.random()*1000,waypoint:null,path:null,pathIndex:0,pathTimer:0,pathKey:"",model:null,soundTimer:1+Math.random()*3
+      stalkSeed:Math.random()*1000,waypoint:null,path:null,pathIndex:0,pathTimer:0,pathKey:"",model:null,soundTimer:1+Math.random()*3,squadId:null
     };
     this.entities.push(e);
     this.modelLibrary.attach(e).catch(()=>{});
@@ -3259,8 +3458,8 @@ class EntityManager{
     const pools={
       "1":["duller","hound","skinstealer","smiler","clump","crawler","wretch"],
       "2":["smiler","hound","deathmoth"],
-      "3":["hound","deathmoth","skinstealer"],
-      "4":[],
+      "3":["hound","deathmoth","skinstealer","faceling","wretch","clump","smiler","deathrat"],
+      "4":["hound","duller"],
       "5":["deathmoth","hound","skinstealer","deathrat"],
       "6":[],
       "7":["leviathan","tiny"],
@@ -3269,19 +3468,27 @@ class EntityManager{
       "10":[]
     };
     for(const c of this.game.world.entitySpawns()){
-      const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key))continue;
+      const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key||e.squadId===key))continue;
       const pool=pools[this.game.level.id]||[this.game.level.entity];
       const rng=new RNG(c.seedKey()^0x4a91);
       const type=pool[Math.floor(rng.next()*pool.length)];
       const def=ENTITY_TYPES[type];if(!def)continue;
       const cell=this.game.level.cellSize,grid=this.game.level.gridSize||CELLS;
       const minSpawn=1,maxSpawn=Math.max(1,grid-2);
-      const x=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,z=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2;
-      const e=this.create(type,new THREE.Vector3(x,0,z),key);
-      if(e){
-        e.state="idle";
-        if(this.game.level.id==="7"&&type==="leviathan")e.group.position.y=-.72;
-        if(this.game.level.id==="7"&&type==="tiny")e.group.position.y=-.28;
+      const groupCount=this.game.level.id==="3"?(rng.next()<.28?3:2):1;
+      const squadId=this.game.level.id==="3"?key:null;
+      const baseX=c.originX+rng.int(minSpawn,maxSpawn)*cell+cell/2,baseZ=c.originZ+rng.int(minSpawn,maxSpawn)*cell+cell/2;
+      for(let member=0;member<groupCount;member++){
+        const angle=member/groupCount*Math.PI*2+rng.next()*.3,offset=groupCount>1?2.2+member*.35:0;
+        const position=new THREE.Vector3(baseX+Math.cos(angle)*offset,0,baseZ+Math.sin(angle)*offset);
+        const memberType=member===0?type:pool[Math.floor(rng.next()*pool.length)];
+        const e=this.create(memberType,position,groupCount>1?key+":"+member:key);
+        if(e){
+          e.squadId=squadId;
+          e.state="idle";
+          if(this.game.level.id==="7"&&type==="leviathan")e.group.position.y=-.72;
+          if(this.game.level.id==="7"&&type==="tiny")e.group.position.y=-.28;
+        }
       }
     }
   }
@@ -3301,6 +3508,14 @@ class EntityManager{
       const heard=entityNoise(this.game,e);
       if(visible)e.lastSeen=p.position.clone();
       if(heard)e.lastHeard=p.position.clone();
+      if(this.game.level.id==="3"&&e.squadId&&(visible||heard)){
+        const sharedPosition=(visible?e.lastSeen:e.lastHeard)?.clone();
+        if(sharedPosition)for(const ally of this.entities){
+          if(ally===e||ally.squadId!==e.squadId)continue;
+          if(visible)ally.lastSeen=sharedPosition.clone();
+          else if(!ally.lastSeen)ally.lastHeard=sharedPosition.clone();
+        }
+      }
       const target=e.lastSeen||e.lastHeard;
       if(target){
         const step=this.game.level.id==="0"?2.0:Math.max(1.5,Math.min(2.4,this.game.level.cellSize*.34));
@@ -3316,7 +3531,14 @@ class EntityManager{
       }
       if(d>72&&e.key.startsWith("manual:")){this.game.scene.remove(e.group);this.entities=this.entities.filter(x=>x!==e);continue}
       const def=e.def;
-      if(def.behavior==="light"){
+      if(this.game.level.id==="4"){
+        // Level 4 is overwhelmingly quiet. Rare Hound/Duller sightings should
+        // investigate briefly rather than immediately turning the office into
+        // a hostile encounter.
+        if(heard&&d<18)e.state="investigate";
+        else if(visible&&d<9)e.state="observe";
+        else e.state="idle";
+      }else if(def.behavior==="light"){
         // Smilers are drawn toward light. Eye contact/slow movement keeps the
         // encounter from instantly becoming a straight-line attack.
         const eyeToEntity=new THREE.Vector3(e.group.position.x-p.position.x,0,e.group.position.z-p.position.z).normalize();

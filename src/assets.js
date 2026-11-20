@@ -594,6 +594,12 @@ export function makeLibrary(level){
     leaf:new THREE.MeshStandardMaterial({color:0x5b5b3e,roughness:.98,metalness:0}),
     officePlastic:new THREE.MeshStandardMaterial({color:0xe8e8e4,roughness:.88,metalness:0}),
     officeColumn:new THREE.MeshStandardMaterial({color:0xf2f2ee,roughness:.9,metalness:0}),
+    officeCeilingTile:new THREE.MeshStandardMaterial({color:0xc9cdca,roughness:.94,metalness:0}),
+    officeCeilingLight:new THREE.MeshStandardMaterial({color:0xf4f5f0,roughness:.28,metalness:0,emissive:0xe5e9e6,emissiveIntensity:1.45}),
+    officeCubicle:new THREE.MeshStandardMaterial({color:0x737d7d,roughness:.92,metalness:0}),
+    officeFileCabinet:new THREE.MeshStandardMaterial({color:0x7b8180,roughness:.76,metalness:.18}),
+    officeWindowGlass:new THREE.MeshPhysicalMaterial({color:0x83939a,roughness:.2,metalness:.04,transparent:true,opacity:.76,clearcoat:.75,clearcoatRoughness:.12,depthWrite:false,side:THREE.DoubleSide}),
+    officeWindowStreak:new THREE.MeshStandardMaterial({color:0xb8c4c7,roughness:.24,metalness:0,transparent:true,opacity:.56,depthWrite:false}),
     indicator:new THREE.MeshStandardMaterial({color:0xff8a3c,roughness:.35,metalness:.1,emissive:0xff5d14,emissiveIntensity:2.2})
   };
 }
