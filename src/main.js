@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20261120-level1-ramp-texture-uv2";
+import { BackroomsGame } from "./game.js?v=20261120-startup-level3-level4-visuals2";
 import { installBackroomsFixes } from "./fixes.js?v=20260926-flashlight2";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20261120-level1-ramp-texture-uv2";
@@ -23,6 +23,9 @@ const registerCache=async()=>{
 
 registerCache();
 const game=new BackroomsGame();
+window.addEventListener("pageshow",event=>{
+  if(event.persisted)window.location.reload();
+});
 installBackroomsFixes(game,BackroomsAdmin);
 /* DEV_ADMIN_START */
 if(game.admin.enabled){

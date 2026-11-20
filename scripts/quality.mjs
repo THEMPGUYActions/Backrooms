@@ -390,6 +390,8 @@ async function checkLevelEnvironment(){
     if(!game.includes(token))fail("Level 10 wheat geometry missing realistic grain/awn detail: "+token);
   }
   if(!assets.includes('wheat:new THREE.MeshStandardMaterial({color:0xffffff'))fail("Wheat material must allow per-instance natural straw variation");
+  if(!game.includes('this.sky.visible=openSky&&! ["7","10"].includes(this.level.id)'))fail("Level 10 must use the reliable daylight background instead of the night-prone atmospheric sky shader");
+  if(!game.includes('this.daylight.intensity=this.level.id==="10"?1.15'))fail("Level 10 must have direct daylight illumination");
 }
 
 async function checkGameplayPhysicsAndRendering(){
@@ -405,7 +407,7 @@ async function checkGameplayPhysicsAndRendering(){
     if(!game.includes(token))fail("Player physics contract missing: "+token);
   }
   if(game.includes("Math.sin(this.pitch)*swimInput"))fail("Swimming must not be controlled by camera pitch");
-  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(210,48,32),oceanSkyMaterial)",'this.oceanSky.visible=this.level.id==="7"','this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10"',"new THREE.PlaneGeometry(size,size,64,64)","backrooms-level7-world-waves-v2","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.55)*.075","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
+  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(210,48,32),oceanSkyMaterial)",'this.oceanSky.visible=this.level.id==="7"','this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10"',"new THREE.PlaneGeometry(size,size,128,128)","backrooms-level7-world-waves-v3","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.19","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
     if(!game.includes(token))fail("Level 7 sky, animated water, or buoyancy surface coupling missing: "+token);
   }
   if(!game.includes('this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4'))fail("Level 7 needs a non-black fallback sky background");
@@ -416,6 +418,28 @@ async function checkGameplayPhysicsAndRendering(){
   if(reflection.includes("this.scene.traverse"))fail("Puddle reflection must not traverse and hide the entire scene each update");
   if(!reflection.includes("camera.layers.enable(1)")||!reflection.includes("source.layers.mask&~(1<<1)"))fail("Puddle reflection must exclude puddles using a dedicated render layer");
   if(!game.includes("puddle.layers.set(1)"))fail("Puddles must use their own layer so the main camera can render them while reflections exclude them");
+}
+
+async function checkStartupAndLevelPresentation(){
+  const game=await readFile(join(root,"src/game.js"),"utf8");
+  const html=await readFile(join(root,"index.html"),"utf8");
+  const css=await readFile(join(root,"styles.css"),"utf8");
+  const main=await readFile(join(root,"src/main.js"),"utf8");
+  const sw=await readFile(join(root,"sw.js"),"utf8");
+  for(const token of ['id="loading-screen"','id="loading-fill"','id="loading-status"','id="loading-detail"']){
+    if(!html.includes(token))fail("Pre-intro loading UI is missing: "+token);
+  }
+  for(const token of ["async ensureAroundAsync(","const assetLoad=(async()=>","return assetLoad;","await this.world.ensureAroundAsync(0,0","await assetLoad;","await this.renderer.compileAsync(this.scene,this.camera)","this.preloadComplete=true"]){
+    if(!game.includes(token))fail("Startup must finish real world preparation before the intro starts: "+token);
+  }
+  if(game.indexOf("this.preloadComplete=true")>game.indexOf('document.getElementById("boot")?.classList.add("intro-ready")'))fail("Intro class must only be added after preloading completes");
+  if(!css.includes(".intro-ready .intro-title-page")||!css.includes("animation:intro-title-sequence 8.2s ease-in-out forwards"))fail("Intro cinematic must start its full title animation after preload completion");
+  if(!main.includes("if(event.persisted)window.location.reload()"))fail("Back-forward cache restoration must start a fresh intro timeline");
+  if(!sw.includes("backrooms-assets-v58"))fail("Service-worker cache version must change when startup and scene bundles change");
+  if(!game.includes("this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half})")||!game.includes("for(const rect of nearby?.solidRects||[])"))fail("Level 1 pillar collision must handle spawn points starting inside a solid pillar");
+  if(!game.includes("this.player.position.set(0,this.player.eyeY,0)")||!game.includes("addPanel(left+.14,z,Math.PI/2"))fail("Level 1 central spawn or Level 3 wall-mounted electrical panel layout missing");
+  if(!game.includes("addGate(cx,cz-size*.22,true)")||!game.includes("addGate(cx+size*.22,cz,false)"))fail("Level 3 barred gates must be located on visible main service corridors");
+  if(!game.includes("const addOfficeBoundary=(axis,fixed,start,end)=>")||!game.includes("addOfficeBoundary(\"x\",z")||!game.includes("lib.officeWindowGlass,0,2.15,0"))fail("Level 4 must use real exterior wall window openings rather than windows hidden in solid walls");
 }
 
 async function checkLevel2UtilityHallGeometry(){
@@ -676,6 +700,7 @@ await checkIndustrialPbrAssets();
 await checkLevelSpecificPbrAssets();
 await checkLevelEnvironment();
 await checkGameplayPhysicsAndRendering();
+await checkStartupAndLevelPresentation();
 await checkWorldTextureUVs();
 await checkLevel2UtilityHallGeometry();
 await checkExitPositionInitialization();
