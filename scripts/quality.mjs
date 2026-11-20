@@ -429,7 +429,40 @@ async function checkLevel2UtilityHallGeometry(){
   if(game.includes("const pipeGeometry=new THREE.CylinderGeometry(.105,.105,1,12)"))fail("Level 2 pipes must use length-scaled UV geometry instead of stretched instanced cylinders");
   if(!assets.includes("texture.wrapS=THREE.RepeatWrapping;")||!assets.includes("texture.wrapT=THREE.RepeatWrapping;"))fail("Loaded PBR maps must repeat for world-scaled UVs");
   if(!assets.includes('wallPrefix+"_color.jpg",true,1,.28'))fail("Industrial wall PBR maps must not add a second global repeat");
-}async function checkExitPositionInitialization(){
+}async function checkWorldTextureUVs(){
+  const assets=await readFile(join(root,"src/assets.js"),"utf8");
+  const game=await readFile(join(root,"src/game.js"),"utf8");
+  for(const token of [
+    "export function tileGeometryUV(geometry,material)",
+    "const tiledGeometryCache = new WeakMap()",
+    "tiled.userData.backroomsWorldTiled=true",
+    "texture.repeat.set(1,1)",
+    "material.userData.backroomsUvTileSize",
+    "new THREE.Mesh(tileGeometryUV(geometry,material),material)",
+    "texture=(await loadRemoteTexture(url,color)).clone()"
+  ]){
+    if(!assets.includes(token))fail("World-space texture UV mapping or isolated texture transforms missing: "+token);
+  }
+  for(const token of [
+    "tileGeometryUV(geometry,material)",
+    "tileGeometryUV(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete)",
+    "tileGeometryUV(new THREE.CylinderGeometry(.11,.11,3.8,10),lib.metal)",
+    "this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z)",
+    "obstacleSegments=this.collisionSegments.slice(this.baseCollisionSegmentCount)",
+    "const centerY=rise/2-.14*Math.cos(angle)",
+    "x-.7275",
+    "x+.7275",
+    "z-.7275",
+    "z+.7275",
+    "this.world.findSafeSpawn(this.player.position.x,this.player.position.z,.46)"
+  ]){
+    if(!game.includes(token))fail("Level geometry UV, ramp traversal, or safe spawn regression: "+token);
+  }
+  if(assets.includes("m.map.repeat.set(scale,scale)")||assets.includes("texture.repeat.set(repeat,repeat)"))fail("Texture maps must not be globally repeated on top of world-space geometry UVs");
+  if(game.includes('ceiling_tiles_color.png')&&game.includes('library.ceiling.map?.image?.src?.includes("ceiling_tiles_color.png")'))fail("Level 1 ceiling must use the stone/concrete map, not the Level 0 grid texture");
+}
+
+async function checkExitPositionInitialization(){
   const source=await readFile(join(root,"src/game.js"),"utf8");
   if(source.includes("this.exit.position.set("))fail("Special exits must initialize their position vector before assigning coordinates");
 }
@@ -638,6 +671,7 @@ await checkIndustrialPbrAssets();
 await checkLevelSpecificPbrAssets();
 await checkLevelEnvironment();
 await checkGameplayPhysicsAndRendering();
+await checkWorldTextureUVs();
 await checkLevel2UtilityHallGeometry();
 await checkExitPositionInitialization();
 await checkWorkflow();

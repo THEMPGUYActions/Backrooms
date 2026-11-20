@@ -1,7 +1,7 @@
-import { BackroomsGame } from "./game.js?v=20261120-level3-electrical-level4-office1";
+import { BackroomsGame } from "./game.js?v=20261120-level1-ramp-texture-uv2";
 import { installBackroomsFixes } from "./fixes.js?v=20260926-flashlight2";
 /* DEV_ADMIN_START */
-import { BackroomsAdmin } from "./admin.js?v=20261120-level3-electrical-level4-office1";
+import { BackroomsAdmin } from "./admin.js?v=20261120-level1-ramp-texture-uv2";
 /* DEV_ADMIN_END */
 
 const registerCache=async()=>{
