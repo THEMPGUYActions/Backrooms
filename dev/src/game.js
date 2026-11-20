@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level-refine1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level-pbr1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-open-sky-crops1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-open-sky-crops1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -623,7 +623,7 @@ class Chunk{
           const intensity=region==="red"?20:30;
           this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
         }
-      }else if(level.id!=="1"&&level.id!=="6"&&rngBase.next()<(level.id==="5"?.17:level.id==="9"?.025:.13)){
+      }else if(!["1","6","7","8","9","10"].includes(level.id)&&rngBase.next()<(level.id==="5"?.17:.13)){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
         const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
         const fixture=box(g,new THREE.BoxGeometry(3.7,.055,.72),material,px,level.wallHeight-.09,pz,0,rotation,0);fixture.userData.light=true;fixture.userData.baseEmissive=material.emissiveIntensity;this.fixtures.push(fixture);
@@ -1315,8 +1315,6 @@ class Chunk{
         box(chair,new THREE.BoxGeometry(.78,1.0,.16),lib.officeWood,0,1.02,-.32);room.add(chair);
         box(room,new THREE.BoxGeometry(1.0,.12,.62),lib.officeWood,.55,.52,.75);
         for(const x of [-.35,1.45])for(const z of [.5,1.0])box(room,new THREE.BoxGeometry(.07,.48,.07),lib.officeWood,x,.24,z);
-        const lamp=box(room,new THREE.CylinderGeometry(.14,.18,.32,10),lib.light,-2.8,3.0,-2.5);
-        lamp.userData.light=true;lamp.userData.baseEmissive=1.2;
         g.add(room);
         this.collisionSegments.push(
           {x1:-4.3,z1:-4.3,x2:4.3,z2:-4.3},{x1:-4.3,z1:-4.3,x2:-4.3,z2:4.3},
@@ -1461,18 +1459,46 @@ class Chunk{
       }
     }else if(level.id==="10"){
       const rng=new RNG(this.seedKey()^0x10c0);
-      const stalkGeometry=new THREE.CylinderGeometry(.018,.032,1.35,4),headGeometry=new THREE.ConeGeometry(.055,.34,5);
+      const stalkGeometry=new THREE.CylinderGeometry(.009,.025,1.45,5,3);
+      const headGeometry=new THREE.CylinderGeometry(.018,.028,.34,6,2);
+      const kernelGeometry=new THREE.SphereGeometry(.027,5,4);
+      const awnGeometry=new THREE.CylinderGeometry(.0015,.005,.24,3);
       const cropCount=isTouchControlsDevice()?1400:3000;
-      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount),heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
-      const dummy=new THREE.Object3D();let count=0;
+      const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount);
+      const heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
+      const kernels=new THREE.InstancedMesh(kernelGeometry,lib.wheatHead,cropCount*8);
+      const awns=new THREE.InstancedMesh(awnGeometry,lib.wheatHead,cropCount*6);
+      const dummy=new THREE.Object3D(),up=new THREE.Vector3(0,1,0),awnDirection=new THREE.Vector3(),grainColor=new THREE.Color(),stalkColor=new THREE.Color();
+      let count=0,kernelCount=0,awnCount=0;
       for(let i=0;i<cropCount;i++){
         const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2);
         if(Math.hypot(x-(this.originX+size/2),z-(this.originZ+size/2))<4)continue;
-        const height=.85+rng.next()*.65,angle=rng.next()*Math.PI*2;
-        dummy.position.set(x,height*.5,z);dummy.rotation.set(0,angle,Math.sin(angle)*.08);dummy.scale.set(1,height/1.35,1);dummy.updateMatrix();stalks.setMatrixAt(count,dummy.matrix);
-        dummy.position.y=height+.12;dummy.scale.set(1,height/1.35,1);dummy.updateMatrix();heads.setMatrixAt(count,dummy.matrix);count++;
+        const height=1.0+rng.next()*.58,lean=(rng.next()-.5)*.22,heading=rng.next()*Math.PI*2;
+        dummy.position.set(x,height*.5,z);dummy.rotation.set(Math.sin(heading)*lean,heading,Math.cos(heading)*lean);dummy.scale.set(.82+rng.next()*.3,height/1.45,.82+rng.next()*.3);dummy.updateMatrix();stalks.setMatrixAt(count,dummy.matrix);
+        stalkColor.setHSL(.19+rng.next()*.025,.34,.28+rng.next()*.10);stalks.setColorAt(count,stalkColor);
+        dummy.position.set(x,height+.12,z);dummy.scale.set(.9,.9,.9);dummy.updateMatrix();heads.setMatrixAt(count,dummy.matrix);
+        grainColor.setHSL(.115+rng.next()*.025,.52,.40+rng.next()*.13);heads.setColorAt(count,grainColor);
+        // Eight overlapping kernels form a plump, irregular grain head.
+        for(let row=0;row<4;row++)for(let side=0;side<2;side++){
+          const angle=heading+row*Math.PI*.72+side*Math.PI;
+          const radius=.022+(row%2)*.006;
+          dummy.position.set(x+Math.cos(angle)*radius,height+.015+row*.075,z+Math.sin(angle)*radius);
+          dummy.rotation.set(0,angle,0);dummy.scale.set(.78,.95,.78);dummy.updateMatrix();kernels.setMatrixAt(kernelCount,dummy.matrix);
+          grainColor.setHSL(.115+rng.next()*.025,.5,.39+rng.next()*.15);kernels.setColorAt(kernelCount,grainColor);kernelCount++;
+        }
+        // Fine bristles (awns) catch the overcast light and break up the toy-like silhouette.
+        for(let bristle=0;bristle<6;bristle++){
+          const angle=heading+bristle*Math.PI/3,tilt=.42+rng.next()*.22;
+          awnDirection.set(Math.cos(angle)*tilt,1,Math.sin(angle)*tilt).normalize();
+          dummy.position.set(x+Math.cos(angle)*.025,height+.16+(bristle%3)*.025,z+Math.sin(angle)*.025);
+          dummy.quaternion.setFromUnitVectors(up,awnDirection);dummy.scale.set(1,.9+rng.next()*.35,1);dummy.updateMatrix();awns.setMatrixAt(awnCount,dummy.matrix);
+          awns.setColorAt(awnCount,grainColor);awnCount++;
+        }
+        count++;
       }
-      stalks.count=count;heads.count=count;stalks.instanceMatrix.needsUpdate=true;heads.instanceMatrix.needsUpdate=true;g.add(stalks,heads);
+      stalks.count=count;heads.count=count;kernels.count=kernelCount;awns.count=awnCount;
+      for(const mesh of [stalks,heads,kernels,awns]){mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere()}
+      g.add(stalks,heads,kernels,awns);
       // Tree and shrub lines divide the cultivated plots, with shallow clean ponds between them.
       const treeCount=14;
       const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.12,.2,2.8,7),lib.treeBark,treeCount);
@@ -2115,7 +2141,7 @@ class WorldStreamer{
       this.ceilingSurface.matrixAutoUpdate=false;
       this.ceilingSurface.frustumCulled=false;
       this.ceilingSurface.renderOrder=-2;
-      this.ceilingSurface.visible=!( ["9","10"].includes(String(this.game.level.id)) );
+      this.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.game.level.id)) );
     }
     if(this.game.level.id==="7"){
       this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
@@ -2601,15 +2627,15 @@ class Player{
       );
       const underwater=this.position.y<.045;
       if(this.game.scene.fog){
-        this.game.scene.fog.color.setHex(underwater?0x061722:0x142b36);
-        this.game.scene.fog.density=underwater?.032:.008;
+        this.game.scene.fog.color.setHex(underwater?0x061722:0x718c98);
+        this.game.scene.fog.density=underwater?.032:.0028;
       }
     }else{
       this.inOcean=false;
       this.position.y=this.eyeY;
       if(this.game.level.id==="7"&&this.game.scene.fog){
-        this.game.scene.fog.color.setHex(0x142b36);
-        this.game.scene.fog.density=.008;
+        this.game.scene.fog.color.setHex(0x718c98);
+        this.game.scene.fog.density=.0028;
       }
     }
     if(this.game.redZoneTrapped&&this.game.redZoneBounds){
@@ -3321,6 +3347,7 @@ export class BackroomsGame{
     // the base fill very low so fluorescent fixtures and the flashlight carry
     // the scene.
     this.ambient=new THREE.HemisphereLight(0x4b3b20,0x050403,.045);this.scene.add(this.ambient);
+    this.daylight=new THREE.DirectionalLight(0xd8e0e4,0);this.daylight.position.set(-35,80,24);this.daylight.castShadow=false;this.scene.add(this.daylight);
     this.flashTarget=new THREE.Object3D();
     this.flashFillTarget=new THREE.Object3D();
     this.blackoutLight=new THREE.PointLight(0xffe8bd,0,2.6,2);
@@ -3600,11 +3627,12 @@ export class BackroomsGame{
     this.levelId=String(id);this.level=levelById(id);document.title="The Backrooms: Level "+this.level.id;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x555039:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.daylight.intensity=this.level.id==="10"?.72:this.level.id==="7"?.22:0;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
-    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["9","10"].includes(String(this.level.id)) );
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.level.id)) );
     this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
@@ -3622,7 +3650,7 @@ export class BackroomsGame{
       this.player.position.set(0,this.player.eyeY,0);
     }
     this.world.ensureAround(this.player.position.x,this.player.position.z);
-    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["9","10"].includes(String(this.level.id)) );
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.level.id)) );
     this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
