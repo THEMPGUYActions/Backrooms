@@ -633,7 +633,7 @@ class Chunk{
           const intensity=region==="red"?20:30;
           this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
         }
-      }else if(!["1","2","6","7","8","9","10"].includes(level.id)&&rngBase.next()<(level.id==="5"?.17:.13)){
+      }else if(!["1","2","3","4","6","7","8","9","10"].includes(level.id)&&rngBase.next()<(level.id==="5"?.17:.13)){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
         const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
         const fixture=box(g,new THREE.BoxGeometry(3.7,.055,.72),material,px,level.wallHeight-.09,pz,0,rotation,0);fixture.userData.light=true;fixture.userData.baseEmissive=material.emissiveIntensity;this.fixtures.push(fixture);

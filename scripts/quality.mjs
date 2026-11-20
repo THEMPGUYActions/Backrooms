@@ -385,7 +385,7 @@ async function checkLevelEnvironment(){
   if(!game.includes('["7","9","10"].includes(String(this.game.level.id))'))fail("Open-air levels 7, 9 and 10 must hide the global ceiling plane");
   if(!game.includes('["7","9","10"].includes(String(this.level.id))'))fail("Level changes must preserve open-air ceiling visibility");
   if(game.includes("0x142b36"))fail("Level 7 surface fog must not be reset to the old near-black tint each frame");
-  if(!game.includes('["1","2","6","7","8","9","10"].includes(level.id)'))fail("Generic fluorescent fixtures must be excluded from levels without indoor ceiling lights");
+  if(!game.includes('["1","2","3","4","6","7","8","9","10"].includes(level.id)'))fail("Generic fluorescent fixtures must be excluded from levels with authored lighting layouts");
   for(const token of ["const kernels=new THREE.InstancedMesh","const awns=new THREE.InstancedMesh","kernels.count=kernelCount;awns.count=awnCount"]){
     if(!game.includes(token))fail("Level 10 wheat geometry missing realistic grain/awn detail: "+token);
   }
