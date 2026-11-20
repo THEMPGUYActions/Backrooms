@@ -1,13 +1,14 @@
-const CACHE_NAME="backrooms-assets-v48";
+const CACHE_NAME="backrooms-assets-v50";
 const CORE=[
   "index.html",
   "styles.css",
-  "src/main.js?v=20261120-open-sky-crops1",
-  "src/game.js?v=20261120-open-sky-crops1",
+  "src/main.js?v=20261120-physics-sky-water1",
+  "src/game.js?v=20261120-physics-sky-water1",
   "src/entity-models.js",
-  "src/assets.js?v=20261120-open-sky-crops1",
-  "src/level1-wet.js?v=20261119-level1wet1",
-  "src/levels.js?v=20261120-open-sky-crops1",
+  "src/assets.js?v=20261120-physics-sky-water1",
+  "src/level1-wet.js?v=20261120-physics-sky-water1",
+  "src/input.js?v=20261120-physics-sky-water1",
+  "src/levels.js?v=20261120-physics-sky-water1",
   "src/audio.js",
   "src/levels.js",
   "src/admin.js",

@@ -14,6 +14,8 @@ export class InputManager {
     this.moveX = 0;
     this.moveY = 0;
     this.run = false;
+    this.swimUp = false;
+    this.swimDown = false;
     this.locked = false;
     this.joystickId = null;
     this.lookId = null;
@@ -89,6 +91,19 @@ export class InputManager {
     const endLook=e=>{if(e.pointerId===this.lookId)this.lookId=null;};
     look?.addEventListener("pointerup",endLook);look?.addEventListener("pointercancel",endLook);
 
+    const bindHold=(id,property)=>{
+      const button=document.getElementById(id);
+      if(!button)return;
+      const start=e=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);this[property]=true;};
+      const stop=()=>{this[property]=false;};
+      button.addEventListener("pointerdown",start);
+      button.addEventListener("pointerup",stop);
+      button.addEventListener("pointercancel",stop);
+      button.addEventListener("lostpointercapture",stop);
+    };
+    bindHold("mobile-swim-up","swimUp");
+    bindHold("mobile-swim-down","swimDown");
+
     const runButton=document.getElementById("mobile-run");
     runButton?.addEventListener("pointerdown",e=>{e.preventDefault();runButton.setPointerCapture(e.pointerId);this.run=true});
     runButton?.addEventListener("pointerup",()=>this.run=false);
@@ -124,4 +139,6 @@ export class InputManager {
   }
 
   wantsRun(){ return this.run || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"); }
+  wantsAscend(){ return this.swimUp || this.keys.has("Space"); }
+  wantsDive(){ return this.swimDown || this.keys.has("ControlLeft") || this.keys.has("ControlRight"); }
 }

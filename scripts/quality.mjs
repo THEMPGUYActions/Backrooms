@@ -385,11 +385,45 @@ async function checkLevelEnvironment(){
   if(!game.includes('["7","9","10"].includes(String(this.game.level.id))'))fail("Open-air levels 7, 9 and 10 must hide the global ceiling plane");
   if(!game.includes('["7","9","10"].includes(String(this.level.id))'))fail("Level changes must preserve open-air ceiling visibility");
   if(game.includes("0x142b36"))fail("Level 7 surface fog must not be reset to the old near-black tint each frame");
-  if(!game.includes('["1","6","7","8","9","10"].includes(level.id)'))fail("Generic fluorescent fixtures must be excluded from levels without indoor ceiling lights");
+  if(!game.includes('["1","2","6","7","8","9","10"].includes(level.id)'))fail("Generic fluorescent fixtures must be excluded from levels without indoor ceiling lights");
   for(const token of ["const kernels=new THREE.InstancedMesh","const awns=new THREE.InstancedMesh","kernels.count=kernelCount;awns.count=awnCount"]){
     if(!game.includes(token))fail("Level 10 wheat geometry missing realistic grain/awn detail: "+token);
   }
   if(!assets.includes('wheat:new THREE.MeshStandardMaterial({color:0xffffff'))fail("Wheat material must allow per-instance natural straw variation");
+}
+
+async function checkGameplayPhysicsAndRendering(){
+  const game=await readFile(join(root,"src/game.js"),"utf8");
+  const input=await readFile(join(root,"src/input.js"),"utf8");
+  const reflection=await readFile(join(root,"src/level1-wet.js"),"utf8");
+  const html=await readFile(join(root,"index.html"),"utf8");
+  const css=await readFile(join(root,"styles.css"),"utf8");
+  for(const token of ['import { Sky } from "three/addons/objects/Sky.js"',"this.sky=new Sky()","this.cloudLayer=new THREE.Mesh","skyUniforms.turbidity.value","this.daylight.intensity=this.level.id==="]){
+    if(!game.includes(token))fail("Atmospheric sky setup missing: "+token);
+  }
+  for(const token of ["this.velocity=new THREE.Vector3()","const buoyancy=9.81*1.25*submerged","const waterDrag=-this.verticalVelocity*2.6","input.wantsAscend()?1:0","input.wantsDive()?1:0"]){
+    if(!game.includes(token))fail("Player physics contract missing: "+token);
+  }
+  if(game.includes("Math.sin(this.pitch)*swimInput"))fail("Swimming must not be controlled by camera pitch");
+  if(!game.includes("new THREE.PlaneGeometry(size,size,32,32)"))fail("Level 7 water surface must be subdivided for wave displacement");
+  if(!input.includes("wantsAscend(){")||!input.includes("wantsDive(){"))fail("Explicit surface/dive input actions are missing");
+  if(!html.includes('id="mobile-swim-up"')||!html.includes('id="mobile-swim-down"'))fail("Mobile swimming controls are missing");
+  if(!css.includes("#mobile-controls.level-seven .touch-button.swim"))fail("Mobile swimming controls must be scoped to Level 7");
+  if(!reflection.includes("this.size=mobile?256:512")||!reflection.includes("this.frame++%3!==0"))fail("Puddle reflections must use reduced resolution and a throttled update cadence");
+  if(reflection.includes("this.scene.traverse"))fail("Puddle reflection must not traverse and hide the entire scene each update");
+  if(!reflection.includes("camera.layers.enable(1)")||!reflection.includes("source.layers.mask&~(1<<1)"))fail("Puddle reflection must exclude puddles using a dedicated render layer");
+  if(!game.includes("puddle.layers.enable(1)"))fail("Puddles must remain visible to the main camera while being excluded from reflections");
+}
+
+async function checkLevel2UtilityHallGeometry(){
+  const game=await readFile(join(root,"src/game.js"),"utf8");
+  const assets=await readFile(join(root,"src/assets.js"),"utf8");
+  for(const token of ["const tiledWallGeometry=(width,height,depth,tileSize=2.8)","uvs.setXY(i,x/tileSize,z/tileSize)","const addPipeRoute=(points,rusted=false)","new THREE.QuadraticBezierCurve3(elbowStart,pts[i+1],elbowEnd)","new THREE.TubeGeometry(curve,8,.105,10,false)","const addFrame=(x,z,alongZ)=>","const addTunnelLight=(x,z,alongZ,index)=>","this.surfaceSize=this.size*(this.radius*2+3)","surface.position.x=centerX;surface.position.z=centerZ;surface.updateMatrix()"]){
+    if(!game.includes(token))fail("Level 2 utility geometry or streamed-surface fix missing: "+token);
+  }
+  if(game.includes('!["1","6","7","8","9","10"].includes(level.id)&&rngBase.next()<'))fail("Level 2 must use corridor-authored lights instead of random generic fixtures");
+  if(!assets.includes('wallPrefix+"_color.jpg",true,1,.28'))fail("Industrial wall PBR maps must not apply an additional global repeat to physically tiled wall UVs");
+  if(!assets.includes('brick/color.jpg",true,1,.2'))fail("Utility brick maps must use the wall geometry's physical UV scale");
 }
 
 async function checkExitPositionInitialization(){
@@ -600,6 +634,8 @@ await checkAudioAssets();
 await checkIndustrialPbrAssets();
 await checkLevelSpecificPbrAssets();
 await checkLevelEnvironment();
+await checkGameplayPhysicsAndRendering();
+await checkLevel2UtilityHallGeometry();
 await checkExitPositionInitialization();
 await checkWorkflow();
 

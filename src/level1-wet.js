@@ -59,7 +59,8 @@ export class Level1Reflection{
     this.renderer=renderer;
     this.scene=scene;
     this.sourceCamera=camera;
-    this.size=mobile?384:768;
+    this.size=mobile?256:512;
+    camera.layers.enable(1);
     this.target=new THREE.WebGLRenderTarget(this.size,this.size,{
       minFilter:THREE.LinearFilter,
       magFilter:THREE.LinearFilter,
@@ -79,6 +80,9 @@ export class Level1Reflection{
     );
     this.material=null;
     this.frame=0;
+    this.lastTime=-Infinity;
+    this.lastPosition=new THREE.Vector3(Infinity,Infinity,Infinity);
+    this.lastDirection=new THREE.Vector3(0,0,0);
     this.direction=new THREE.Vector3();
     this.position=new THREE.Vector3();
     this.lookTarget=new THREE.Vector3();
@@ -93,13 +97,17 @@ export class Level1Reflection{
   render(time){
     if(!this.material)return;
     this.material.uniforms.time.value=time;
-    if(this.frame++%2!==0)return;
+    if(this.frame++%3!==0)return;
 
     const renderer=this.renderer,source=this.sourceCamera;
     source.updateMatrixWorld(true);
+    source.getWorldDirection(this.direction);
+    const moved=this.lastPosition.distanceToSquared(source.position)>.0016;
+    const turned=1-this.lastDirection.dot(this.direction)>.00035;
+    if(!moved&&!turned&&time-this.lastTime<.32)return;
+
     this.position.copy(source.position);
     this.position.y=.036-this.position.y;
-    source.getWorldDirection(this.direction);
     this.direction.y=-this.direction.y;
     this.up.copy(source.up);
     this.up.y=-this.up.y;
@@ -107,21 +115,17 @@ export class Level1Reflection{
     this.camera.position.copy(this.position);
     this.lookTarget.copy(this.position).add(this.direction);
     this.camera.lookAt(this.lookTarget);
-    this.camera.projectionMatrix.copy(source.projectionMatrix);
-    this.camera.projectionMatrixInverse.copy(source.projectionMatrixInverse);
-    this.camera.layers.mask=source.layers.mask;
+    this.camera.fov=source.fov;
+    this.camera.aspect=1;
+    this.camera.near=source.near;
+    this.camera.far=Math.min(source.far,120);
+    this.camera.updateProjectionMatrix();
+    this.camera.layers.mask=source.layers.mask&~(1<<1);
     this.camera.updateMatrixWorld(true);
     this.textureMatrix.copy(this.bias)
       .multiply(this.camera.projectionMatrix)
       .multiply(this.camera.matrixWorldInverse);
 
-    const hidden=[];
-    this.scene.traverse(object=>{
-      if(object.userData?.isLevel1Puddle&&object.visible){
-        hidden.push(object);
-        object.visible=false;
-      }
-    });
     const previousTarget=renderer.getRenderTarget();
     const previousAutoClear=renderer.autoClear;
     try{
@@ -129,10 +133,12 @@ export class Level1Reflection{
       renderer.setRenderTarget(this.target);
       renderer.clear();
       renderer.render(this.scene,this.camera);
+      this.lastPosition.copy(source.position);
+      this.lastDirection.copy(this.direction).setY(-this.direction.y);
+      this.lastTime=time;
     }finally{
       renderer.setRenderTarget(previousTarget);
       renderer.autoClear=previousAutoClear;
-      for(const object of hidden)object.visible=true;
     }
   }
   dispose(){
