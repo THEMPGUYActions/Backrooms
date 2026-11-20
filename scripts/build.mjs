@@ -7,6 +7,7 @@ const root = process.cwd();
 const dist = join(root, "dist");
 const pbrDir = join(dist, "assets", "pbr");
 const industrialPbrDir = join(pbrDir, "industrial");
+const levelSpecificPbrDir = join(pbrDir, "level-specific");
 const audioDir = join(dist, "assets", "audio");
 const ffDir = join(dist, "assets", "found-footage");
 const entityDir = join(dist, "assets", "entities");
@@ -54,6 +55,7 @@ async function copyLocalAssets(){
   const localPbr=join(root,"assets","pbr");
   const localAudio=join(root,"assets","audio");
   const localIndustrialPbr=join(localPbr,"industrial");
+  const localLevelSpecificPbr=join(localPbr,"level-specific");
   const localFoundFootage=join(root,"assets","found-footage");
 
   const requiredPbr=Object.keys(lock.files);
@@ -63,6 +65,21 @@ async function copyLocalAssets(){
     if(!info?.isFile())throw new Error("Missing committed PBR asset: "+filename);
     await cp(source,join(pbrDir,filename));
   }
+
+  const levelSpecificManifest=JSON.parse(await readFile(join(localLevelSpecificPbr,"manifest.json"),"utf8"));
+  if(levelSpecificManifest.license!=="CC0-1.0")throw new Error("Level-specific PBR assets must be CC0-1.0.");
+  for(const entry of levelSpecificManifest.files||[]){
+    const source=join(localLevelSpecificPbr,entry.path);
+    const info=await stat(source).catch(()=>null);
+    if(!info?.isFile())throw new Error("Missing level-specific PBR asset: "+entry.path);
+    const data=await readFile(source);
+    const sha256=createHash("sha256").update(data).digest("hex");
+    if(data.length!==entry.bytes||sha256!==entry.sha256)throw new Error("Level-specific PBR checksum mismatch: "+entry.path);
+    const target=join(levelSpecificPbrDir,entry.path);
+    await mkdir(join(target,".."),{recursive:true});
+    await cp(source,target);
+  }
+  await cp(join(localLevelSpecificPbr,"manifest.json"),join(levelSpecificPbrDir,"manifest.json"));
 
   for(const [filename,entry] of Object.entries(industrialLock.files||{})){
     const source=join(localIndustrialPbr,filename);
@@ -99,6 +116,7 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 await mkdir(pbrDir,{recursive:true});
 await mkdir(industrialPbrDir,{recursive:true});
+await mkdir(levelSpecificPbrDir,{recursive:true});
 await mkdir(audioDir,{recursive:true});
 await mkdir(ffDir,{recursive:true});
 await mkdir(entityDir,{recursive:true});
@@ -146,6 +164,7 @@ await writeFile(join(dist,".nojekyll"),"","utf8");
 
 console.log("Copied "+PBR_FILES.length+" committed CC0 OpenGameArt PBR maps.");
 console.log("Copied "+Object.keys(industrialLock.files).length+" committed ambientCG CC0 industrial PBR maps.");
+console.log("Copied "+JSON.parse(await readFile(join(levelSpecificPbrDir,"manifest.json"),"utf8")).files.length+" checksum-locked ambientCG CC0 level-specific PBR maps.");
 console.log("Copied "+Object.keys(audioLock.files).length+" committed CC0 audio assets.");
 console.log("Copied "+SPB_FILES.length+" committed Found Footage assets.");
 console.log("PBR manifest size: " + (await stat(join(pbrDir, "manifest.json"))).size + " bytes.");

@@ -351,6 +351,31 @@ async function checkIndustrialPbrAssets(){
   }catch(e){fail("Industrial PBR manifest invalid or missing: "+e.message)}
 }
 
+async function checkLevelSpecificPbrAssets(){
+  const sourceDir=join(root,"assets/pbr/level-specific");
+  const builtDir=join(root,"dist/assets/pbr/level-specific");
+  try{
+    const source=JSON.parse(await readFile(join(sourceDir,"manifest.json"),"utf8"));
+    const built=JSON.parse(await readFile(join(builtDir,"manifest.json"),"utf8"));
+    if(source.license!=="CC0-1.0"||source.license_url!=="https://ambientcg.com/license")fail("Level-specific PBR license metadata is invalid");
+    if(JSON.stringify(source)!==JSON.stringify(built))fail("Level-specific PBR build manifest differs from source lock");
+    if(source.resolution!=="1K-JPG")fail("Level-specific PBR maps must remain at the 1K-JPG tier");
+    if(source.files?.length!==21)fail("Level-specific PBR lock must contain exactly 21 maps");
+    for(const entry of source.files||[]){
+      if(!/^[a-z-]+\/(color|normalgl|roughness)\.jpg$/.test(entry.path))fail("Unexpected level-specific PBR path: "+entry.path);
+      if(!Number.isInteger(entry.bytes)||entry.bytes<=0||!/^[a-f0-9]{64}$/.test(entry.sha256||""))fail("Level-specific PBR checksum metadata invalid: "+entry.path);
+      for(const dir of [sourceDir,builtDir]){
+        try{
+          const data=await readFile(join(dir,entry.path));
+          const sha=createHash("sha256").update(data).digest("hex");
+          if(data.length!==entry.bytes||sha!==entry.sha256)fail("Level-specific PBR checksum mismatch: "+entry.path+" in "+dir);
+          if(data.length<4||data[0]!==0xff||data[1]!==0xd8||data[2]!==0xff)fail("Level-specific PBR asset is not JPEG: "+entry.path);
+        }catch{fail("Level-specific PBR asset missing: "+entry.path+" in "+dir)}
+      }
+    }
+  }catch(e){fail("Level-specific PBR manifest invalid or missing: "+e.message)}
+}
+
 async function checkAudioAssets(){
   let lock;
   try{lock=JSON.parse(await readFile(join(root,"data/audio-assets-lock.json"),"utf8"))}catch(e){fail("data/audio-assets-lock.json is missing or invalid: "+e.message);return}
@@ -552,6 +577,7 @@ await checkAssetSources();
 await checkSpacePotatoAssets();
 await checkAudioAssets();
 await checkIndustrialPbrAssets();
+await checkLevelSpecificPbrAssets();
 await checkWorkflow();
 
 for (const file of files) {

@@ -4,6 +4,7 @@ THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
 const LOCAL_INDUSTRIAL_ASSET_BASE = new URL("../assets/pbr/industrial/", import.meta.url).href;
+const LOCAL_LEVEL_PBR_BASE = new URL("../assets/pbr/level-specific/", import.meta.url).href;
 const LOCAL_FF_ASSET_BASE = new URL("../assets/found-footage/", import.meta.url).href
 
 export const FOUND_FOOTAGE_ASSET_SOURCES = Object.freeze({
@@ -229,7 +230,7 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
     if(kind==="normalMap")material.normalScale.set(normalStrength,normalStrength);
     material.needsUpdate=true;
   }catch(error){
-    console.warn("[Backrooms] OpenGameArt texture unavailable, keeping procedural fallback:",url,error);
+    console.warn("[Backrooms] Surface texture unavailable, keeping procedural fallback:",url,error);
   }
 }
 
@@ -376,12 +377,73 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
   library.rustMetal.color.setHex(0xffffff);
   library.rustMetal.roughness=.86;
   library.rustMetal.metalness=.48;
+  entries.push(
+    [library.brickWall,"map",LOCAL_LEVEL_PBR_BASE+"brick/color.jpg",true,2.4,.2,"Utility brick albedo"],
+    [library.brickWall,"roughnessMap",LOCAL_LEVEL_PBR_BASE+"brick/roughness.jpg",false,2.4,.2,"Utility brick roughness"],
+    [library.brickWall,"normalMap",LOCAL_LEVEL_PBR_BASE+"brick/normalgl.jpg",false,2.4,.28,"Utility brick normal"]
+  );
   let done=0;
   await Promise.all(entries.map(async([material,kind,file,color,repeat,normalStrength,label])=>{
-    await applyRemoteTexture(material,kind,LOCAL_INDUSTRIAL_ASSET_BASE+file,color,repeat,normalStrength);
+    const url=file.startsWith("http")?file:LOCAL_INDUSTRIAL_ASSET_BASE+file;
+    await applyRemoteTexture(material,kind,url,color,repeat,normalStrength);
     done++;onProgress(done/entries.length,"LOADING INDUSTRIAL PBR",label);
   }));
   onProgress(1,"INDUSTRIAL SURFACES READY","Bundled ambientCG CC0 materials loaded");
+  return true;
+}
+
+export async function applyLevelSpecificPBR(library,level,onProgress=()=>{}){
+  const carpet=BACKROOMS_PBR_SOURCES.carpet;
+  const sets={
+    "4":[[library.floor,"office-tile",2.8,.82,"Office floor tile"]],
+    "5":[
+      [library.floor,carpet,4.2,.94,"Hotel carpet"],
+      [library.mahogany,"hotel-wood",1.8,.72,"Hotel mahogany"],
+      [library.officeWood,"hotel-wood",1.8,.78,"Hotel timber"]
+    ],
+    "7":[[
+      library.concrete,
+      {
+        color:LOCAL_INDUSTRIAL_ASSET_BASE+"level3_concrete_color.jpg",
+        normal:LOCAL_INDUSTRIAL_ASSET_BASE+"level3_concrete_normal.jpg",
+        rough:LOCAL_INDUSTRIAL_ASSET_BASE+"level3_concrete_roughness.jpg"
+      },
+      2.6,.92,"Flooded concrete"
+    ]],
+    "8":[
+      [library.concrete,"cave-rock",3.4,.96,"Cave limestone"],
+      [library.floor,"soil",3.2,.98,"Cave sediment"]
+    ],
+    "9":[
+      [library.asphalt,"wet-asphalt",3.2,.88,"Residential asphalt"],
+      [library.wetAsphalt,"wet-asphalt",3.2,.24,"Wet road surface"],
+      [library.lawn,"grass",2.4,.98,"Suburban grass"]
+    ],
+    "10":[
+      [library.floor,"soil",3.4,.98,"Farm soil"],
+      [library.farmDirt,"soil",2.8,.98,"Farm dirt"],
+      [library.lawn,"grass",2.4,.99,"Field grass"]
+    ]
+  };
+  const entries=sets[level.id]||[];
+  if(!entries.length)return false;
+  let done=0,total=entries.length*3;
+  const maps=["color","normalgl","roughness"];
+  await Promise.all(entries.flatMap(([material,source,repeat,roughness,label])=>{
+    material.roughness=roughness;
+    material.color.setHex(0xffffff);
+    return maps.map(async map=>{
+      const kind=map==="color"?"map":map==="normalgl"?"normalMap":"roughnessMap";
+      const color=map==="color";
+      const normalStrength=map==="normalgl"?.32:.2;
+      const url=typeof source==="string"
+        ?LOCAL_LEVEL_PBR_BASE+source+"/"+map+".jpg"
+        :source[map==="color"?"color":map==="normalgl"?"normal":"rough"];
+      await applyRemoteTexture(material,kind,url,color,repeat,normalStrength);
+      done++;onProgress(done/total,"LOADING LEVEL SURFACES",label+" "+map);
+    });
+  }));
+  onProgress(1,"LEVEL SURFACES READY","Level-specific CC0 PBR maps loaded");
   return true;
 }
 

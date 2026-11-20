@@ -39,3 +39,22 @@ The converted OGG files are bundled at assets/audio/. The full lock and manifest
 ## Existing assets
 
 The existing OpenGameArt PBR and audio assets, and selected Found Footage reference textures, remain separately attributed in ATTRIBUTION.md and assets/README.md. Third-party files retain their original license terms; this project does not relicense them.
+
+
+## Level-specific PBR materials
+
+The following 1K JPG PBR maps are from ambientCG and are released under CC0 1.0 Universal:
+
+| Material set | ambientCG asset |
+| --- | --- |
+| Utility brick | [Bricks094](https://ambientcg.com/view?id=Bricks094) |
+| Office floor tile | [Tiles025](https://ambientcg.com/view?id=Tiles025) |
+| Hotel wood | [WoodFloor001](https://ambientcg.com/view?id=WoodFloor001) |
+| Cave rock | [Rocks025](https://ambientcg.com/view?id=Rocks025) |
+| Wet asphalt | [Asphalt025A](https://ambientcg.com/view?id=Asphalt025A) |
+| Grass | [Grass001](https://ambientcg.com/view?id=Grass001) |
+| Soil | [Ground068](https://ambientcg.com/view?id=Ground068) |
+
+License: https://ambientcg.com/license
+
+The exact files, sizes, and SHA-256 checksums are recorded in assets/pbr/level-specific/manifest.json.
