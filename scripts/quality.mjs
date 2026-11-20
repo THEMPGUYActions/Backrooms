@@ -415,7 +415,7 @@ async function checkGameplayPhysicsAndRendering(){
   if(!reflection.includes("this.size=mobile?256:512")||!reflection.includes("this.frame++%3!==0"))fail("Puddle reflections must use reduced resolution and a throttled update cadence");
   if(reflection.includes("this.scene.traverse"))fail("Puddle reflection must not traverse and hide the entire scene each update");
   if(!reflection.includes("camera.layers.enable(1)")||!reflection.includes("source.layers.mask&~(1<<1)"))fail("Puddle reflection must exclude puddles using a dedicated render layer");
-  if(!game.includes("puddle.layers.enable(1)"))fail("Puddles must remain visible to the main camera while being excluded from reflections");
+  if(!game.includes("puddle.layers.set(1)"))fail("Puddles must use their own layer so the main camera can render them while reflections exclude them");
 }
 
 async function checkLevel2UtilityHallGeometry(){

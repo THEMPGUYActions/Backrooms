@@ -228,6 +228,7 @@ function installManilaAdmin(adminClass){
       p.yaw=0;p.pitch=0;p.viewYaw=0;p.viewPitch=0;
       this.game.world.ensureAround(x,z);
       this.game.paused=false;
+      this.game.syncPageTitle?.();
       this.game.toast("TELEPORTED TO MANILA ROOM",1.8);
       this.sync();
     }catch(error){

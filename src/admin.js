@@ -241,6 +241,7 @@ export class BackroomsAdmin{
       const y=Number(this.root.querySelector("#admin-y")?.value||this.game.player.eyeY);
       const z=Number(this.root.querySelector("#admin-z")?.value||0);
       this.game.player.position.set(x,y,z);
+      this.game.syncPageTitle?.();
       this.game.toast("TELEPORTED",1);
     });
 
@@ -300,6 +301,7 @@ export class BackroomsAdmin{
       this.game.paused=wasPaused;
       this.game.introActive=false;
       this.game.introPlaying=false;
+      this.game.syncPageTitle?.();
       document.getElementById("hud")?.classList.remove("hidden");
       document.getElementById("mobile-controls")?.classList.toggle("hidden",matchMedia("(pointer:fine)").matches);
       const n=document.getElementById("level-number");if(n)n.textContent=level.number;
@@ -315,6 +317,7 @@ export class BackroomsAdmin{
       this.game.paused=wasPaused;
       this.game.introActive=false;
       this.game.introPlaying=false;
+      this.game.syncPageTitle?.();
       this.game.toast("ADMIN TELEPORT FAILED",2);
     }finally{
       this.busy=false;
