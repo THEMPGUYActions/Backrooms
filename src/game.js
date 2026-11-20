@@ -436,7 +436,7 @@ class Chunk{
         this.walls.fill(0);
         if(level.id==="3"){
           const roomRoll=cycleHash(this.seedKey()^0x31e1,this.cx*17+this.cz*31,0x3a);
-          this.zone=this.cx===0&&this.cz===0?"generator":roomRoll<.28?"generator":roomRoll<.50?"assembly":roomRoll<.72?"boiler":roomRoll<.88?"sanctum":"corridors";
+          this.zone=this.cx===0&&this.cz===0?"generator":roomRoll<.28?"generator":roomRoll<.50?"assembly":roomRoll<.72?"boiler":roomRoll<.88?"switchgear":"corridors";
           this.level3RoomType=this.zone;
         }
       }else if(level.id==="4"){
@@ -1164,20 +1164,54 @@ class Chunk{
           addPipeRun(bx,bz-1,bx,roomZ-6,2.45,.12,lib.rustMetal);
           this.collisionSegments.push({x1:bx-1.1,z1:bz-1.1,x2:bx+1.1,z2:bz-1.1},{x1:bx+1.1,z1:bz-1.1,x2:bx+1.1,z2:bz+1.1},{x1:bx+1.1,z1:bz+1.1,x2:bx-1.1,z2:bz+1.1},{x1:bx-1.1,z1:bz+1.1,x2:bx-1.1,z2:bz-1.1});
         }
-      }else if(this.zone==="sanctum"){
-        // A darker, atypical chamber with Greco-Roman pillars and a worn statue.
-        const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.42,.54,3.45,12),lib.officePlastic);
-        for(const px of [-4.7,4.7])for(const pz of [-4.7,4.7]){
-          const copy=pillar.clone();copy.position.set(roomX+px,1.72,roomZ+pz);g.add(copy);
-          const capital=new THREE.Mesh(new THREE.CylinderGeometry(.68,.58,.2,12),lib.officePlastic);
-          capital.position.set(roomX+px,3.48,roomZ+pz);g.add(capital);
+      }else if(this.zone==="switchgear"){
+        // A high-voltage switchgear bay: paired breaker cabinets, visible
+        // busbars, ceramic standoffs and heavy conduit instead of decorative props.
+        for(const side of [-1,1]){
+          const bankX=roomX+side*3.15;
+          const bank=new THREE.Group();bank.position.set(bankX,0,roomZ);
+          box(bank,new THREE.BoxGeometry(2.45,2.55,1.25),lib.rustMetal,0,1.3,0);
+          box(bank,new THREE.BoxGeometry(2.12,2.16,.055),lib.dark,0,1.32,-.655);
+          box(bank,new THREE.BoxGeometry(2.18,.12,.08),lib.metal,0,2.48,-.68);
+          for(let row=0;row<4;row++){
+            const y=2.05-row*.43;
+            for(let col=0;col<3;col++){
+              const x=-.68+col*.68;
+              const switchHandle=box(bank,new THREE.BoxGeometry(.13,.18,.075),lib.handle,x,y,-.71);
+              switchHandle.userData.level3BreakerSwitch=true;
+              const lamp=box(bank,new THREE.BoxGeometry(.12,.105,.065),(row+col)%3===0?lib.orangeLight:lib.indicator,x,y+.16,-.71);
+              lamp.userData.level3BreakerIndicator=true;
+            }
+          }
+          for(let fin=0;fin<9;fin++){
+            box(bank,new THREE.BoxGeometry(.09,1.92,.34),lib.metal,-1.12+fin*.28,1.32,.72);
+          }
+          const cabinet=box(bank,new THREE.BoxGeometry(2.5,.13,1.3),lib.metal,0,.12,0);
+          cabinet.userData.level3SwitchgearCabinet=true;
+          bank.userData.level3SwitchgearBank=true;
+          g.add(bank);
+          const halfX=1.27,halfZ=.68;
+          this.collisionSegments.push(
+            {x1:bankX-halfX,z1:roomZ-halfZ,x2:bankX+halfX,z2:roomZ-halfZ},
+            {x1:bankX+halfX,z1:roomZ-halfZ,x2:bankX+halfX,z2:roomZ+halfZ},
+            {x1:bankX+halfX,z1:roomZ+halfZ,x2:bankX-halfX,z2:roomZ+halfZ},
+            {x1:bankX-halfX,z1:roomZ+halfZ,x2:bankX-halfX,z2:roomZ-halfZ}
+          );
         }
-        const plinth=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(1.9,.5,1.9),lib.rustMetal),lib.rustMetal);
-        plinth.position.set(roomX, .25,roomZ);g.add(plinth);
-        const statue=new THREE.Mesh(new THREE.ConeGeometry(.7,2.25,8),lib.officePlastic);
-        statue.position.set(roomX,1.62,roomZ);g.add(statue);
-        const stained=new THREE.Mesh(new THREE.PlaneGeometry(3.2,2.2),lib.windowDark);
-        stained.position.set(roomX,2.25,roomZ-6.8);g.add(stained);
+        for(const offset of [-2.15,2.15]){
+          addPipeRun(roomX-5.2,roomZ+offset,roomX+5.2,roomZ+offset,3.08,.11,lib.rustMetal);
+          addPipeRun(roomX-5.2,roomZ+offset,roomX+5.2,roomZ+offset,3.32,.065,lib.metal);
+        }
+        const insulatorGeometry=new THREE.CylinderGeometry(.13,.19,.62,10);
+        for(const xOffset of [-4.6,-2.3,0,2.3,4.6])for(const zOffset of [-2.15,2.15]){
+          const insulator=new THREE.Mesh(insulatorGeometry,lib.officeColumn||lib.officePlastic);
+          insulator.position.set(roomX+xOffset,2.73,roomZ+zOffset);
+          insulator.userData.level3BusbarInsulator=true;
+          g.add(insulator);
+        }
+        const warning=box(g,new THREE.BoxGeometry(1.85,.48,.055),lib.orangeLight,roomX,2.78,roomZ-5.1);
+        warning.userData.level3WarningSign=true;
+        warning.userData.label="HIGH VOLTAGE";
       }else{
         const storage=new THREE.Group();storage.position.set(roomX,0,roomZ);
         for(let i=0;i<4;i++){
@@ -2694,7 +2728,7 @@ class WorldStreamer{
       if(!this.chunks.has(k)){
         const c=new Chunk(this,cx+dx,cz+dz);this.chunks.set(k,c);this.game.scene.add(c.group);changed=true;
         const entityChance=this.game.level.id==="3"?.13:this.game.level.id==="4"?.012:.055;
-        if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&c.level3RoomType!=="sanctum"&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<entityChance)c.entitySpawn=true;
+        if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&c.level3RoomType!=="switchgear"&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<entityChance)c.entitySpawn=true;
       }
     }
     for(const [k,c] of this.chunks){
@@ -2726,7 +2760,7 @@ class WorldStreamer{
         const chunk=new Chunk(this,chunkX,chunkZ);
         this.chunks.set(key,chunk);this.game.scene.add(chunk.group);changed=true;
         const entityChance=this.game.level.id==="3"?.13:this.game.level.id==="4"?.012:.055;
-        if(this.game.level.entity!=="none"&&Math.hypot(chunkX,chunkZ)>=2&&chunk.level3RoomType!=="sanctum"&&cycleHash(this.game.seed,chunkX,chunkZ+449+this.game.level.id.charCodeAt(0))<entityChance)chunk.entitySpawn=true;
+        if(this.game.level.entity!=="none"&&Math.hypot(chunkX,chunkZ)>=2&&chunk.level3RoomType!=="switchgear"&&cycleHash(this.game.seed,chunkX,chunkZ+449+this.game.level.id.charCodeAt(0))<entityChance)chunk.entitySpawn=true;
       }
       done++;
       onProgress(done,targets.length);

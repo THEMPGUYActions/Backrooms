@@ -439,6 +439,7 @@ async function checkStartupAndLevelPresentation(){
   if(!game.includes("this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half})")||!game.includes("for(const rect of nearby?.solidRects||[])"))fail("Level 1 pillar collision must handle spawn points starting inside a solid pillar");
   if(!game.includes("this.player.position.set(0,this.player.eyeY,0)")||!game.includes("addPanel(left+.14,z,Math.PI/2"))fail("Level 1 central spawn or Level 3 wall-mounted electrical panel layout missing");
   if(!game.includes("addGate(cx,cz-size*.22,true)")||!game.includes("addGate(cx+size*.22,cz,false)"))fail("Level 3 barred gates must be located on visible main service corridors");
+  if(game.includes('"sanctum"')||!game.includes('this.zone==="switchgear"')||!game.includes("level3SwitchgearCabinet"))fail("Level 3 special rooms must remain electrical/industrial, not fantasy or temple themed");
   if(!game.includes("const addOfficeBoundary=(axis,fixed,start,end)=>")||!game.includes("addOfficeBoundary(\"x\",z")||!game.includes("lib.officeWindowGlass,0,2.15,0"))fail("Level 4 must use real exterior wall window openings rather than windows hidden in solid walls");
 }
 

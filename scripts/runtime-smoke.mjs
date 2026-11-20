@@ -326,7 +326,7 @@ try{
   if(level3Level4Result.result?.exceptionDetails){const d=level3Level4Result.result.exceptionDetails;throw new Error("LEVEL3_LEVEL4_ENVIRONMENT_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
   const level3Level4=JSON.parse(level3Level4Result.result?.result?.value||"{}");
   const l3=level3Level4['3'],l4=level3Level4['4'];
-  if(!l3||l3.gates<2||l3.panels<8||l3.wallMountedPanels<8||l3.specialRooms!==1||l3.collisionSegments<60||!['generator','assembly','boiler','sanctum','corridors'].includes(l3.zone))throw new Error("Level 3 electrical-facility architecture incomplete: "+JSON.stringify(l3));
+  if(!l3||l3.gates<2||l3.panels<8||l3.wallMountedPanels<8||l3.specialRooms!==1||l3.collisionSegments<60||!['generator','assembly','boiler','switchgear','corridors'].includes(l3.zone))throw new Error("Level 3 electrical-facility architecture incomplete: "+JSON.stringify(l3));
   if(!l4||l4.officeRooms<6||l4.windowPanes<8||l4.ceilingPanels!==1||l4.ceilingLights!==1||l4.collisionSegments>1000||l4.instancedMeshes<3||l4.fixtures>20||l4.fog<0x777777)throw new Error("Level 4 office architecture/lighting incomplete: "+JSON.stringify(l4));
   console.log("LEVEL3_LEVEL4_ENVIRONMENT_SMOKE "+JSON.stringify(level3Level4));
   markSmokeStage("Level 3 electrical rooms and Level 4 office plan");
