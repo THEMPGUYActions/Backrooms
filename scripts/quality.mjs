@@ -467,6 +467,7 @@ async function checkLevel2UtilityHallGeometry(){
 }async function checkWorldTextureUVs(){
   const assets=await readFile(join(root,"src/assets.js"),"utf8");
   const game=await readFile(join(root,"src/game.js"),"utf8");
+  const levels=await readFile(join(root,"src/levels.js"),"utf8");
   for(const token of [
     "export function tileGeometryUV(geometry,material)",
     "const tiledGeometryCache = new WeakMap()",
@@ -478,12 +479,15 @@ async function checkLevel2UtilityHallGeometry(){
   ]){
     if(!assets.includes(token))fail("World-space texture UV mapping or isolated texture transforms missing: "+token);
   }
+  if(!levels.includes("wallHeight: 12.0,"))fail("Level 1 must retain six metres of clearance on both storeys");
   for(const token of [
     "tileGeometryUV(geometry,material)",
     "tileGeometryUV(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete)",
     "tileGeometryUV(new THREE.CylinderGeometry(.11,.11,3.8,10),lib.metal)",
     "this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z,this.parkingFloor)",
-    "const LEVEL1_UPPER_FLOOR_Y=3.0;",
+    'const LEVEL1_UPPER_FLOOR_Y=LEVELS["1"].wallHeight/2;',
+    "const upperPillarGeom=new THREE.BoxGeometry(1.22,upperStoreyHeight,1.22);",
+    "rampLength=40,",
     "level1UpperFloorOpening",
     "upperDeck.userData.level1WalkableDeck=true",
     "this.parkingFloor===0&&this.position.x>=ramp.endX-.05",

@@ -55,7 +55,7 @@ export const LEVELS = {
     },
     gridSize: 10,
     cellSize: 8.0,
-    wallHeight: 6.0,
+    wallHeight: 12.0,
     darkness: 0.24,
     holeChance: 0,
     pipeChance: 0,
