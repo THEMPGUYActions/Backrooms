@@ -418,16 +418,15 @@ async function checkGameplayPhysicsAndRendering(){
 async function checkLevel2UtilityHallGeometry(){
   const game=await readFile(join(root,"src/game.js"),"utf8");
   const assets=await readFile(join(root,"src/assets.js"),"utf8");
-  for(const token of ["const tiledWallGeometry=(width,height,depth,tileSize=2.8)","uvs.setXY(i,x/tileSize,z/tileSize)","const addPipeRoute=(points,rusted=false)","new THREE.QuadraticBezierCurve3(elbowStart,pts[i+1],elbowEnd)","uvs.setXY(i,uvs.getX(i)*circumference/.8,(y+length/2)/.8)","const baySeed=this.seedKey()^0x2b71","const bayX=cx+baySide*size*.29,bayZ=cz+bayOffset*size","const addFrame=(x,z,alongZ)=>","const addTunnelLight=(x,z,alongZ,index)=>","this.surfaceSize=this.size*(this.radius*2+3)","surface.position.x=centerX;surface.position.z=centerZ;surface.updateMatrix()"]){
-    if(!game.includes(token))fail("Level 2 utility geometry or streamed-surface fix missing: "+token);
+  for(const token of ["const tiledWallGeometry=(width,height,depth,tileSize=2.8)","uvs.setXY(i,x/tileSize,z/tileSize)","const addPipeRoute=(points,rusted=false)","const junctionGap=3.25,crossGap=1.25","const addRunWithOpening=(axis,fixed,start,end,openingCenter,openingHalf,rusted)=>","if(Math.abs(z-cz)<6)continue;","if(Math.abs(x-cx)<6)continue;","uvs.setXY(i,uvs.getX(i)*circumference/.8,(y+length/2)/.8)","const addFrame=(x,z,alongZ)=>","const addTunnelLight=(x,z,alongZ,index)=>","this.surfaceSize=this.size*(this.radius*2+3)","surface.position.x=centerX;surface.position.z=centerZ;surface.updateMatrix()"]){
+    if(!game.includes(token))fail("Level 2 open-junction or utility geometry fix missing: "+token);
   }
-  if(game.includes("const ledge=new THREE.Mesh"))fail("Level 2 must not create the corridor-blocking raised ledge");
+  if(game.includes("const baySeed=")||game.includes("const bayX=")||game.includes("const pumpX="))fail("Level 2 must not generate partitions or equipment in the cross-junction");
+  if(game.includes("const drain=new THREE.Mesh"))fail("Level 2 cross-junction must not contain floor obstructions");
   if(game.includes("const pipeGeometry=new THREE.CylinderGeometry(.105,.105,1,12)"))fail("Level 2 pipes must use length-scaled UV geometry instead of stretched instanced cylinders");
   if(!assets.includes("texture.wrapS=THREE.RepeatWrapping;")||!assets.includes("texture.wrapT=THREE.RepeatWrapping;"))fail("Loaded PBR maps must repeat for world-scaled UVs");
   if(!assets.includes('wallPrefix+"_color.jpg",true,1,.28'))fail("Industrial wall PBR maps must not add a second global repeat");
-}
-
-async function checkExitPositionInitialization(){
+}async function checkExitPositionInitialization(){
   const source=await readFile(join(root,"src/game.js"),"utf8");
   if(source.includes("this.exit.position.set("))fail("Special exits must initialize their position vector before assigning coordinates");
 }

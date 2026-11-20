@@ -865,26 +865,8 @@ class Chunk{
         addUtilityWall(this.originX,z,cx-door/2,z);
         addUtilityWall(cx+door/2,z,this.originX+size,z);
       }
-      // Irregular utility-bay walls are generated from the chunk seed and kept
-      // behind the main service corridor, with no diagonal wall across a route.
-      const baySeed=this.seedKey()^0x2b71;
-      const baySide=cycleHash(baySeed,this.cx,this.cz,0x22)<.5?-1:1;
-      const bayOffset=cycleHash(baySeed,this.cx,this.cz,0x23)<.5?-.29:.29;
-      const bayX=cx+baySide*size*.29,bayZ=cz+bayOffset*size;
-      const bayW=3.2+cycleHash(baySeed,this.cx,this.cz,0x24)*1.6;
-      const bayH=2.8+cycleHash(baySeed,this.cx,this.cz,0x25)*1.4;
-      addUtilityWall(bayX-bayW/2,bayZ-bayH/2,bayX+bayW/2,bayZ-bayH/2,2.7,lib.wall2);
-      addUtilityWall(bayX+bayW/2,bayZ-bayH/2,bayX+bayW/2,bayZ+bayH/2,2.7,lib.wall2);
-      addUtilityWall(bayX+bayW/2,bayZ+bayH/2,bayX-bayW/2,bayZ+bayH/2,2.7,lib.wall2);
-      // Compact equipment is placed inside the generated maintenance bay,
-      // rather than scattered into the four-way passage.
-      const pumpX=bayX+baySide*.45,pumpZ=bayZ;
-      const pump=new THREE.Group();pump.position.set(pumpX,0,pumpZ);
-      box(pump,new THREE.BoxGeometry(.95,.34,.72),lib.rustMetal,0,.17,0);
-      const vessel=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.9,12),lib.metal);
-      vessel.position.set(0,.78,0);pump.add(vessel);g.add(pump);
-      // Main service lines follow the corridor walls. Each bend is a curved
-      // elbow, and each riser branches directly from a horizontal main.
+      // Keep the cross-junction completely open. Do not generate room
+      // partitions or machinery in this shared passage volume.
       const pipeMeshes=[];
       const addPipeSegment=(start,end,rusted=false)=>{
         const direction=new THREE.Vector3().subVectors(end,start),length=direction.length();
@@ -923,29 +905,36 @@ class Chunk{
           }
         }
       };
-      const yNorthSouth=2.78,yEastWest=2.58;
-      // Keep the central crossing clear: overhead mains stop at the junction
-      // and branch around it instead of running through the opening.
-      const branchGap=3.1;
+      const yNorthSouth=3.02,yEastWest=3.02;
+      // Route mains along the outer edges of each corridor arm. Every route
+      // stops before a cross-corridor opening; no pipe spans a doorway.
+      const junctionGap=3.25,crossGap=1.25;
+      const addRunWithOpening=(axis,fixed,start,end,openingCenter,openingHalf,rusted)=>{
+        const intervals=[];
+        const lo=Math.min(start,end),hi=Math.max(start,end);
+        const cutA=Math.max(lo,openingCenter-openingHalf),cutB=Math.min(hi,openingCenter+openingHalf);
+        if(cutA>lo+.25)intervals.push([lo,cutA]);
+        if(cutB<hi-.25)intervals.push([cutB,hi]);
+        for(const [a,b] of intervals){
+          const p0=axis==="z"?[fixed,yNorthSouth,a]:[a,yEastWest,fixed];
+          const p1=axis==="z"?[fixed,yNorthSouth,b]:[b,yEastWest,fixed];
+          addPipeRoute([p0,p1],rusted);
+        }
+      };
       for(const side of [-1,1]){
         const x=cx+side*1.38;
-        addPipeRoute([[x,yNorthSouth,this.originZ+1.1],[x,yNorthSouth,cz-branchGap]],side>0);
-        addPipeRoute([[x,yNorthSouth,cz+branchGap],[x,yNorthSouth,this.originZ+size-1.1]],side>0);
+        const northEnd=cz-junctionGap;
+        const southStart=cz+junctionGap;
+        addRunWithOpening("z",x,this.originZ+1.1,northEnd,cz-1.85,crossGap,side>0);
+        addRunWithOpening("z",x,southStart,this.originZ+size-1.1,cz+1.85,crossGap,side>0);
         const z=cz+side*1.38;
-        addPipeRoute([[this.originX+1.1,yEastWest,z],[cx-branchGap,yEastWest,z]],side<0);
-        addPipeRoute([[cx+branchGap,yEastWest,z],[this.originX+size-1.1,yEastWest,z]],side<0);
+        const westEnd=cx-junctionGap;
+        const eastStart=cx+junctionGap;
+        addRunWithOpening("x",z,this.originX+1.1,westEnd,cx-1.85,crossGap,side<0);
+        addRunWithOpening("x",z,eastStart,this.originX+size-1.1,cx+1.85,crossGap,side<0);
       }
-      // A few local risers connect the overhead mains to wall-mounted valves;
-      // they are placed in service alcoves, never across the walkable junction.
-      // Short drops are tucked against the side walls in maintenance bays.
-      for(const [side,zOffset] of [[-1,-12],[1,12]]){
-        const x=cx+side*1.38,z=cz+zOffset;
-        addPipeSegment(new THREE.Vector3(x,yNorthSouth,z),new THREE.Vector3(x,.42,z),side>0);
-        const tee=new THREE.Mesh(new THREE.SphereGeometry(.145,10,8),side>0?rustMat:pipeMat);
-        tee.position.set(x,yNorthSouth,z);g.add(tee);
-        const wheel=new THREE.Mesh(new THREE.TorusGeometry(.18,.035,8,16),lib.handle);
-        wheel.position.set(x,.88,z+.13);g.add(wheel);
-      }
+      // No low-hanging risers, valve wheels, or equipment are placed in the
+      // cross-path. Those details belong in dedicated wall recesses only.
       // Repeating support frames and warm fixtures follow both corridor axes.
       const addFrame=(x,z,alongZ)=>{
         for(const side of [-1,1]){
@@ -968,33 +957,16 @@ class Chunk{
       let fixtureIndex=0;
       for(let i=0;i<5;i++){
         const z=this.originZ+5+i*10;
+        if(Math.abs(z-cz)<6)continue;
         addFrame(cx,z,true);addTunnelLight(cx,z,true,fixtureIndex++);
       }
       for(let i=0;i<5;i++){
         const x=this.originX+5+i*10;
-        if(Math.abs(x-cx)<5)continue;
+        if(Math.abs(x-cx)<6)continue;
         addFrame(x,cz,false);addTunnelLight(x,cz,false,fixtureIndex++);
       }
-      // Keep the junction floor continuous and unobstructed. Drain grates are
-      // flush with the walking surface and have no collision volume.
-      const drain=new THREE.Mesh(new THREE.BoxGeometry(.24,.018,size-4),lib.dark);
-      drain.position.set(cx+1.48,.012,cz);g.add(drain);
-      for(let i=0;i<7;i++){
-        const z=this.originZ+4+i*7;
-        box(g,new THREE.BoxGeometry(.32,.012,.62),lib.metal,cx+1.48,.022,z);
-      }
-      // A wall-mounted pressure gauge and handwheel finish the service bay.
-      const gauge=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.055,16),lib.dark);
-      gauge.position.set(pumpX,.0,pumpZ-.42);gauge.rotation.x=Math.PI/2;g.add(gauge);
-      const valve=new THREE.Mesh(new THREE.TorusGeometry(.18,.035,8,16),lib.handle);
-      valve.position.set(pumpX,.92,pumpZ-.43);valve.rotation.x=Math.PI/2;g.add(valve);
-      // Floor drains and painted service markings make the corridors read as
-      // maintained infrastructure instead of an empty maze with pipes.
-      for(let i=0;i<6;i++){
-        const x=this.originX+size*(.12+i*.145),z=cz+(i%2?1:-1)*2.55;
-        box(g,new THREE.BoxGeometry(1.25,.025,.34),lib.dark,x,.025,z);
-        for(let stripe=0;stripe<4;stripe++)box(g,new THREE.BoxGeometry(.16,.018,.36),lib.orangeLight,x-.48+stripe*.32,.043,z);
-      }
+      // The junction is deliberately left free of drains, grates, markings,
+      // props and collision geometry so all four exits remain unobstructed.
     }else if(level.id==="3"){
       const rng=new RNG(this.seedKey()^0x31e1);
       const addStationWall=(x1,z1,x2,z2,height=3.45,material=lib.rustMetal)=>{
