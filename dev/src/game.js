@@ -1,13 +1,14 @@
 import * as THREE from "three";
+import { Sky } from "three/addons/objects/Sky.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { InputManager } from "./input.js?v=20260923-2050";
-import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
+import { InputManager } from "./input.js?v=20261120-physics-sky-water1";
+import { Level1Reflection } from "./level1-wet.js?v=20261120-physics-sky-water1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-open-sky-crops1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-open-sky-crops1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-physics-sky-water1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-physics-sky-water1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -623,7 +624,7 @@ class Chunk{
           const intensity=region==="red"?20:30;
           this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
         }
-      }else if(!["1","6","7","8","9","10"].includes(level.id)&&rngBase.next()<(level.id==="5"?.17:.13)){
+      }else if(!["1","2","6","7","8","9","10"].includes(level.id)&&rngBase.next()<(level.id==="5"?.17:.13)){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
         const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
         const fixture=box(g,new THREE.BoxGeometry(3.7,.055,.72),material,px,level.wallHeight-.09,pz,0,rotation,0);fixture.userData.light=true;fixture.userData.baseEmissive=material.emissiveIntensity;this.fixtures.push(fixture);
@@ -835,10 +836,23 @@ class Chunk{
 
     if(level.id==="2"){
       const rng=new RNG(this.seedKey()^0x72ea),pipeMat=lib.metal,rustMat=lib.rustMetal;
+      const tiledWallGeometry=(width,height,depth,tileSize=2.8)=>{
+        const geometry=new THREE.BoxGeometry(width,height,depth);
+        const positions=geometry.attributes.position,normals=geometry.attributes.normal,uvs=geometry.attributes.uv;
+        for(let i=0;i<positions.count;i++){
+          const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
+          const nx=Math.abs(normals.getX(i)),ny=Math.abs(normals.getY(i)),nz=Math.abs(normals.getZ(i));
+          if(ny>nx&&ny>nz)uvs.setXY(i,x/tileSize,z/tileSize);
+          else if(nx>nz)uvs.setXY(i,z/tileSize,y/tileSize);
+          else uvs.setXY(i,x/tileSize,y/tileSize);
+        }
+        uvs.needsUpdate=true;
+        return geometry;
+      };
       const addUtilityWall=(x1,z1,x2,z2,height=2.95,material=lib.wall)=>{
         const dx=x2-x1,dz=z2-z1,length=Math.hypot(dx,dz),angle=-Math.atan2(dz,dx);
         if(length<.3)return;
-        box(g,new THREE.BoxGeometry(length,height,.18),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
+        box(g,tiledWallGeometry(length,height,.18),material,(x1+x2)/2,height/2,(z1+z2)/2,0,angle,0);
         this.collisionSegments.push({x1,z1,x2,z2});
       };
       const cx=this.originX+size/2,cz=this.originZ+size/2,door=1.5,offset=1.85;
@@ -895,20 +909,14 @@ class Chunk{
         const drum=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.9,12),lib.rustMetal);
         drum.position.set(x,.47,z);g.add(drum);
       }
-      // Route continuous pipework along the ceiling and down to service equipment.
-      // CylinderGeometry is Y-up; each segment is aligned from its endpoints.
-      const pipeGeometry=new THREE.CylinderGeometry(.105,.105,1,10);
+      // Main service lines follow the corridor walls. Each bend is a curved
+      // elbow, and each riser branches directly from a horizontal main.
+      const pipeGeometry=new THREE.CylinderGeometry(.105,.105,1,12);
       const pipeCapacity=192;
       const cleanPipes=new THREE.InstancedMesh(pipeGeometry,pipeMat,pipeCapacity);
       const rustPipes=new THREE.InstancedMesh(pipeGeometry,rustMat,pipeCapacity);
       cleanPipes.userData.pipeNetwork=true;rustPipes.userData.pipeNetwork=true;
       const pipeDummy=new THREE.Object3D(),pipeAxis=new THREE.Vector3(0,1,0);
-      const elbowGeometry=new THREE.SphereGeometry(.145,8,8);
-      const routes=[
-        [[this.originX+1.2,3.04,this.originZ+1.2],[this.originX+size*.30,3.04,this.originZ+1.2],[this.originX+size*.46,3.04,this.originZ+size*.28],[this.originX+size*.78,3.04,this.originZ+size*.28],[this.originX+size-1.2,3.04,this.originZ+size*.48]],
-        [[this.originX+1.2,2.98,this.originZ+size-1.2],[this.originX+size*.24,2.98,this.originZ+size-1.2],[this.originX+size*.40,2.98,this.originZ+size*.72],[this.originX+size*.78,2.98,this.originZ+size*.72],[this.originX+size-1.2,2.98,this.originZ+size*.52]],
-        [[this.originX+1.2,3.10,this.originZ+size*.50],[this.originX+size*.32,3.10,this.originZ+size*.50],[this.originX+size*.48,3.10,this.originZ+size*.62],[this.originX+size-1.2,3.10,this.originZ+size*.62]]
-      ];
       let cleanCount=0,rustCount=0;
       const addPipeSegment=(start,end,rusted=false)=>{
         const direction=new THREE.Vector3().subVectors(end,start),length=direction.length();
@@ -919,27 +927,78 @@ class Chunk{
         if(rusted&&rustCount<pipeCapacity)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
         else if(cleanCount<pipeCapacity)cleanPipes.setMatrixAt(cleanCount++,pipeDummy.matrix);
       };
-      for(let routeIndex=0;routeIndex<routes.length;routeIndex++){
-        const route=routes[routeIndex].map(point=>new THREE.Vector3(...point));
-        for(let i=1;i<route.length;i++){
-          addPipeSegment(route[i-1],route[i],(routeIndex+i)%3===0);
-          if(i<route.length-1){
-            const joint=new THREE.Mesh(elbowGeometry,(routeIndex+i)%3===0?rustMat:pipeMat);
-            joint.position.copy(route[i]);g.add(joint);
+      const addPipeRoute=(points,rusted=false)=>{
+        const pts=points.map(point=>new THREE.Vector3(...point)),trim=.22;
+        for(let i=0;i<pts.length-1;i++){
+          const direction=new THREE.Vector3().subVectors(pts[i+1],pts[i]).normalize();
+          const a=pts[i].clone().addScaledVector(direction,i>0?trim:0);
+          const b=pts[i+1].clone().addScaledVector(direction,i<pts.length-2?-trim:0);
+          addPipeSegment(a,b,rusted);
+          if(i<pts.length-2){
+            const nextDirection=new THREE.Vector3().subVectors(pts[i+2],pts[i+1]).normalize();
+            const elbowStart=pts[i+1].clone().addScaledVector(direction,-trim);
+            const elbowEnd=pts[i+1].clone().addScaledVector(nextDirection,trim);
+            const curve=new THREE.QuadraticBezierCurve3(elbowStart,pts[i+1],elbowEnd);
+            g.add(new THREE.Mesh(new THREE.TubeGeometry(curve,8,.105,10,false),rusted?rustMat:pipeMat));
           }
         }
-      }
-      // Vertical drops feed the pumps and wall-mounted service valves.
+      };
+      const yNorthSouth=2.78,yEastWest=2.58;
+      addPipeRoute([[cx-1.38,yNorthSouth,this.originZ+1.1],[cx-1.38,yNorthSouth,cz-1.38],[cx-1.38,yNorthSouth,cz+1.38],[cx-1.38,yNorthSouth,this.originZ+size-1.1]]);
+      addPipeRoute([[cx+1.38,yNorthSouth,this.originZ+1.1],[cx+1.38,yNorthSouth,cz-1.38],[cx+1.38,yNorthSouth,cz+1.38],[cx+1.38,yNorthSouth,this.originZ+size-1.1]],true);
+      addPipeRoute([[this.originX+1.1,yEastWest,cz-1.38],[cx-1.38,yEastWest,cz-1.38],[cx+1.38,yEastWest,cz-1.38],[this.originX+size-1.1,yEastWest,cz-1.38]],true);
+      addPipeRoute([[this.originX+1.1,yEastWest,cz+1.38],[cx-1.38,yEastWest,cz+1.38],[cx+1.38,yEastWest,cz+1.38],[this.originX+size-1.1,yEastWest,cz+1.38]]);
+      addPipeRoute([[cx-1.72,1.12,this.originZ+2.0],[cx-1.72,1.12,cz],[cx-1.72,1.12,this.originZ+size-2.0]],true);
+      addPipeRoute([[cx+1.72,1.02,this.originZ+2.0],[cx+1.72,1.02,cz],[cx+1.72,1.02,this.originZ+size-2.0]]);
+      // Four vertical drops connect the upper mains to low wall valves.
       for(let i=0;i<4;i++){
-        const x=this.originX+size*(.18+i*.21),z=this.originZ+(i%2?size*.72:size*.28);
-        const top=new THREE.Vector3(x,3.04,z),bottom=new THREE.Vector3(x,.95,z);
+        const side=i%2?1:-1,z=cz+(i<2?-1:1)*11.5,x=cx+side*1.38;
+        const top=new THREE.Vector3(x,yNorthSouth,z),bottom=new THREE.Vector3(x,.36,z);
         addPipeSegment(top,bottom,i%2===1);
-        const collar=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,6,12),lib.handle);
-        collar.position.copy(top);collar.rotation.x=Math.PI/2;g.add(collar);
+        const tee=new THREE.Mesh(new THREE.SphereGeometry(.145,10,8),i%2===1?rustMat:pipeMat);
+        tee.position.copy(top);g.add(tee);
+        const collar=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,8,14),lib.handle);
+        collar.position.set(x,1.18,z);collar.rotation.x=Math.PI/2;g.add(collar);
+        const wheel=new THREE.Mesh(new THREE.TorusGeometry(.18,.035,8,16),lib.handle);
+        wheel.position.set(x,.88,z+.13);g.add(wheel);
+      }
+      // Repeating support frames and warm fixtures follow both corridor axes.
+      const addFrame=(x,z,alongZ)=>{
         for(const side of [-1,1]){
-          const hanger=box(g,new THREE.BoxGeometry(.055,.12,.055),lib.rustMetal,x+side*.18,3.15,z);
-          hanger.userData.pipeSupport=true;
+          const px=x+(alongZ?side*1.68:0),pz=z+(alongZ?0:side*1.68);
+          box(g,new THREE.BoxGeometry(.1,2.82,.1),lib.rustMetal,px,1.41,pz);
+          box(g,new THREE.BoxGeometry(.2,.12,.2),lib.metal,px,2.78,pz);
         }
+        box(g,alongZ?new THREE.BoxGeometry(3.45,.13,.14):new THREE.BoxGeometry(.14,.13,3.45),lib.rustMetal,x,2.88,z);
+        box(g,alongZ?new THREE.BoxGeometry(3.25,.055,.09):new THREE.BoxGeometry(.09,.055,3.25),lib.metal,x,2.79,z);
+      };
+      const addTunnelLight=(x,z,alongZ,index)=>{
+        const material=lib.light.clone();
+        material.color.setHex(index%4===0?0xffe4bc:0xfff0d5);
+        material.emissive.setHex(index%4===0?0xffa65f:0xffd5a1);
+        material.emissiveIntensity=index%4===0?1.65:2.25;
+        const fixture=box(g,new THREE.BoxGeometry(1.18,.055,.34),material,x,3.055,z,0,alongZ?Math.PI/2:0,0);
+        fixture.userData.light=true;fixture.userData.baseEmissive=material.emissiveIntensity;this.fixtures.push(fixture);
+        this.lightSources.push({position:new THREE.Vector3(x,2.88,z),color:index%4===0?0xffb16f:0xffd8ad,baseIntensity:index%4===0?78:112,intensity:index%4===0?78:112,distance:11.5,decay:2,fixture});
+      };
+      let fixtureIndex=0;
+      for(let i=0;i<5;i++){
+        const z=this.originZ+5+i*10;
+        addFrame(cx,z,true);addTunnelLight(cx,z,true,fixtureIndex++);
+      }
+      for(let i=0;i<5;i++){
+        const x=this.originX+5+i*10;
+        if(Math.abs(x-cx)<5)continue;
+        addFrame(x,cz,false);addTunnelLight(x,cz,false,fixtureIndex++);
+      }
+      const ledge=new THREE.Mesh(new THREE.BoxGeometry(.62,.38,size-3),lib.concrete);
+      ledge.position.set(cx-1.38,.19,cz);g.add(ledge);
+      this.collisionSegments.push({x1:cx-1.69,z1:this.originZ+1.5,x2:cx-.99,z2:this.originZ+1.5},{x1:cx-.99,z1:this.originZ+1.5,x2:cx-.99,z2:this.originZ+size-1.5},{x1:cx-.99,z1:this.originZ+size-1.5,x2:cx-1.69,z2:this.originZ+size-1.5},{x1:cx-1.69,z1:this.originZ+size-1.5,x2:cx-1.69,z2:this.originZ+1.5});
+      const drain=new THREE.Mesh(new THREE.BoxGeometry(.24,.08,size-4),lib.dark);
+      drain.position.set(cx+1.48,-.035,cz);g.add(drain);
+      for(let i=0;i<7;i++){
+        const z=this.originZ+4+i*7;
+        box(g,new THREE.BoxGeometry(.32,.035,.62),lib.metal,cx+1.48,.012,z);
       }
       cleanPipes.count=cleanCount;rustPipes.count=rustCount;
       cleanPipes.instanceMatrix.needsUpdate=true;rustPipes.instanceMatrix.needsUpdate=true;
@@ -1287,8 +1346,18 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.72,2.15,.08),lib.dark,x,1.25,z-.08);
       }
     }else if(level.id==="7"){
-      const water=lib.water.clone();water.color.setHex(0x1a4354);water.opacity=.82;water.roughness=.16;water.metalness=.08;water.depthWrite=false;
-      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size),water);surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
+      const water=lib.water.clone();water.color.setHex(0x316a78);water.opacity=.78;water.roughness=.13;water.metalness=.025;water.depthWrite=false;
+      water.onBeforeCompile=shader=>{
+        shader.uniforms.uBackroomsTime={value:0};
+        water.userData.timeUniform=shader.uniforms.uBackroomsTime;
+        shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;");
+        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nfloat waveDx=.02016*cos(position.x*.72+uBackroomsTime*.65)+.0054*cos((position.x+position.y)*.45+uBackroomsTime*.34);\nfloat waveDy=.0198*cos(position.y*1.1-uBackroomsTime*.48)+.0054*cos((position.x+position.y)*.45+uBackroomsTime*.34);\nobjectNormal=normalize(vec3(-waveDx,-waveDy,1.0));");
+        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\ntransformed.z+=sin(position.x*.72+uBackroomsTime*.65)*.028+sin(position.y*1.1-uBackroomsTime*.48)*.018+sin((position.x+position.y)*.45+uBackroomsTime*.34)*.012;");
+      };
+      water.customProgramCacheKey=()=>"backrooms-level7-water-waves-v1";
+      water.needsUpdate=true;
+      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,32,32),water);surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
+      g.userData.animatedWaterMaterials=[water];
       const rng=new RNG(this.seedKey()^0x7a77),rockGeometry=new THREE.IcosahedronGeometry(1,1);
       const rocks=new THREE.InstancedMesh(rockGeometry,lib.concrete,24),rockDummy=new THREE.Object3D();
       for(let i=0;i<24;i++){
@@ -1976,6 +2045,7 @@ class Chunk{
       puddle.position.set(px,.018,pz);
       puddle.renderOrder=2;
       puddle.userData.isLevel1Puddle=true;
+      puddle.layers.enable(1);
       g.add(puddle);
     }
   }
@@ -2115,7 +2185,8 @@ class WorldStreamer{
     if(this.library)disposeLibrary(this.library);
 
     this.size=this.game.level.cellSize*(this.game.level.gridSize||CELLS);
-    this.surfaceSize=4096;
+    this.surfaceSize=this.size*(this.radius*2+3);
+    this.surfaceCenterX=0;this.surfaceCenterZ=0;
     this.library=makeLibrary(this.game.level);
     if(this.game.level.id==="0")this.configureLevel0FloorHoles(this.library.floor);
 
@@ -2268,8 +2339,8 @@ class WorldStreamer{
 
     for(const {material,tileWorldX,tileWorldZ} of surfaces){
       if(!material)continue;
-      // The surface is a 4096 m plane with UVs spanning 0..1, so repeat the
-      // texture once per real-world tile instead of stretching one image over it.
+      // UVs span 0..1 across the active streamed surface, so repeat once per
+      // real-world tile instead of stretching one image across the whole world.
       const repeatX=this.surfaceSize/tileWorldX;
       const repeatZ=this.surfaceSize/tileWorldZ;
       for(const key of ["map","roughnessMap","normalMap"]){
@@ -2278,7 +2349,11 @@ class WorldStreamer{
         texture.wrapS=THREE.RepeatWrapping;
         texture.wrapT=THREE.RepeatWrapping;
         texture.repeat.set(repeatX,repeatZ);
-        texture.offset.set(0,0);
+        const isFloor=material===this.library?.floor;
+        texture.offset.set(
+          this.surfaceCenterX/tileWorldX,
+          (isFloor?-1:1)*this.surfaceCenterZ/tileWorldZ
+        );
       }
     }
   }
@@ -2290,6 +2365,15 @@ class WorldStreamer{
   ensureAround(x,z){
     const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    const centerX=cx*this.size,centerZ=cz*this.size;
+    if(centerX!==this.surfaceCenterX||centerZ!==this.surfaceCenterZ){
+      this.surfaceCenterX=centerX;this.surfaceCenterZ=centerZ;
+      for(const surface of [this.floorSurface,this.ceilingSurface]){
+        if(!surface)continue;
+        surface.position.x=centerX;surface.position.z=centerZ;surface.updateMatrix();
+      }
+      this.updateSurfaceTiling();
+    }
     let changed=false;
     for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
       if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
@@ -2579,14 +2663,14 @@ class WorldStreamer{
 
 class Player{
   constructor(game){
-    this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.yaw=0;this.pitch=0;
+    this.game=game;this.position=new THREE.Vector3(0,1.72,0);this.velocity=new THREE.Vector3();this.verticalVelocity=0;this.yaw=0;this.pitch=0;
     this.health=100;this.stamina=100;this.hydration=100;this.sanity=100;
     this.flashlight=true;this.flashBattery=100;
     this.eyeY=1.72;this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;this.flashWarmup=1.15;this.redFlashBoost=1;this.inOcean=false;
     this.viewYaw=0;this.viewPitch=0;
   }
   reset(){
-    this.position.set(0,this.eyeY,0);this.yaw=0;this.pitch=0;this.viewYaw=0;this.viewPitch=0;
+    this.position.set(0,this.eyeY,0);this.velocity.set(0,0,0);this.verticalVelocity=0;this.yaw=0;this.pitch=0;this.viewYaw=0;this.viewPitch=0;
     this.bob=0;this.bobStrength=0;this.shake=0;this.cameraFov=62;
     this.health=this.stamina=this.hydration=this.sanity=100;this.flashBattery=100;
     this.flashlight=this.game.startFlash;
@@ -2604,34 +2688,57 @@ class Player{
     const viewAlpha=1-Math.exp(-dt*20);
     this.viewYaw+=yawDiff*viewAlpha;
     this.viewPitch+=(this.pitch-this.viewPitch)*viewAlpha;
-    const mv=input.getMove(),run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12,speed=run?6.2:2.85;
-    const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw)),right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
-    const delta=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);if(delta.lengthSq()>1)delta.normalize();
+    const mv=input.getMove();
+    const forward=new THREE.Vector3(-Math.sin(this.yaw),0,-Math.cos(this.yaw));
+    const right=new THREE.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw));
+    const wish=new THREE.Vector3().addScaledVector(right,mv.x).addScaledVector(forward,-mv.y);
+    if(wish.lengthSq()>1)wish.normalize();
+    const predictedX=this.position.x+wish.x*.2,predictedZ=this.position.z+wish.z*.2;
+    const level7Ocean=this.game.level.id==="7"&&(Math.abs(predictedX)>4.5||predictedZ>4.5||predictedZ< -4.5);
+    const run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12;
+    const speed=level7Ocean?(run?2.8:1.9):(run?6.2:2.85);
+    const response=level7Ocean?(wish.lengthSq()>.001?4.2:1.65):(wish.lengthSq()>.001?(run?19:16):14);
+    const targetX=wish.x*speed,targetZ=wish.z*speed;
+    const blend=1-Math.exp(-response*dt);
+    this.velocity.x+=(targetX-this.velocity.x)*blend;
+    this.velocity.z+=(targetZ-this.velocity.z)*blend;
     const oldX=this.position.x,oldZ=this.position.z;
-    this.position.x+=delta.x*speed*dt;this.position.z+=delta.z*speed*dt;
-    const col=this.game.world.collision(this.position,.34);this.position.x=col.x;this.position.z=col.z;
-    const level7Ocean=this.game.level.id==="7"&&(Math.abs(this.position.x)>4.5||this.position.z>4.5||this.position.z< -4.5);
-    if(level7Ocean){
+    const proposedX=this.position.x+this.velocity.x*dt;
+    const proposedZ=this.position.z+this.velocity.z*dt;
+    const col=this.game.world.collision(new THREE.Vector3(proposedX,this.position.y,proposedZ),.34);
+    if(Math.abs(col.x-proposedX)>.001)this.velocity.x=0;
+    if(Math.abs(col.z-proposedZ)>.001)this.velocity.z=0;
+    this.position.x=col.x;this.position.z=col.z;
+
+    const nowInOcean=this.game.level.id==="7"&&(Math.abs(this.position.x)>4.5||this.position.z>4.5||this.position.z< -4.5);
+    if(nowInOcean){
       if(!this.inOcean){
         this.inOcean=true;
-        this.position.y=.82;
-        this.game.toast("Ocean: look down and move forward to dive. Look up to surface.",4);
+        this.verticalVelocity=0;
+        this.game.toast("Swimming: WASD to move, SPACE to surface, CTRL to dive.",4);
       }
-      // Pitch-driven swimming works with both keyboard and touch-look controls.
-      // Buoyancy holds depth when the player is not actively swimming.
-      const swimInput=-mv.y;
-      this.position.y=THREE.MathUtils.clamp(
-        this.position.y-Math.sin(this.pitch)*swimInput*speed*dt,
-        -12,
-        1.2
-      );
-      const underwater=this.position.y<.045;
+      const surfaceY=.045;
+      const bodyBottom=this.position.y-1.0;
+      const submerged=THREE.MathUtils.clamp((surfaceY-bodyBottom)/1.0,0,1);
+      const swimInput=(input.wantsAscend()?1:0)-(input.wantsDive()?1:0);
+      const gravity=-9.81;
+      const buoyancy=9.81*1.25*submerged;
+      const waterDrag=-this.verticalVelocity*2.6;
+      this.verticalVelocity=THREE.MathUtils.clamp(this.verticalVelocity+(gravity+buoyancy+waterDrag+swimInput*8.5)*dt,-4.2,4.2);
+      this.position.y=THREE.MathUtils.clamp(this.position.y+this.verticalVelocity*dt,-12,2.5);
+      if(this.position.y<=-12&&this.verticalVelocity<0)this.verticalVelocity=0;
+      const depthBlend=THREE.MathUtils.clamp((surfaceY+.04-this.position.y)/2.2,0,1);
       if(this.game.scene.fog){
-        this.game.scene.fog.color.setHex(underwater?0x061722:0x718c98);
-        this.game.scene.fog.density=underwater?.032:.0028;
+        this.game.scene.fog.color.setRGB(
+          THREE.MathUtils.lerp(.44,.006,depthBlend),
+          THREE.MathUtils.lerp(.55,.09,depthBlend),
+          THREE.MathUtils.lerp(.60,.13,depthBlend)
+        );
+        this.game.scene.fog.density=.0028+depthBlend*.028;
       }
     }else{
       this.inOcean=false;
+      this.verticalVelocity=0;
       this.position.y=this.eyeY;
       if(this.game.level.id==="7"&&this.game.scene.fog){
         this.game.scene.fog.color.setHex(0x718c98);
@@ -2663,7 +2770,7 @@ class Player{
     if(this.health<=0||this.sanity<=0){this.game.die(this.health<=0?"The dark won.":"Your sense of direction collapsed.");return}
     const distance=Math.hypot(this.position.x-oldX,this.position.z-oldZ);
     const moving=distance>.001;
-    const stride=Math.min(1,Math.abs(mv.y));
+    const stride=Math.min(1,Math.hypot(mv.x,mv.y));
     const targetBobStrength=moving?stride:0;
     this.bobStrength+=(targetBobStrength-this.bobStrength)*(1-Math.exp(-dt*13));
     if(this.bobStrength>.01){
@@ -2678,14 +2785,15 @@ class Player{
     const bobX=(run?.028:.017)*Math.sin(this.bob)*this.bobStrength;
     const breathing=Math.sin(this.game.gameTime*1.31)*.0035;
     const sway=Math.sin(this.game.gameTime*.72)*.0022;
-    const roll=Math.sin(this.bob)*(.0024+(run?.0032:.00125))*this.bobStrength+sway*.35;
+    const lateralLean=THREE.MathUtils.clamp(-this.velocity.x*.006,-.035,.035);
+    const roll=Math.sin(this.bob)*(.0024+(run?.0032:.00125))*this.bobStrength+sway*.35+lateralLean;
     const shakeY=this.shake*Math.sin(this.game.gameTime*31)*.11;
     const side=new THREE.Vector3(Math.cos(this.viewYaw),0,-Math.sin(this.viewYaw));
     const cameraTarget=this.position.clone().addScaledVector(side,bobX);
-    cameraTarget.y=this.position.y+bobY+breathing+shakeY;
-    this.game.camera.position.lerp(cameraTarget,1-Math.exp(-dt*24));
+    cameraTarget.y=this.position.y+bobY+breathing+shakeY+(this.inOcean?Math.sin(this.game.gameTime*2.2)*.012:0);
+    this.game.camera.position.lerp(cameraTarget,1-Math.exp(-dt*18));
 
-    const targetFov=run?67:62;
+    const targetFov=THREE.MathUtils.clamp(62+Math.hypot(this.velocity.x,this.velocity.z)*.72,62,67);
     this.cameraFov+=(targetFov-this.cameraFov)*(1-Math.exp(-dt*8));
     if(Math.abs(this.game.camera.fov-this.cameraFov)>.01){this.game.camera.fov=this.cameraFov;this.game.camera.updateProjectionMatrix()}
     this.game.camera.rotation.set(this.viewPitch,this.viewYaw,roll,"YXZ");
@@ -3316,6 +3424,31 @@ export class BackroomsGame{
     // but setLevel() is intentionally not called during bootstrap, so update() must never
     // assume scene.fog already exists.
     this.scene.fog=new THREE.FogExp2(0x000000,.027);
+    this.sky=new Sky();
+    this.sky.scale.setScalar(220);
+    this.sky.renderOrder=-10;
+    this.sky.material.depthWrite=false;
+    this.sky.material.depthTest=false;
+    this.sky.visible=false;
+    this.scene.add(this.sky);
+    const cloudMaterial=new THREE.ShaderMaterial({
+      uniforms:{time:{value:0},coverage:{value:.56},opacity:{value:.55},cloudColor:{value:new THREE.Color(0xc3c8c8)}},
+      vertexShader:"varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+      fragmentShader:[
+        "varying vec2 vUv;uniform float time;uniform float coverage;uniform float opacity;uniform vec3 cloudColor;",
+        "float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}",
+        "float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x),mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x),f.y);}",
+        "float fbm(vec2 p){float v=0.0,a=.5;for(int i=0;i<4;i++){v+=noise(p)*a;p*=2.03;a*=.5;}return v;}",
+        "void main(){vec2 uv=vec2(vUv.x*2.0+time*.000018,vUv.y);float n=fbm(uv*vec2(18.0,8.0));float detail=fbm(uv*vec2(39.0,17.0)+vec2(3.7,8.1));float field=mix(n,detail,.24);float cloud=smoothstep(coverage,coverage+.2,field);float horizon=smoothstep(.02,.24,vUv.y)*(1.0-smoothstep(.88,1.0,vUv.y));float alpha=cloud*opacity*horizon;gl_FragColor=vec4(cloudColor,alpha);}",
+        "#include <tonemapping_fragment>",
+        "#include <colorspace_fragment>"
+      ].join("\n"),
+      transparent:true,depthWrite:false,depthTest:false,side:THREE.BackSide,toneMapped:true
+    });
+    this.cloudLayer=new THREE.Mesh(new THREE.SphereGeometry(216,48,24),cloudMaterial);
+    this.cloudLayer.renderOrder=-9;
+    this.cloudLayer.visible=false;
+    this.scene.add(this.cloudLayer);
     this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
     const touchDevice=isTouchControlsDevice();
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"highp"});
@@ -3628,7 +3761,21 @@ export class BackroomsGame{
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
-    this.daylight.intensity=this.level.id==="10"?.72:this.level.id==="7"?.22:0;
+    const openSky=["7","9","10"].includes(this.level.id);
+    this.sky.visible=openSky;
+    this.cloudLayer.visible=this.level.id==="9"||this.level.id==="10";
+    const skyUniforms=this.sky.material.uniforms;
+    skyUniforms.turbidity.value=this.level.id==="10"?16:this.level.id==="9"?11:7;
+    skyUniforms.rayleigh.value=this.level.id==="10"?.45:this.level.id==="9"?.22:2.2;
+    skyUniforms.mieCoefficient.value=this.level.id==="10"?.018:this.level.id==="9"?.012:.004;
+    skyUniforms.mieDirectionalG.value=this.level.id==="10"?.72:.82;
+    skyUniforms.sunPosition.value.set(0,this.level.id==="9"?-.18:this.level.id==="10"?.22:.28,-1).normalize();
+    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="10"?.48:.63;
+    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="10"?.78:.42;
+    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="10"?0xb5b9b7:0x343e4b);
+    this.daylight.color.setHex(this.level.id==="9"?0x8499bd:0xe4edf0);
+    this.daylight.position.set(-35,this.level.id==="9"?-18:80,24);
+    this.daylight.intensity=this.level.id==="10"?.48:this.level.id==="7"?.62:this.level.id==="9"?.035:0;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
@@ -3637,6 +3784,9 @@ export class BackroomsGame{
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
     const objective=document.getElementById("objective");if(objective)objective.textContent=this.level.objective;
+    const mobileControls=document.getElementById("mobile-controls");
+    mobileControls?.classList.toggle("level-seven",this.level.id==="7");
+    this.player.velocity.set(0,0,0);this.player.verticalVelocity=0;this.player.inOcean=false;
     const recordingLevel=document.getElementById("recording-level");if(recordingLevel)recordingLevel.textContent=this.level.number;
     const pauseLevel=document.getElementById("pause-level");if(pauseLevel)pauseLevel.textContent=this.level.number;
   }
@@ -4129,6 +4279,18 @@ export class BackroomsGame{
   }
 
   render(){
+    if(this.sky.visible){
+      this.sky.position.copy(this.camera.position);
+      this.cloudLayer.position.copy(this.camera.position);
+      this.cloudLayer.material.uniforms.time.value=this.gameTime;
+    }
+    if(this.level.id==="7"){
+      for(const chunk of this.world.chunks.values()){
+        for(const material of chunk.group.userData.animatedWaterMaterials||[]){
+          if(material.userData.timeUniform)material.userData.timeUniform.value=this.gameTime;
+        }
+      }
+    }
     if(this.level.id==="1"&&this.world.library?.puddle){
       if(!this.level1Reflection)this.level1Reflection=new Level1Reflection(this.renderer,this.scene,this.camera,isTouchControlsDevice());
       this.level1Reflection.setMaterial(this.world.library.puddle);

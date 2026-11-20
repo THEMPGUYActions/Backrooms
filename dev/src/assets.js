@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createLevel1PuddleMaterial } from "./level1-wet.js?v=20261119-level1wet1";
+import { createLevel1PuddleMaterial } from "./level1-wet.js?v=20261120-physics-sky-water1";
 THREE.Cache.enabled=true;
 
 const LOCAL_PBR_ASSET_BASE = new URL("../assets/pbr/", import.meta.url).href;
@@ -352,9 +352,9 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
   const rustPrefix=level.id==="2"?"industrial_rust":"industrial_aged";
   const floorPrefix=level.id==="2"?"level3_concrete":"level2_concrete";
   const entries=[
-    [library.wall,"map",wallPrefix+"_color.jpg",true,2.8,.28,"Utility concrete albedo"],
-    [library.wall,"roughnessMap",wallPrefix+"_roughness.jpg",false,2.8,.28,"Utility concrete roughness"],
-    [library.wall,"normalMap",wallPrefix+"_normal.jpg",false,2.8,.34,"Utility concrete normal"],
+    [library.wall,"map",wallPrefix+"_color.jpg",true,1,.28,"Utility concrete albedo"],
+    [library.wall,"roughnessMap",wallPrefix+"_roughness.jpg",false,1,.28,"Utility concrete roughness"],
+    [library.wall,"normalMap",wallPrefix+"_normal.jpg",false,1,.34,"Utility concrete normal"],
     [library.floor,"map",floorPrefix+"_color.jpg",true,4.2,.16,"Industrial floor albedo"],
     [library.floor,"roughnessMap",floorPrefix+"_roughness.jpg",false,4.2,.16,"Industrial floor roughness"],
     [library.floor,"normalMap",floorPrefix+"_normal.jpg",false,4.2,.2,"Industrial floor normal"],
@@ -377,10 +377,18 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
   library.rustMetal.color.setHex(0xffffff);
   library.rustMetal.roughness=.86;
   library.rustMetal.metalness=.48;
+  for(const material of [library.wall,library.brickWall]){
+    for(const texture of [material.map,material.roughnessMap,material.normalMap]){
+      if(!texture)continue;
+      texture.wrapS=THREE.RepeatWrapping;
+      texture.wrapT=THREE.RepeatWrapping;
+      texture.repeat.set(1,1);
+    }
+  }
   entries.push(
-    [library.brickWall,"map",LOCAL_LEVEL_PBR_BASE+"brick/color.jpg",true,2.4,.2,"Utility brick albedo"],
-    [library.brickWall,"roughnessMap",LOCAL_LEVEL_PBR_BASE+"brick/roughness.jpg",false,2.4,.2,"Utility brick roughness"],
-    [library.brickWall,"normalMap",LOCAL_LEVEL_PBR_BASE+"brick/normalgl.jpg",false,2.4,.28,"Utility brick normal"]
+    [library.brickWall,"map",LOCAL_LEVEL_PBR_BASE+"brick/color.jpg",true,1,.2,"Utility brick albedo"],
+    [library.brickWall,"roughnessMap",LOCAL_LEVEL_PBR_BASE+"brick/roughness.jpg",false,1,.2,"Utility brick roughness"],
+    [library.brickWall,"normalMap",LOCAL_LEVEL_PBR_BASE+"brick/normalgl.jpg",false,1,.28,"Utility brick normal"]
   );
   let done=0;
   await Promise.all(entries.map(async([material,kind,file,color,repeat,normalStrength,label])=>{
