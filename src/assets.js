@@ -262,6 +262,7 @@ function yellowizeCarpetTexture(texture){
   shifted.colorSpace=THREE.SRGBColorSpace;
   shifted.wrapS=texture.wrapS;shifted.wrapT=texture.wrapT;shifted.repeat.copy(texture.repeat);
   shifted.userData.backroomsOwned=true;
+  shifted.userData.sourceUrl=texture.userData.sourceUrl;
   texture.dispose();
   return shifted;
 }
@@ -272,6 +273,7 @@ async function applyRemoteTexture(material,kind,url,color,repeat,normalStrength)
     // independent. A shared Texture lets floor tiling silently retile pillars.
     const texture=(await loadRemoteTexture(url,color)).clone();
     texture.userData.backroomsOwned=true;
+    texture.userData.sourceUrl=url;
     texture.needsUpdate=true;
     // PBR maps use UVs beyond 0..1 on world-scaled walls and pipe geometry.
     // ClampToEdge silently smears the edge texel over those regions.
