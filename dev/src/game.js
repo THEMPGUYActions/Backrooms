@@ -7,7 +7,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-intro-preload-office-lighting1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level4-ceiling-lighting1";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level0-spawn-ceiling-level3-uv1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
@@ -100,6 +100,7 @@ const VHSShader={
 const CELLS=16;
 const BASE_RADIUS=1;
 const MAX_DT=.05;
+const LEVELS_WITHOUT_GLOBAL_CEILING=new Set(["4","7","9","10"]);
 const QUERY_PARAMS=new URLSearchParams(location.search);
 function queryFlag(name){
   if(!QUERY_PARAMS.has(name))return false;
@@ -1348,9 +1349,9 @@ class Chunk{
         g.add(litPanels);
         // A small number of local sources support the panel rows without
         // creating one PointLight for every ceiling tile.
-        for(let row=0;row<4;row++)for(let col=0;col<4;col++){
-          const x=this.originX+size*(.125+col*.25),z=this.originZ+size*(.125+row*.25);
-          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xe8edef,baseIntensity:45,intensity:45,distance:60,cullRadius:64,decay:1.7,fixture:litPanels});
+        for(let row=0;row<12;row++)for(let col=0;col<12;col++){
+          const x=this.originX+size*(.0416666667+col/12),z=this.originZ+size*(.0416666667+row/12);
+          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xfff2df,baseIntensity:8000,intensity:8000,distance:40,cullRadius:42,decay:2,fixture:litPanels});
         }
       }
 
@@ -2553,7 +2554,7 @@ class WorldStreamer{
       this.ceilingSurface.matrixAutoUpdate=false;
       this.ceilingSurface.frustumCulled=false;
       this.ceilingSurface.renderOrder=-2;
-      this.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.game.level.id)) );
+      this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
     }
     if(this.game.level.id==="7"){
       this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
@@ -3040,7 +3041,7 @@ class WorldStreamer{
     const out=[];
     const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
-    const span=this.game.level.id==="0"?1:2;
+    const span=["0","4"].includes(this.game.level.id)?1:2;
     for(let dz=-span;dz<=span;dz++)for(let dx=-span;dx<=span;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
@@ -4210,11 +4211,25 @@ export class BackroomsGame{
     }
     this.toast(this.level.objective,2.4);
   }
+  resizeLocalLightPool(){
+    const touch=isTouchControlsDevice();
+    const desired=this.level.id==="4"?(touch?18:32):this.level.id==="0"?(touch?8:14):(touch?14:24);
+    while(this.localLights.length<desired){
+      const light=new THREE.PointLight(0xffffff,0,0,2);
+      light.name="dynamic_fluorescent_"+this.localLights.length;
+      this.localLights.push(light);
+      this.scene.add(light);
+    }
+    while(this.localLights.length>desired){
+      const light=this.localLights.pop();
+      this.scene.remove(light);
+    }
+  }
   setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
-    this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x788589:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0xb3bbb5:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
     this.sky.visible=openSky&&! ["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
@@ -4240,7 +4255,7 @@ export class BackroomsGame{
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
-    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.level.id)) );
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.level.id));
     this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
     const levelName=document.getElementById("level-name");if(levelName)levelName.textContent=this.level.name;
@@ -4268,7 +4283,7 @@ export class BackroomsGame{
     this.world.ensureAround(this.player.position.x,this.player.position.z);
     const spawn=this.world.findSafeSpawn(this.player.position.x,this.player.position.z,.46);
     this.player.position.set(spawn.x,this.player.eyeY+this.world.walkSurfaceHeightAt(spawn.x,spawn.z),spawn.z);
-    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!( ["7","9","10"].includes(String(this.level.id)) );
+    if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.level.id));
     this.toast("You slipped into "+this.level.number+".",3);
   }
   reachExit(){if(this.level.next)this.changeLevel(this.level.next);else this.ending()}
