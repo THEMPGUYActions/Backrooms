@@ -141,7 +141,7 @@ export const LEVELS = {
       wallRough: 0.88,
       floor: 0xb8b8b4,
       ceiling: 0xe8e8e4,
-      fog: 0x1a1a1c,
+      fog: 0xc9cdd0,
       accent: 0xa0a8b0,
       light: 0xf0f2f5,
       ambient: 0x3a3c40
@@ -156,7 +156,7 @@ export const LEVELS = {
     exitStyle: "green",
     exitAfterChunks: 5,
     objective: "Search the quiet office floors for the stairwell. Stock up before moving on.",
-    safe: true, ambientIntensity: 0.19, fogDensity: 0.006
+    safe: true, ambientIntensity: 0.24, fogDensity: 0.003
   },
   "5": {
     id: "5", number: "LEVEL 5", name: "TERROR HOTEL",

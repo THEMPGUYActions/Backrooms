@@ -6,8 +6,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20260923-2050";
 import { Level1Reflection } from "./level1-wet.js?v=20261119-level1wet1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261119-levels2-10g";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261119-levels2-10g";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level-refine1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, box, makePropSet } from "./assets.js?v=20261120-level-pbr1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 const VHSShader={
@@ -547,7 +547,11 @@ class Chunk{
 
     const chunkDistance=Math.hypot(this.cx,this.cz),minCell=1,maxCell=Math.max(1,cells-2);
     const level1ExitSector=level.id==="1"&&this.zone==="corridors"&&!((this.cx===0&&this.cz===0))&&chunkDistance>=level.exitAfterChunks;
-    if(level.id==="1"){
+    if(level.id==="4"){
+      // Level 4 has no maze edges to convert into a door. Put one stairwell
+      // exit in a deterministic outer sector so the open office cannot be endless.
+      if(this.cx===level.exitAfterChunks&&this.cz===0)this.exit={kind:"office"};
+    }else if(level.id==="1"){
       // The Level 1 generator places the level2 stairwell on
       // maze-grid sectors outside the starting area, using a 50% roll.
       if(level1ExitSector&&rng2.next()<.5){
@@ -561,7 +565,7 @@ class Chunk{
           this.exit={...chosen,kind:"stairwell2"};
         }
       }
-    }else if(chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
+    }else if(level.id!=="4"&&chunkDistance>=level.exitAfterChunks&&cycleHash(this.seedKey(),this.cx*13+this.cz*7,level.id.charCodeAt(0))<.18){
       const candidates=[];
       for(let z=minCell;z<=maxCell;z++)for(let x=minCell;x<=maxCell;x++){
         const mask=this.walls[this.index(x,z)];
@@ -732,7 +736,16 @@ class Chunk{
 
     if(this.exit){
       const e=this.exit;
-      if(e.kind==="stairwell2"){
+      if(e.kind==="office"){
+        const px=this.originX+size/2,pz=this.originZ+size-.2,doorWidth=1.16,doorHeight=2.55;
+        box(g,new THREE.BoxGeometry(doorWidth,doorHeight,.1),lib.officePlastic,px,doorHeight/2,pz-.05);
+        for(const side of [-1,1])box(g,new THREE.BoxGeometry(.12,doorHeight+.08,.16),lib.officeColumn,px+side*(doorWidth/2+.06),doorHeight/2,pz-.05);
+        box(g,new THREE.BoxGeometry(doorWidth+.24,.12,.16),lib.officeColumn,px,doorHeight+.02,pz-.05);
+        const signMaterial=new THREE.MeshStandardMaterial({color:0x5ca66b,emissive:0x287b3b,emissiveIntensity:.65,roughness:.5});
+        box(g,new THREE.BoxGeometry(.72,.22,.035),signMaterial,px,doorHeight+.28,pz-.16);
+        this.exit.position=new THREE.Vector3(px,1.05,pz-.86);
+        this.lightSources.push({position:new THREE.Vector3(px,2.9,pz-.65),color:0x9cdb9a,baseIntensity:4,intensity:4,distance:8,decay:2});
+      }else if(e.kind==="stairwell2"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         const landing=box(g,new THREE.BoxGeometry(3.9,.12,3.9),lib.concrete,px,.06,pz);
         landing.userData.exit=true;
@@ -771,7 +784,7 @@ class Chunk{
         box(g,new THREE.BoxGeometry(doorWidth+.28,.14,.25),lib.exitFrame,px,doorHeight+.02,pz-.06);
         box(g,new THREE.BoxGeometry(.12,.12,.08),level.id==="2"?lib.orangeLight:lib.indicator,px+doorWidth*.28,doorHeight-.28,pz-.2);
         this.collisionSegments.push({x1:px-half,z1:pz,x2:px-doorWidth/2-.08,z2:pz},{x1:px+doorWidth/2+.08,z1:pz,x2:px+half,z2:pz});
-        this.exit.position.set(px,1.05,pz-.92);
+        this.exit.position=new THREE.Vector3(px,1.05,pz-.92);
         this.lightSources.push({position:new THREE.Vector3(px,2.8,pz-.7),color:level.id==="2"?0xa58aff:0x9cdb9a,baseIntensity:3.2,intensity:3.2,distance:7,decay:2});
       }else if(e.kind==="cave"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
@@ -782,26 +795,26 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px+.9,1.28,pz-.08);
         box(g,new THREE.BoxGeometry(2.0,.16,.2),lib.hotelGold,px,2.58,pz-.08);
         box(g,new THREE.BoxGeometry(.72,.28,.06),lib.indicator,px,2.15,pz-.18);
-        this.exit.position.set(px,1.05,pz-.85);
+        this.exit.position=new THREE.Vector3(px,1.05,pz-.85);
         this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.9),color:0xd8c28b,baseIntensity:3.4,intensity:3.4,distance:8,decay:2});
       }else if(e.kind==="ocean"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         const rim=new THREE.Mesh(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
         const shaft=new THREE.Mesh(new THREE.CylinderGeometry(1.18,1.18,2.8,24,1,true),lib.dark);shaft.position.set(px,-1.35,pz);g.add(shaft);
         for(let i=0;i<7;i++)box(g,new THREE.BoxGeometry(1.1,.08,.08),lib.metal,px,-.35-i*.32,pz);
-        this.exit.position.set(px,.82,pz);
+        this.exit.position=new THREE.Vector3(px,.82,pz);
       }else if(e.kind==="suburb"){
         const px=this.originX+(e.x+e.w/2)*cell,pz=this.originZ+(e.z+e.h/2)*cell-3.28;
         box(g,new THREE.BoxGeometry(1.18,2.3,.09),lib.exitDoor,px,1.15,pz);
         for(const side of [-1,1])box(g,new THREE.BoxGeometry(.1,2.48,.14),lib.exitFrame,px+side*.66,1.24,pz);
         box(g,new THREE.BoxGeometry(1.42,.12,.16),lib.exitFrame,px,2.42,pz);
-        this.exit.position.set(px,1.1,pz-.5);
+        this.exit.position=new THREE.Vector3(px,1.1,pz-.5);
         this.lightSources.push({position:new THREE.Vector3(px,2.5,pz-.5),color:0x9cdb9a,baseIntensity:2.6,intensity:2.6,distance:6,decay:2});
       }else if(e.kind==="field"){
         const px=this.originX+(e.x+.5)*cell,pz=this.originZ+(e.z+.5)*cell-3.25;
         for(const side of [-1,1])box(g,new THREE.BoxGeometry(.14,4.2,.18),lib.exitFrame,px+side*1.18,2.1,pz);
         box(g,new THREE.BoxGeometry(2.55,.16,.18),lib.exitFrame,px,4.05,pz);
-        this.exit.position.set(px,1.1,pz-.55);
+        this.exit.position=new THREE.Vector3(px,1.1,pz-.55);
         this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.7),color:0xc2a46b,baseIntensity:2.2,intensity:2.2,distance:7,decay:2});
       }else{
         const p=wallPoint(e,.105,1.95),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
@@ -882,35 +895,56 @@ class Chunk{
         const drum=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.9,12),lib.rustMetal);
         drum.position.set(x,.47,z);g.add(drum);
       }
-      // CylinderGeometry is Y-up. Horizontal runs: rotate so the long axis follows corridor.
-      // alongX → rot.z = PI/2; alongZ → rot.x = PI/2. Vertical risers stay unrotated.
-      const pipeGeometry=new THREE.CylinderGeometry(.11,.11,cell*.72,8);
-      const cleanPipes=new THREE.InstancedMesh(pipeGeometry,pipeMat,cells*cells*2);
-      const rustPipes=new THREE.InstancedMesh(pipeGeometry,rustMat,cells*cells*2);
-      const pipeDummy=new THREE.Object3D();let cleanCount=0,rustCount=0;
-      for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
-        if(rng.next()>.14)continue;
-        const px=this.originX+(x+.5)*cell,pz=this.originZ+(z+.5)*cell,alongX=rng.next()<.5;
-        const py=2.48+rng.next()*.38;
-        pipeDummy.position.set(px,py,pz);
-        // Explicit axis alignment (avoids ambiguous combined Euler)
-        if(alongX) pipeDummy.rotation.set(0,0,Math.PI/2);
-        else pipeDummy.rotation.set(Math.PI/2,0,0);
-        pipeDummy.scale.set(1,1,1);pipeDummy.updateMatrix();
-        if(rng.next()<.48)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
-        else cleanPipes.setMatrixAt(cleanCount++,pipeDummy.matrix);
-        // Occasional vertical riser so runs connect to the ceiling plane
-        if(rng.next()<.32){
-          pipeDummy.position.set(px+(alongX?cell*.28:0),py*.55,pz+(alongX?0:cell*.28));
-          pipeDummy.rotation.set(0,0,0);
-          pipeDummy.scale.set(1,py/ (cell*.72),1);
-          pipeDummy.updateMatrix();
-          if(rng.next()<.5)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
-          else cleanPipes.setMatrixAt(cleanCount++,pipeDummy.matrix);
+      // Route continuous pipework along the ceiling and down to service equipment.
+      // CylinderGeometry is Y-up; each segment is aligned from its endpoints.
+      const pipeGeometry=new THREE.CylinderGeometry(.105,.105,1,10);
+      const pipeCapacity=192;
+      const cleanPipes=new THREE.InstancedMesh(pipeGeometry,pipeMat,pipeCapacity);
+      const rustPipes=new THREE.InstancedMesh(pipeGeometry,rustMat,pipeCapacity);
+      cleanPipes.userData.pipeNetwork=true;rustPipes.userData.pipeNetwork=true;
+      const pipeDummy=new THREE.Object3D(),pipeAxis=new THREE.Vector3(0,1,0);
+      const elbowGeometry=new THREE.SphereGeometry(.145,8,8);
+      const routes=[
+        [[this.originX+1.2,3.04,this.originZ+1.2],[this.originX+size*.30,3.04,this.originZ+1.2],[this.originX+size*.46,3.04,this.originZ+size*.28],[this.originX+size*.78,3.04,this.originZ+size*.28],[this.originX+size-1.2,3.04,this.originZ+size*.48]],
+        [[this.originX+1.2,2.98,this.originZ+size-1.2],[this.originX+size*.24,2.98,this.originZ+size-1.2],[this.originX+size*.40,2.98,this.originZ+size*.72],[this.originX+size*.78,2.98,this.originZ+size*.72],[this.originX+size-1.2,2.98,this.originZ+size*.52]],
+        [[this.originX+1.2,3.10,this.originZ+size*.50],[this.originX+size*.32,3.10,this.originZ+size*.50],[this.originX+size*.48,3.10,this.originZ+size*.62],[this.originX+size-1.2,3.10,this.originZ+size*.62]]
+      ];
+      let cleanCount=0,rustCount=0;
+      const addPipeSegment=(start,end,rusted=false)=>{
+        const direction=new THREE.Vector3().subVectors(end,start),length=direction.length();
+        if(length<.12)return;
+        pipeDummy.position.copy(start).add(end).multiplyScalar(.5);
+        pipeDummy.quaternion.setFromUnitVectors(pipeAxis,direction.normalize());
+        pipeDummy.scale.set(1,length,1);pipeDummy.updateMatrix();
+        if(rusted&&rustCount<pipeCapacity)rustPipes.setMatrixAt(rustCount++,pipeDummy.matrix);
+        else if(cleanCount<pipeCapacity)cleanPipes.setMatrixAt(cleanCount++,pipeDummy.matrix);
+      };
+      for(let routeIndex=0;routeIndex<routes.length;routeIndex++){
+        const route=routes[routeIndex].map(point=>new THREE.Vector3(...point));
+        for(let i=1;i<route.length;i++){
+          addPipeSegment(route[i-1],route[i],(routeIndex+i)%3===0);
+          if(i<route.length-1){
+            const joint=new THREE.Mesh(elbowGeometry,(routeIndex+i)%3===0?rustMat:pipeMat);
+            joint.position.copy(route[i]);g.add(joint);
+          }
+        }
+      }
+      // Vertical drops feed the pumps and wall-mounted service valves.
+      for(let i=0;i<4;i++){
+        const x=this.originX+size*(.18+i*.21),z=this.originZ+(i%2?size*.72:size*.28);
+        const top=new THREE.Vector3(x,3.04,z),bottom=new THREE.Vector3(x,.95,z);
+        addPipeSegment(top,bottom,i%2===1);
+        const collar=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,6,12),lib.handle);
+        collar.position.copy(top);collar.rotation.x=Math.PI/2;g.add(collar);
+        for(const side of [-1,1]){
+          const hanger=box(g,new THREE.BoxGeometry(.055,.12,.055),lib.rustMetal,x+side*.18,3.15,z);
+          hanger.userData.pipeSupport=true;
         }
       }
       cleanPipes.count=cleanCount;rustPipes.count=rustCount;
-      cleanPipes.instanceMatrix.needsUpdate=true;rustPipes.instanceMatrix.needsUpdate=true;g.add(cleanPipes,rustPipes);
+      cleanPipes.instanceMatrix.needsUpdate=true;rustPipes.instanceMatrix.needsUpdate=true;
+      cleanPipes.computeBoundingSphere();rustPipes.computeBoundingSphere();
+      g.add(cleanPipes,rustPipes);
       // Valve wheels, pressure gauges and low service vents sit in the bays.
       for(let i=0;i<8;i++){
         const x=this.originX+cell*(1+rng.next()*Math.max(1,cells-2)),z=this.originZ+cell*(1+rng.next()*Math.max(1,cells-2));
@@ -2120,12 +2154,7 @@ class WorldStreamer{
         else if(this.game.level.id==="0"){
           await applyFoundFootageLevel0Assets(this.library,this.game.level,onProgress);
           await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
-        }else if(this.game.level.id==="4"){
-          // Painted white office + grey carpet; never Level-0 yellow wallpaper packs.
-          if(this.library.wall){this.library.wall.map=null;this.library.wall.normalMap=null;this.library.wall.roughnessMap=null;this.library.wall.color.setHex(0xe6e6e2);this.library.wall.needsUpdate=true;}
-          if(this.library.floor){this.library.floor.map=null;this.library.floor.normalMap=null;this.library.floor.roughnessMap=null;this.library.floor.color.setHex(0x6e7074);this.library.floor.needsUpdate=true;}
-          if(this.library.ceiling){this.library.ceiling.map=null;this.library.ceiling.normalMap=null;this.library.ceiling.roughnessMap=null;this.library.ceiling.color.setHex(0xecece8);this.library.ceiling.needsUpdate=true;}
-        }else await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
+        }else await applyLevelSpecificPBR(this.library,this.game.level,onProgress);
       }catch(error){
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
@@ -2396,6 +2425,25 @@ class WorldStreamer{
         if(mask&8)testSegment(minX,minZ,minX,maxZ);
       }
     }
+    if(this.game.level.id!=="1"){
+      const offset=this.size/2;
+      const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+      const reach=wallRadius+.35;
+      for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+        if(dx<0&&x-chunk.originX>reach)continue;
+        if(dx>0&&chunk.originX+this.size-x>reach)continue;
+        if(dz<0&&z-chunk.originZ>reach)continue;
+        if(dz>0&&chunk.originZ+this.size-z>reach)continue;
+        const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
+        if(!nearby?.collisionSegments?.length)continue;
+        for(const seg of nearby.collisionSegments){
+          const minX=Math.min(seg.x1,seg.x2)-reach,maxX=Math.max(seg.x1,seg.x2)+reach;
+          const minZ=Math.min(seg.z1,seg.z2)-reach,maxZ=Math.max(seg.z1,seg.z2)+reach;
+          if(x<minX||x>maxX||z<minZ||z>maxZ)continue;
+          testSegment(seg.x1,seg.z1,seg.x2,seg.z2);
+        }
+      }
+    }
     return {x,z};
   }
   pebbleAt(x,z){
@@ -2417,9 +2465,15 @@ class WorldStreamer{
     return false;
   }
   exitAt(x,z){
-    const c=this.chunkAt(x,z);if(!c||!c.exit)return false;
-    if(c.exit.kind==="ocean"&&this.game.player.position.y> -2.4)return false;
-    return Math.hypot(c.exit.position.x-x,c.exit.position.z-z)<1.25;
+    const offset=this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+      const chunk=this.chunks.get(this.key(cx+dx,cz+dz)),exit=chunk?.exit;
+      if(!exit?.position)continue;
+      if(exit.kind==="ocean"&&this.game.player.position.y> -2.4)continue;
+      if(Math.hypot(exit.position.x-x,exit.position.z-z)<1.25)return true;
+    }
+    return false;
   }
   lightProximity(x,z){
     const offset=this.size/2;
@@ -2442,11 +2496,13 @@ class WorldStreamer{
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
       for(const light of c.lightSources){
-        if(!frustum.containsPoint(light.position))continue;
+        const influenceRadius=light.cullRadius??(light.distance>0?light.distance:96);
+        const influenceSphere=new THREE.Sphere(light.position,influenceRadius);
+        if(!frustum.intersectsSphere(influenceSphere))continue;
         const range=Math.max(34,light.distance||0);
         const d=Math.hypot(light.position.x-x,light.position.z-z);
         if(d>Math.max(96,range+54))continue;
-        out.push({light,d,score:d});
+        out.push({light,d,score:d-Math.min(influenceRadius,48)*.12});
       }
     }
     out.sort((a,b)=>a.score-b.score);

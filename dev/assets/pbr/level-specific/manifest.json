@@ -1,0 +1,161 @@
+{
+  "license": "CC0-1.0",
+  "license_url": "https://ambientcg.com/license",
+  "resolution": "1K-JPG",
+  "assets": {
+    "brick": {
+      "id": "Bricks094",
+      "source": "https://ambientcg.com/view?id=Bricks094"
+    },
+    "office-carpet": {
+      "id": "Carpet001",
+      "source": "https://ambientcg.com/view?id=Carpet001"
+    },
+    "hotel-carpet": {
+      "id": "Carpet009",
+      "source": "https://ambientcg.com/view?id=Carpet009"
+    },
+    "hotel-wood": {
+      "id": "WoodFloor001",
+      "source": "https://ambientcg.com/view?id=WoodFloor001"
+    },
+    "cave-rock": {
+      "id": "Rocks025",
+      "source": "https://ambientcg.com/view?id=Rocks025"
+    },
+    "wet-asphalt": {
+      "id": "Asphalt025A",
+      "source": "https://ambientcg.com/view?id=Asphalt025A"
+    },
+    "grass": {
+      "id": "Grass001",
+      "source": "https://ambientcg.com/view?id=Grass001"
+    },
+    "soil": {
+      "id": "Ground068",
+      "source": "https://ambientcg.com/view?id=Ground068"
+    }
+  },
+  "files": [
+    {
+      "path": "brick/color.jpg",
+      "sha256": "b5f7845f993bd991617497f8870f419afb861788f5b4a1e1413379ab28dff90e",
+      "bytes": 739308
+    },
+    {
+      "path": "brick/normalgl.jpg",
+      "sha256": "d6f5f9d999ad53d5be1ee500f573e17f723cb228f2d923298787364ea712615f",
+      "bytes": 927789
+    },
+    {
+      "path": "brick/roughness.jpg",
+      "sha256": "2bb8a8857a6667b54e0afaea961f1f7fc081c876bced161296408e0795e0f746",
+      "bytes": 377008
+    },
+    {
+      "path": "office-carpet/color.jpg",
+      "sha256": "603b24064bfbee2f8ac03903592be397f485a793ab6359630641ce9a446ac3dd",
+      "bytes": 1501861
+    },
+    {
+      "path": "office-carpet/normalgl.jpg",
+      "sha256": "0cec36dbf2cfb24f16c82834c0bd8fd9a81f6ed686bb4e7ed1a5dc5239522a3c",
+      "bytes": 2392714
+    },
+    {
+      "path": "office-carpet/roughness.jpg",
+      "sha256": "f1311c8096b3f75bca3f427bb38fef74ffff74c52809b448137a2869096eb324",
+      "bytes": 642512
+    },
+    {
+      "path": "hotel-carpet/color.jpg",
+      "sha256": "e59e16f99e013f43eb49f6e5273924bb2f4f0e9e097b7d21f8c637a5211471d1",
+      "bytes": 1422715
+    },
+    {
+      "path": "hotel-carpet/normalgl.jpg",
+      "sha256": "0aba8143ef899c90c4f56e59e10aaef7c929b83267c931c9298b26b52e2c58d0",
+      "bytes": 2660821
+    },
+    {
+      "path": "hotel-carpet/roughness.jpg",
+      "sha256": "624df864ff90674916cd41bf3943f7e5060f663dfd95623b7076fdf9f77e3d1e",
+      "bytes": 586924
+    },
+    {
+      "path": "hotel-wood/color.jpg",
+      "sha256": "bb978f99ee996136b89a630b076a6625aeaf28f3c83a83bed61e58ed5cf8628d",
+      "bytes": 908334
+    },
+    {
+      "path": "hotel-wood/normalgl.jpg",
+      "sha256": "836707a926b31597f26694aabf7f5f9f747092a5a8937f2dd5a9f40e98803785",
+      "bytes": 1092857
+    },
+    {
+      "path": "hotel-wood/roughness.jpg",
+      "sha256": "12eaebb25eb5c37ac155275482aa4a0c688753469a6ce7d18d9451ef1ade7eeb",
+      "bytes": 475508
+    },
+    {
+      "path": "cave-rock/color.jpg",
+      "sha256": "2fad8b83d07cadc01914b122dc325ffc758d4bc9896fa35ff76ffa3cc01cf018",
+      "bytes": 1730929
+    },
+    {
+      "path": "cave-rock/normalgl.jpg",
+      "sha256": "f53181cde6fb6403872ce9e735d1f67bacdad9d91bad1ac8de9534dc550c6b4c",
+      "bytes": 1975803
+    },
+    {
+      "path": "cave-rock/roughness.jpg",
+      "sha256": "e9507ad2f9dfa738e759755e7dffaa0270195468bcf60fd765193c1959958992",
+      "bytes": 633958
+    },
+    {
+      "path": "wet-asphalt/color.jpg",
+      "sha256": "937906797e5ba8b550b4997fe37b20e517d208c15a93972f073aa4452e11e80c",
+      "bytes": 1056456
+    },
+    {
+      "path": "wet-asphalt/normalgl.jpg",
+      "sha256": "9e693a458d55a3dfddc3c159bc2d9abb83b552e741ca9ee97300241edb360313",
+      "bytes": 2019662
+    },
+    {
+      "path": "wet-asphalt/roughness.jpg",
+      "sha256": "b935bb6fea9735303deeafb9b51d5fa6686b87aba6da40a7b7d895aa960f3c1c",
+      "bytes": 669509
+    },
+    {
+      "path": "grass/color.jpg",
+      "sha256": "b9b6d61bc3b6137b868a3447eef18737896acd26d58fe2f4b83ce8c0e9d3f8ad",
+      "bytes": 1764300
+    },
+    {
+      "path": "grass/normalgl.jpg",
+      "sha256": "eef0b56db5f00a6fcb3d0e0f8463e4e141e88aa85b26527a04d617b75a4ab5d2",
+      "bytes": 2338245
+    },
+    {
+      "path": "grass/roughness.jpg",
+      "sha256": "8810effd44756341170d551501b7d0c645dc2395dbce46a8c7f1e61045258a06",
+      "bytes": 823623
+    },
+    {
+      "path": "soil/color.jpg",
+      "sha256": "027f180023f33e6435ed8cf3f94481904612151360964e134de710b1b52f7a2d",
+      "bytes": 1906391
+    },
+    {
+      "path": "soil/normalgl.jpg",
+      "sha256": "ed5550f1016acca78276e8055e4677604763818846e43d0fee94778aaf5ce424",
+      "bytes": 2303772
+    },
+    {
+      "path": "soil/roughness.jpg",
+      "sha256": "1fbc95dbbbb022c673169d883a722033f9ad2bbb46708ed2b089250d4aab1367",
+      "bytes": 717978
+    }
+  ]
+}
