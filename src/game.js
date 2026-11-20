@@ -2645,6 +2645,7 @@ class WorldStreamer{
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
       if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
+      if(this.ceilingSurface)this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
       this.updateSurfaceTiling();
       this.updateWallTextureTiling();
     })();
@@ -2916,6 +2917,7 @@ class WorldStreamer{
   }
 
   updateVisibility(dt){
+    if(this.ceilingSurface)this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
     const camera=this.game.camera;
     camera.updateMatrixWorld();
     const frustum=new THREE.Frustum().setFromProjectionMatrix(
