@@ -3161,7 +3161,7 @@ class Player{
       const swimInput=(input.wantsAscend()?1:0)-(input.wantsDive()?1:0);
       const forwardStroke=-mv.y*Math.sin(this.pitch);
       const gravity=-9.81;
-      const buoyancy=9.81*1.28*submerged;
+      const buoyancy=9.81*1.18*submerged;
       const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8);
       const swimForce=swimInput*6.4+forwardStroke*3.2;
       this.verticalVelocity=THREE.MathUtils.clamp(this.verticalVelocity+(gravity+buoyancy+waterDrag+swimForce)*dt,-3.1,3.0);

@@ -403,7 +403,7 @@ async function checkGameplayPhysicsAndRendering(){
   for(const token of ['import { Sky } from "three/addons/objects/Sky.js"',"this.sky=new Sky()","this.cloudLayer=new THREE.Mesh","skyUniforms.turbidity.value","this.daylight.intensity=this.level.id==="]){
     if(!game.includes(token))fail("Atmospheric sky setup missing: "+token);
   }
-  for(const token of ["this.velocity=new THREE.Vector3()","function oceanSurfaceHeight(x,z,time)","const buoyancy=9.81*1.28*submerged","const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8)","const forwardStroke=-mv.y*Math.sin(this.pitch)","input.wantsAscend()?1:0","input.wantsDive()?1:0"]){
+  for(const token of ["this.velocity=new THREE.Vector3()","function oceanSurfaceHeight(x,z,time)","const buoyancy=9.81*1.18*submerged","const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8)","const forwardStroke=-mv.y*Math.sin(this.pitch)","input.wantsAscend()?1:0","input.wantsDive()?1:0"]){
     if(!game.includes(token))fail("Player physics contract missing: "+token);
   }
   if(game.includes("Math.sin(this.pitch)*swimInput"))fail("Swimming must not be controlled by camera pitch");
