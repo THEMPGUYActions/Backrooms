@@ -412,7 +412,7 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
   const wallPrefix=level.id==="2"?"level2_concrete":"level3_concrete";
   const metalPrefix=level.id==="2"?"industrial_aged":"industrial_rust";
   const rustPrefix=level.id==="2"?"industrial_rust":"industrial_aged";
-  const floorPrefix=level.id==="2"?"level3_concrete":"level2_concrete";
+  const floorPrefix=level.id==="2"?"level2_concrete":"level3_concrete";
   const entries=[
     [library.wall,"map",wallPrefix+"_color.jpg",true,1,.28,"Utility concrete albedo"],
     [library.wall,"roughnessMap",wallPrefix+"_roughness.jpg",false,1,.28,"Utility concrete roughness"],
