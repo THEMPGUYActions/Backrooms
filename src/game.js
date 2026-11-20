@@ -1242,6 +1242,7 @@ class Chunk{
       const colMat=lib.officeColumn||lib.officePlastic;
       const wallMat=lib.officePlastic;
       const cx=this.originX+size/2,cz=this.originZ+size/2,doorWidth=1.75;
+      let officeWindowIndex=0;
       const roomSpecs=[
         {type:"empty-office",x:.08,z:.08,w:.23,h:.23},
         {type:"open-office",x:.40,z:.08,w:.24,h:.22},
