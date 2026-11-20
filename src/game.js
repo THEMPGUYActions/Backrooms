@@ -743,7 +743,7 @@ class Chunk{
         box(g,new THREE.BoxGeometry(doorWidth+.24,.12,.16),lib.officeColumn,px,doorHeight+.02,pz-.05);
         const signMaterial=new THREE.MeshStandardMaterial({color:0x5ca66b,emissive:0x287b3b,emissiveIntensity:.65,roughness:.5});
         box(g,new THREE.BoxGeometry(.72,.22,.035),signMaterial,px,doorHeight+.28,pz-.16);
-        this.exit.position.set(px,1.05,pz-.86);
+        this.exit.position=new THREE.Vector3(px,1.05,pz-.86);
         this.lightSources.push({position:new THREE.Vector3(px,2.9,pz-.65),color:0x9cdb9a,baseIntensity:4,intensity:4,distance:8,decay:2});
       }else if(e.kind==="stairwell2"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
@@ -784,7 +784,7 @@ class Chunk{
         box(g,new THREE.BoxGeometry(doorWidth+.28,.14,.25),lib.exitFrame,px,doorHeight+.02,pz-.06);
         box(g,new THREE.BoxGeometry(.12,.12,.08),level.id==="2"?lib.orangeLight:lib.indicator,px+doorWidth*.28,doorHeight-.28,pz-.2);
         this.collisionSegments.push({x1:px-half,z1:pz,x2:px-doorWidth/2-.08,z2:pz},{x1:px+doorWidth/2+.08,z1:pz,x2:px+half,z2:pz});
-        this.exit.position.set(px,1.05,pz-.92);
+        this.exit.position=new THREE.Vector3(px,1.05,pz-.92);
         this.lightSources.push({position:new THREE.Vector3(px,2.8,pz-.7),color:level.id==="2"?0xa58aff:0x9cdb9a,baseIntensity:3.2,intensity:3.2,distance:7,decay:2});
       }else if(e.kind==="cave"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
@@ -795,26 +795,26 @@ class Chunk{
         box(g,new THREE.BoxGeometry(.16,2.55,.2),lib.hotelGold,px+.9,1.28,pz-.08);
         box(g,new THREE.BoxGeometry(2.0,.16,.2),lib.hotelGold,px,2.58,pz-.08);
         box(g,new THREE.BoxGeometry(.72,.28,.06),lib.indicator,px,2.15,pz-.18);
-        this.exit.position.set(px,1.05,pz-.85);
+        this.exit.position=new THREE.Vector3(px,1.05,pz-.85);
         this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.9),color:0xd8c28b,baseIntensity:3.4,intensity:3.4,distance:8,decay:2});
       }else if(e.kind==="ocean"){
         const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
         const rim=new THREE.Mesh(new THREE.TorusGeometry(1.45,.16,12,40),lib.rustMetal);rim.rotation.x=Math.PI/2;rim.position.set(px,.055,pz);g.add(rim);
         const shaft=new THREE.Mesh(new THREE.CylinderGeometry(1.18,1.18,2.8,24,1,true),lib.dark);shaft.position.set(px,-1.35,pz);g.add(shaft);
         for(let i=0;i<7;i++)box(g,new THREE.BoxGeometry(1.1,.08,.08),lib.metal,px,-.35-i*.32,pz);
-        this.exit.position.set(px,.82,pz);
+        this.exit.position=new THREE.Vector3(px,.82,pz);
       }else if(e.kind==="suburb"){
         const px=this.originX+(e.x+e.w/2)*cell,pz=this.originZ+(e.z+e.h/2)*cell-3.28;
         box(g,new THREE.BoxGeometry(1.18,2.3,.09),lib.exitDoor,px,1.15,pz);
         for(const side of [-1,1])box(g,new THREE.BoxGeometry(.1,2.48,.14),lib.exitFrame,px+side*.66,1.24,pz);
         box(g,new THREE.BoxGeometry(1.42,.12,.16),lib.exitFrame,px,2.42,pz);
-        this.exit.position.set(px,1.1,pz-.5);
+        this.exit.position=new THREE.Vector3(px,1.1,pz-.5);
         this.lightSources.push({position:new THREE.Vector3(px,2.5,pz-.5),color:0x9cdb9a,baseIntensity:2.6,intensity:2.6,distance:6,decay:2});
       }else if(e.kind==="field"){
         const px=this.originX+(e.x+.5)*cell,pz=this.originZ+(e.z+.5)*cell-3.25;
         for(const side of [-1,1])box(g,new THREE.BoxGeometry(.14,4.2,.18),lib.exitFrame,px+side*1.18,2.1,pz);
         box(g,new THREE.BoxGeometry(2.55,.16,.18),lib.exitFrame,px,4.05,pz);
-        this.exit.position.set(px,1.1,pz-.55);
+        this.exit.position=new THREE.Vector3(px,1.1,pz-.55);
         this.lightSources.push({position:new THREE.Vector3(px,2.2,pz-.7),color:0xc2a46b,baseIntensity:2.2,intensity:2.2,distance:7,decay:2});
       }else{
         const p=wallPoint(e,.105,1.95),anomaly=box(g,new THREE.BoxGeometry(1.72,2.35,.028),lib.wallAnomaly.clone(),p.position.x,p.position.y,p.position.z,0,p.rotation,0);
@@ -2430,6 +2430,10 @@ class WorldStreamer{
       const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
       const reach=wallRadius+.35;
       for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+        if(dx<0&&x-chunk.originX>reach)continue;
+        if(dx>0&&chunk.originX+this.size-x>reach)continue;
+        if(dz<0&&z-chunk.originZ>reach)continue;
+        if(dz>0&&chunk.originZ+this.size-z>reach)continue;
         const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
         if(!nearby?.collisionSegments?.length)continue;
         for(const seg of nearby.collisionSegments){

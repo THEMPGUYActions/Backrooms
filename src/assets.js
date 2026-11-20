@@ -393,11 +393,10 @@ export async function applyIndustrialPBR(library,level,onProgress=()=>{}){
 }
 
 export async function applyLevelSpecificPBR(library,level,onProgress=()=>{}){
-  const carpet=BACKROOMS_PBR_SOURCES.carpet;
   const sets={
-    "4":[[library.floor,"office-tile",2.8,.82,"Office floor tile"]],
+    "4":[[library.floor,"office-carpet",3.1,.97,"Grey office carpet"]],
     "5":[
-      [library.floor,carpet,4.2,.94,"Hotel carpet"],
+      [library.floor,"hotel-carpet",3.2,.95,"Hotel patterned carpet"],
       [library.mahogany,"hotel-wood",1.8,.72,"Hotel mahogany"],
       [library.officeWood,"hotel-wood",1.8,.78,"Hotel timber"]
     ],
@@ -421,7 +420,7 @@ export async function applyLevelSpecificPBR(library,level,onProgress=()=>{}){
     ],
     "10":[
       [library.floor,"soil",3.4,.98,"Farm soil"],
-      [library.farmDirt,"soil",2.8,.98,"Farm dirt"],
+      [library.farmDirt,"soil",3.4,.98,"Farm dirt"],
       [library.lawn,"grass",2.4,.99,"Field grass"]
     ]
   };

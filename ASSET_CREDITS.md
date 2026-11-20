@@ -48,7 +48,8 @@ The following 1K JPG PBR maps are from ambientCG and are released under CC0 1.0 
 | Material set | ambientCG asset |
 | --- | --- |
 | Utility brick | [Bricks094](https://ambientcg.com/view?id=Bricks094) |
-| Office floor tile | [Tiles025](https://ambientcg.com/view?id=Tiles025) |
+| Office carpet | [Carpet001](https://ambientcg.com/view?id=Carpet001) |
+| Hotel carpet | [Carpet009](https://ambientcg.com/view?id=Carpet009) |
 | Hotel wood | [WoodFloor001](https://ambientcg.com/view?id=WoodFloor001) |
 | Cave rock | [Rocks025](https://ambientcg.com/view?id=Rocks025) |
 | Wet asphalt | [Asphalt025A](https://ambientcg.com/view?id=Asphalt025A) |

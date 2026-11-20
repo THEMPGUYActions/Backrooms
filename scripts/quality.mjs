@@ -360,7 +360,7 @@ async function checkLevelSpecificPbrAssets(){
     if(source.license!=="CC0-1.0"||source.license_url!=="https://ambientcg.com/license")fail("Level-specific PBR license metadata is invalid");
     if(JSON.stringify(source)!==JSON.stringify(built))fail("Level-specific PBR build manifest differs from source lock");
     if(source.resolution!=="1K-JPG")fail("Level-specific PBR maps must remain at the 1K-JPG tier");
-    if(source.files?.length!==21)fail("Level-specific PBR lock must contain exactly 21 maps");
+    if(source.files?.length!==24)fail("Level-specific PBR lock must contain exactly 21 maps");
     for(const entry of source.files||[]){
       if(!/^[a-z-]+\/(color|normalgl|roughness)\.jpg$/.test(entry.path))fail("Unexpected level-specific PBR path: "+entry.path);
       if(!Number.isInteger(entry.bytes)||entry.bytes<=0||!/^[a-f0-9]{64}$/.test(entry.sha256||""))fail("Level-specific PBR checksum metadata invalid: "+entry.path);
@@ -374,6 +374,11 @@ async function checkLevelSpecificPbrAssets(){
       }
     }
   }catch(e){fail("Level-specific PBR manifest invalid or missing: "+e.message)}
+}
+
+async function checkExitPositionInitialization(){
+  const source=await readFile(join(root,"src/game.js"),"utf8");
+  if(source.includes("this.exit.position.set("))fail("Special exits must initialize their position vector before assigning coordinates");
 }
 
 async function checkAudioAssets(){
@@ -578,6 +583,7 @@ await checkSpacePotatoAssets();
 await checkAudioAssets();
 await checkIndustrialPbrAssets();
 await checkLevelSpecificPbrAssets();
+await checkExitPositionInitialization();
 await checkWorkflow();
 
 for (const file of files) {
