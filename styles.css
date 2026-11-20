@@ -1819,6 +1819,7 @@ button,.audio-gate{
   opacity:1;
   visibility:visible;
   pointer-events:auto;
+  transition:opacity 1.2s ease,visibility 0s linear 0s;
 }
 .intro-title-page,
 .intro-credits-page,

@@ -436,6 +436,7 @@ async function checkStartupAndLevelPresentation(){
   if(game.indexOf('boot?.classList.add("intro-ready")')>game.indexOf("const assetLoad=this.world.configure();"))fail("The intro must start before asynchronous asset and chunk preloading");
   if(!game.includes("this.armAudioGateFallback?.()")||!game.includes("if(this.pendingStart)this.beginIntroReveal();"))fail("Intro audio activation and queued gameplay handoff must survive asynchronous preloading");
   if(game.indexOf("this.worldReady=true;")>game.indexOf("if(this.pendingStart)this.beginIntroReveal();"))fail("Gameplay may only hand off after the prepared world is ready");
+  if(!css.includes(".intro-screen.intro-ready")||!css.includes("transition:opacity 1.2s ease,visibility 0s linear 0s"))fail("Ready intro overlay must become visible immediately instead of inheriting the fade-out visibility delay");
   if(!css.includes(".intro-ready .intro-title-page")||!css.includes("animation:intro-title-sequence 8.2s ease-in-out forwards"))fail("Intro title cinematic animation is missing");
   if(!css.includes(".intro-ready .intro-credits-page")||!css.includes("animation:intro-credits-sequence 6.4s ease-in-out 8.6s forwards"))fail("Intro credits cinematic animation is missing");
   if(!css.includes(".intro-ready .intro-audio-page")||!css.includes("animation:intro-audio-sequence 1s ease 15.25s forwards"))fail("Intro audio gate timeline is missing");
