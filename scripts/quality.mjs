@@ -382,9 +382,12 @@ async function checkLevelEnvironment(){
   if(LEVELS["7"].fog<0x506070)fail("Level 7 sky/fog palette must not be near-black");
   if(LEVELS["10"].fog<0x808080)fail("Level 10 overcast sky must use a visible daylight palette");
   if(LEVELS["10"].fogDensity>.003)fail("Level 10 must use light atmospheric haze, not permanent dense fog");
-  if(LEVELS["4"].fogDensity!==0||LEVELS["4"].ambientIntensity<2||LEVELS["4"].theme.fog<0xaaaaaa||LEVELS["4"].theme.ambient<0xe0e0e0)fail("Level 4 must have no fog and retain a pale, bright office atmosphere");
-  if(!game.includes('this.level.id==="4"?0xb3bbb5'))fail("Level 4 hemisphere ground fill must not use the near-black default");
-  if(!game.includes("for(let row=0;row<12;row++)for(let col=0;col<12;col++)")||!game.includes("baseIntensity:8000,intensity:8000,distance:40,cullRadius:42,decay:2"))fail("Level 4 must have dense, physically attenuated ceiling-light coverage");
+  if(LEVELS["4"].fogDensity!==0||LEVELS["4"].ambientIntensity<.8||LEVELS["4"].ambientIntensity>1||LEVELS["4"].theme.fog<0xaaaaaa||LEVELS["4"].theme.ambient<0x909090)fail("Level 4 must have no fog and a restrained office ambient-light budget");
+  if(!game.includes('this.level.id==="4"?0x7d898b'))fail("Level 4 hemisphere ground fill must retain a muted cool-gray floor bounce");
+  if(!game.includes("for(let row=0;row<12;row++)for(let col=0;col<12;col++)")||!game.includes("baseIntensity:900,intensity:900,distance:30,cullRadius:32,decay:2"))fail("Level 4 must use restrained, physically attenuated ceiling-light coverage");
+  if(!game.includes('const xA=this.originX+size*(.33')||!game.includes('isLevel4BlackedOut=blackedOut')||!game.includes('level4OfficeSign=true'))fail("Level 4 needs staggered office partitions, mostly blacked-out windows, and restrained room wayfinding");
+  if(!assets.includes('[library.officePlastic,BACKROOMS_PBR_SOURCES.paintedWall,2.4,.96')||!assets.includes('[library.officeCeilingTile,BACKROOMS_PBR_SOURCES.ceiling,2.1,.97'))fail("Level 4 painted drywall and suspended ceiling must use their committed PBR maps");
+  if(!assets.includes('officePlastic:2.4,officeCeilingTile:2.1')||!game.includes('tileGeometryUV(new THREE.BoxGeometry(tileSize,.055,tileSize),lib.officeCeilingTile)'))fail("Level 4 drywall and suspended-ceiling PBR maps must use world-space UV tiling");
   if(!game.includes('const LEVELS_WITHOUT_GLOBAL_CEILING=new Set(["4","7","9","10"])')||!game.includes("LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id))")||!game.includes("LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.level.id))"))fail("Level 4 authored ceiling and open-air levels must hide the generic world ceiling");
   if(!game.includes('this.level.id==="4"?null:new THREE.FogExp2'))fail("Level 4 must not be affected by scene fog");
   if(game.includes("0x142b36"))fail("Level 7 surface fog must not be reset to the old near-black tint each frame");
@@ -442,12 +445,12 @@ async function checkStartupAndLevelPresentation(){
   if(!css.includes(".intro-ready .intro-audio-page")||!css.includes("animation:intro-audio-sequence 1s ease 15.25s forwards"))fail("Intro audio gate timeline is missing");
   if(css.includes(".intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{\n    animation-duration:.01ms"))fail("Reduced-motion CSS must not collapse the intro into a near-instant flash");
   if(!main.includes("if(event.persisted)window.location.reload()"))fail("Back-forward cache restoration must start a fresh intro timeline");
-  if(!sw.includes("backrooms-assets-v60"))fail("Service-worker cache version must change when startup and scene bundles change");
+  if(!sw.includes("backrooms-assets-v61"))fail("Service-worker cache version must change when startup and scene bundles change");
   if(!game.includes("this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half})")||!game.includes("for(const rect of nearby?.solidRects||[])"))fail("Level 1 pillar collision must handle spawn points starting inside a solid pillar");
   if(!game.includes("this.player.position.set(0,this.player.eyeY,0)")||!game.includes("addPanel(left+.14,z,Math.PI/2"))fail("Level 1 central spawn or Level 3 wall-mounted electrical panel layout missing");
   if(!game.includes("addGate(cx,cz-size*.22,true)")||!game.includes("addGate(cx+size*.22,cz,false)"))fail("Level 3 barred gates must be located on visible main service corridors");
   if(game.includes('"sanctum"')||!game.includes('this.zone==="switchgear"')||!game.includes("level3SwitchgearCabinet"))fail("Level 3 special rooms must remain electrical/industrial, not fantasy or temple themed");
-  if(!game.includes("const addOfficeBoundary=(axis,fixed,start,end)=>")||!game.includes("addOfficeBoundary(\"x\",z")||!game.includes("lib.officeWindowGlass,0,2.15,0"))fail("Level 4 must use real exterior wall window openings rather than windows hidden in solid walls");
+  if(!game.includes("const addOfficeBoundary=(axis,fixed,start,end)=>")||!game.includes("addOfficeBoundary(\"x\",z")||!game.includes("blackedOut?lib.officeWindowBlackout:lib.officeWindowGlass")||!game.includes("const xA=this.originX+size*(.33"))fail("Level 4 must use real windows and a connected, non-cross-shaped office layout");
 }
 
 async function checkLevel2UtilityHallGeometry(){
@@ -479,7 +482,12 @@ async function checkLevel2UtilityHallGeometry(){
     "tileGeometryUV(geometry,material)",
     "tileGeometryUV(new THREE.BoxGeometry(rampLength,.28,6.5),lib.concrete)",
     "tileGeometryUV(new THREE.CylinderGeometry(.11,.11,3.8,10),lib.metal)",
-    "this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z)",
+    "this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z,this.parkingFloor)",
+    "const LEVEL1_UPPER_FLOOR_Y=3.0;",
+    "level1UpperFloorOpening",
+    "upperDeck.userData.level1WalkableDeck=true",
+    "this.parkingFloor===0&&this.position.x>=ramp.endX-.05",
+    "this.parkingFloor===1&&this.position.x<=ramp.startX+.05",
     "obstacleSegments=this.collisionSegments.slice(this.baseCollisionSegmentCount)",
     "const centerY=rise/2-.14*Math.cos(angle)",
     "x-.7275",
