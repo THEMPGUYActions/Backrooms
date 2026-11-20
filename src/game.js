@@ -12,7 +12,7 @@ import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyI
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
-  return .045+Math.sin(x*.19+time*.72)*.19+Math.sin(z*.15-time*.61)*.12+Math.sin((x+z)*.09+time*.43)*.075;
+  return .02+Math.sin(x*.19+time*.72)*.13+Math.sin(z*.15-time*.61)*.08+Math.sin((x+z)*.09+time*.43)*.05;
 }
 
 const VHSShader={
@@ -1539,20 +1539,20 @@ class Chunk{
       }
     }else if(level.id==="7"){
       const water=lib.water.clone();
-      water.color.setHex(0x28788a);water.opacity=.89;water.roughness=.13;water.metalness=.035;water.emissive.setHex(0x031a22);water.emissiveIntensity=.12;
+      water.color.setHex(0x28788a);water.opacity=.89;water.roughness=.09;water.metalness=0;water.emissive.setHex(0x031a22);water.emissiveIntensity=.12;
       water.side=THREE.DoubleSide;water.depthWrite=false;
       const waterUniforms={time:{value:0},offset:{value:new THREE.Vector2(this.originX+size/2,this.originZ+size/2)}};
       water.onBeforeCompile=shader=>{
         shader.uniforms.uBackroomsTime=waterUniforms.time;
         shader.uniforms.uBackroomsWaterOffset=waterUniforms.offset;
         shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;\nuniform vec2 uBackroomsWaterOffset;\nvarying vec2 vBackroomsWaterWorld;");
-        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nvec2 waterP=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nfloat waterDx=.046*cos(waterP.x*.19+uBackroomsTime*.72)+.021*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.43);\nfloat waterDz=.035*cos(waterP.y*.15-uBackroomsTime*.61)+.021*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.43);\nobjectNormal=normalize(vec3(-waterDx,waterDz,1.0));");
-        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nvec2 waterWorld=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nvBackroomsWaterWorld=waterWorld;\ntransformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.19+sin(waterWorld.y*.15-uBackroomsTime*.61)*.12+sin((waterWorld.x+waterWorld.y)*.09+uBackroomsTime*.43)*.075;");
+        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nvec2 waterP=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nfloat waterDx=.029*cos(waterP.x*.19+uBackroomsTime*.72)+.005*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.43);\nfloat waterDz=.014*cos(waterP.y*.15-uBackroomsTime*.61)+.005*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.43);\nobjectNormal=normalize(vec3(-waterDx,waterDz,1.0));");
+        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nvec2 waterWorld=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nvBackroomsWaterWorld=waterWorld;\ntransformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.13+sin(waterWorld.y*.15-uBackroomsTime*.61)*.08+sin((waterWorld.x+waterWorld.y)*.09+uBackroomsTime*.43)*.05;");
         shader.fragmentShader=shader.fragmentShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;\nvarying vec2 vBackroomsWaterWorld;");
         shader.fragmentShader=shader.fragmentShader.replace("#include <color_fragment>","#include <color_fragment>\nfloat crestA=pow(max(0.0,sin(vBackroomsWaterWorld.x*.19+vBackroomsWaterWorld.y*.09+uBackroomsTime*1.15)),16.0);\nfloat crestB=pow(max(0.0,sin(vBackroomsWaterWorld.y*.16-vBackroomsWaterWorld.x*.055-uBackroomsTime*.82)),19.0);\nfloat surfaceGlint=crestA*.38+crestB*.25;\ndiffuseColor.rgb*=.82+surfaceGlint;\ndiffuseColor.rgb+=vec3(.055,.15,.18)*(crestA+crestB)*.55;");
         water.userData.timeUniform=shader.uniforms.uBackroomsTime;
       };
-      water.customProgramCacheKey=()=>"backrooms-level7-world-waves-v3";water.needsUpdate=true;
+      water.customProgramCacheKey=()=>"backrooms-level7-world-waves-v4";water.needsUpdate=true;
       const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,128,128),water);
       surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
       water.userData.timeUniform=waterUniforms.time;
