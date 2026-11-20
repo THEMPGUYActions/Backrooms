@@ -7,12 +7,12 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level3-electrical-level4-office1";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-daylight-ocean-startup2";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level0-spawn-ceiling-level3-uv1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
-  return .045+Math.sin(x*.19+time*.55)*.075+Math.sin(z*.15-time*.42)*.045+Math.sin((x+z)*.09+time*.31)*.028;
+  return .02+Math.sin(x*.19+time*.72)*.13+Math.sin(z*.15-time*.61)*.08+Math.sin((x+z)*.09+time*.43)*.05;
 }
 
 const VHSShader={
@@ -216,7 +216,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.obstacleSegments=[];this.baseCollisionSegmentCount=0;this.level1Ramp=null;this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.obstacleSegments=[];this.solidRects=[];this.baseCollisionSegmentCount=0;this.level1Ramp=null;this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
     if(this.game.level.id==="1")this.obstacleSegments=this.collisionSegments.slice(this.baseCollisionSegmentCount);
@@ -436,7 +436,7 @@ class Chunk{
         this.walls.fill(0);
         if(level.id==="3"){
           const roomRoll=cycleHash(this.seedKey()^0x31e1,this.cx*17+this.cz*31,0x3a);
-          this.zone=this.cx===0&&this.cz===0?"generator":roomRoll<.28?"generator":roomRoll<.50?"assembly":roomRoll<.72?"boiler":roomRoll<.88?"sanctum":"corridors";
+          this.zone=this.cx===0&&this.cz===0?"generator":roomRoll<.28?"generator":roomRoll<.50?"assembly":roomRoll<.72?"boiler":roomRoll<.88?"switchgear":"corridors";
           this.level3RoomType=this.zone;
         }
       }else if(level.id==="4"){
@@ -1018,8 +1018,8 @@ class Chunk{
         gate.userData.isLevel3BarredGate=true;
         gate.userData.roomType="blocked-utility-passage";
         g.add(gate);
-        if(alongX)this.collisionSegments.push({x1:x-half,z1:z-depth,x2:x+half,z2:z+depth});
-        else this.collisionSegments.push({x1:x-depth,z1:z-half,x2:x+depth,z2:z+half});
+        if(alongX)this.collisionSegments.push({x1:x-half,z1:z,x2:x+half,z2:z});
+        else this.collisionSegments.push({x1:x,z1:z-half,x2:x,z2:z+half});
       };
       const addPanel=(x,z,rotation=0,large=false)=>{
         const panel=new THREE.Group();
@@ -1093,24 +1093,27 @@ class Chunk{
       addDivider("x",cz-9,this.originX+size*.13,this.originX+size*.87,cx-size*.12,1.8,3.0,brick);
       addDivider("x",cz+9,this.originX+size*.13,this.originX+size*.87,cx+size*.12,1.8,3.0,brick);
 
-      // Rusted, barred utility passages sit off the navigable service spine.
-      addGate(this.originX+size*.50,this.originZ+size*.13,true);
-      addGate(this.originX+size*.13,this.originZ+size*.50,false);
-      addGate(this.originX+size*.87,this.originZ+size*.50,false);
+      // Heavy barred gates interrupt two visible arms of the main service spine.
+      // Their centre remains open so the player can orient before reaching them.
+      addGate(cx,cz-size*.22,true);
+      addGate(cx+size*.22,cz,false);
+      addGate(cx-size*.22,cz,false);
 
-      // Cable trays, junction boxes and insulated pipes trace the corridors.
+      // Cable trays and insulated pipes run above the service corridors.
       for(const offset of [-2.35,2.35]){
         addPipeRun(this.originX+1.2,cz+offset,this.originX+size-1.2,cz+offset,3.12,.075,lib.metal);
         addPipeRun(cx+offset,this.originZ+1.2,cx+offset,this.originZ+size-1.2,3.18,.095,lib.rustMetal);
         box(g,new THREE.BoxGeometry(size-2.4,.07,.12),lib.rustMetal,cx,3.28,cz+offset);
       }
-      for(let i=0;i<7;i++){
-        const x=this.originX+8+i*14.5,z=cz+(i%2?2.35:-2.35);
-        addPanel(x,z,i%2?Math.PI/2:0,i%3===0);
+      // Breaker and switchgear panels are wall-mounted, never placed in the
+      // centre of the service lanes or on top of the overhead pipe runs.
+      for(const z of [this.originZ+size*.19,this.originZ+size*.39,this.originZ+size*.61,this.originZ+size*.81]){
+        addPanel(left+.14,z,Math.PI/2,Math.abs(z-cz)>size*.28);
+        addPanel(right-.14,z,-Math.PI/2,Math.abs(z-cz)>size*.28);
       }
-      for(let i=0;i<8;i++){
-        const z=this.originZ+8+i*14.0,x=cx+(i%2?2.35:-2.35);
-        addPanel(x,z,0,i%3===1);
+      for(const x of [this.originX+size*.19,this.originX+size*.81]){
+        addPanel(x,near+.14,0,false);
+        addPanel(x,far-.14,Math.PI,false);
       }
       let fixtureIndex=0;
       for(let i=0;i<7;i++){
@@ -1161,20 +1164,54 @@ class Chunk{
           addPipeRun(bx,bz-1,bx,roomZ-6,2.45,.12,lib.rustMetal);
           this.collisionSegments.push({x1:bx-1.1,z1:bz-1.1,x2:bx+1.1,z2:bz-1.1},{x1:bx+1.1,z1:bz-1.1,x2:bx+1.1,z2:bz+1.1},{x1:bx+1.1,z1:bz+1.1,x2:bx-1.1,z2:bz+1.1},{x1:bx-1.1,z1:bz+1.1,x2:bx-1.1,z2:bz-1.1});
         }
-      }else if(this.zone==="sanctum"){
-        // A darker, atypical chamber with Greco-Roman pillars and a worn statue.
-        const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.42,.54,3.45,12),lib.officePlastic);
-        for(const px of [-4.7,4.7])for(const pz of [-4.7,4.7]){
-          const copy=pillar.clone();copy.position.set(roomX+px,1.72,roomZ+pz);g.add(copy);
-          const capital=new THREE.Mesh(new THREE.CylinderGeometry(.68,.58,.2,12),lib.officePlastic);
-          capital.position.set(roomX+px,3.48,roomZ+pz);g.add(capital);
+      }else if(this.zone==="switchgear"){
+        // A high-voltage switchgear bay: paired breaker cabinets, visible
+        // busbars, ceramic standoffs and heavy conduit instead of decorative props.
+        for(const side of [-1,1]){
+          const bankX=roomX+side*3.15;
+          const bank=new THREE.Group();bank.position.set(bankX,0,roomZ);
+          box(bank,new THREE.BoxGeometry(2.45,2.55,1.25),lib.rustMetal,0,1.3,0);
+          box(bank,new THREE.BoxGeometry(2.12,2.16,.055),lib.dark,0,1.32,-.655);
+          box(bank,new THREE.BoxGeometry(2.18,.12,.08),lib.metal,0,2.48,-.68);
+          for(let row=0;row<4;row++){
+            const y=2.05-row*.43;
+            for(let col=0;col<3;col++){
+              const x=-.68+col*.68;
+              const switchHandle=box(bank,new THREE.BoxGeometry(.13,.18,.075),lib.handle,x,y,-.71);
+              switchHandle.userData.level3BreakerSwitch=true;
+              const lamp=box(bank,new THREE.BoxGeometry(.12,.105,.065),(row+col)%3===0?lib.orangeLight:lib.indicator,x,y+.16,-.71);
+              lamp.userData.level3BreakerIndicator=true;
+            }
+          }
+          for(let fin=0;fin<9;fin++){
+            box(bank,new THREE.BoxGeometry(.09,1.92,.34),lib.metal,-1.12+fin*.28,1.32,.72);
+          }
+          const cabinet=box(bank,new THREE.BoxGeometry(2.5,.13,1.3),lib.metal,0,.12,0);
+          cabinet.userData.level3SwitchgearCabinet=true;
+          bank.userData.level3SwitchgearBank=true;
+          g.add(bank);
+          const halfX=1.27,halfZ=.68;
+          this.collisionSegments.push(
+            {x1:bankX-halfX,z1:roomZ-halfZ,x2:bankX+halfX,z2:roomZ-halfZ},
+            {x1:bankX+halfX,z1:roomZ-halfZ,x2:bankX+halfX,z2:roomZ+halfZ},
+            {x1:bankX+halfX,z1:roomZ+halfZ,x2:bankX-halfX,z2:roomZ+halfZ},
+            {x1:bankX-halfX,z1:roomZ+halfZ,x2:bankX-halfX,z2:roomZ-halfZ}
+          );
         }
-        const plinth=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(1.9,.5,1.9),lib.rustMetal),lib.rustMetal);
-        plinth.position.set(roomX, .25,roomZ);g.add(plinth);
-        const statue=new THREE.Mesh(new THREE.ConeGeometry(.7,2.25,8),lib.officePlastic);
-        statue.position.set(roomX,1.62,roomZ);g.add(statue);
-        const stained=new THREE.Mesh(new THREE.PlaneGeometry(3.2,2.2),lib.windowDark);
-        stained.position.set(roomX,2.25,roomZ-6.8);g.add(stained);
+        for(const offset of [-2.15,2.15]){
+          addPipeRun(roomX-5.2,roomZ+offset,roomX+5.2,roomZ+offset,3.08,.11,lib.rustMetal);
+          addPipeRun(roomX-5.2,roomZ+offset,roomX+5.2,roomZ+offset,3.32,.065,lib.metal);
+        }
+        const insulatorGeometry=new THREE.CylinderGeometry(.13,.19,.62,10);
+        for(const xOffset of [-4.6,-2.3,0,2.3,4.6])for(const zOffset of [-2.15,2.15]){
+          const insulator=new THREE.Mesh(insulatorGeometry,lib.officeColumn||lib.officePlastic);
+          insulator.position.set(roomX+xOffset,2.73,roomZ+zOffset);
+          insulator.userData.level3BusbarInsulator=true;
+          g.add(insulator);
+        }
+        const warning=box(g,new THREE.BoxGeometry(1.85,.48,.055),lib.orangeLight,roomX,2.78,roomZ-5.1);
+        warning.userData.level3WarningSign=true;
+        warning.userData.label="HIGH VOLTAGE";
       }else{
         const storage=new THREE.Group();storage.position.set(roomX,0,roomZ);
         for(let i=0;i<4;i++){
@@ -1218,14 +1255,53 @@ class Chunk{
           if(b<end)addOfficeWall(b,fixed,end,fixed,height);
         }
       };
-      // Connected cross-hallways continue cleanly through every streamed edge.
-      for(const x of [this.originX+.22,this.originX+size-.22]){
-        const opening=cz;
-        addOfficePartition("z",x,this.originZ+.2,this.originZ+size-.2,opening,2.0,level.wallHeight);
-      }
-      for(const z of [this.originZ+.22,this.originZ+size-.22]){
-        addOfficePartition("x",z,this.originX+.2,this.originX+size-.2,cx,2.0,level.wallHeight);
-      }
+      const addOfficeWindow=(axis,fixed,center,index)=>{
+        const alongZ=axis==="z",rotation=alongZ?-Math.PI/2:0;
+        const windowGroup=new THREE.Group();
+        windowGroup.position.set(alongZ?fixed:center,0,alongZ?center:fixed);
+        windowGroup.rotation.y=rotation;
+        const pane=box(windowGroup,new THREE.BoxGeometry(3.05,1.42,.055),lib.officeWindowGlass,0,2.15,0);
+        pane.userData.isLevel4Window=true;
+        pane.userData.rainy=index%3!==1;
+        const frame=lib.officeColumn||lib.officeFileCabinet;
+        box(windowGroup,new THREE.BoxGeometry(3.22,.12,.13),frame,0,1.42,0);
+        box(windowGroup,new THREE.BoxGeometry(3.22,.12,.13),frame,0,2.88,0);
+        for(const side of [-1,1])box(windowGroup,new THREE.BoxGeometry(.12,1.58,.13),frame,side*1.55,2.15,0);
+        if(index%3!==1){
+          for(let streak=0;streak<11;streak++){
+            const sx=-1.34+streak*.268;
+            const drops=box(windowGroup,new THREE.BoxGeometry(.018,.76+rng.next()*.56,.012),lib.officeWindowStreak,sx,2.15+(rng.next()-.5)*.1,.045);
+            drops.userData.isLevel4RainStreak=true;
+          }
+        }
+        windowGroup.userData.isLevel4Window=true;
+        g.add(windowGroup);
+        if(alongZ)this.collisionSegments.push({x1:fixed,z1:center-1.55,x2:fixed,z2:center+1.55});
+        else this.collisionSegments.push({x1:center-1.55,z1:fixed,x2:center+1.55,z2:fixed});
+      };
+      const addOfficeBoundary=(axis,fixed,start,end)=>{
+        const span=end-start,openings=[
+          {center:start+span*.24,width:3.45,window:true},
+          {center:(start+end)/2,width:2.2,window:false},
+          {center:start+span*.76,width:3.45,window:true}
+        ].sort((a,b)=>a.center-b.center);
+        let cursor=start,index=0;
+        for(const opening of openings){
+          const a=opening.center-opening.width/2,b=opening.center+opening.width/2;
+          if(a>cursor){
+            if(axis==="x")addOfficeWall(cursor,fixed,a,fixed,level.wallHeight);
+            else addOfficeWall(fixed,cursor,fixed,a,level.wallHeight);
+          }
+          if(opening.window)addOfficeWindow(axis,fixed,opening.center,index++);
+          cursor=b;
+        }
+        if(cursor<end){
+          if(axis==="x")addOfficeWall(cursor,fixed,end,fixed,level.wallHeight);
+          else addOfficeWall(fixed,cursor,fixed,end,level.wallHeight);
+        }
+      };
+      for(const z of [this.originZ+.22,this.originZ+size-.22])addOfficeBoundary("x",z,this.originX+.2,this.originX+size-.2);
+      for(const x of [this.originX+.22,this.originX+size-.22])addOfficeBoundary("z",x,this.originZ+.2,this.originZ+size-.2);
       // Perimeter and internal office dividers create a readable connected plan.
       addOfficePartition("z",this.originX+size*.50,this.originZ+1,this.originZ+size-1,this.originZ+size*.25,doorWidth);
       addOfficePartition("x",this.originZ+size*.50,this.originX+1,this.originX+size-1,this.originX+size*.75,doorWidth);
@@ -1274,35 +1350,7 @@ class Chunk{
         // creating one PointLight for every ceiling tile.
         for(let i=0;i<8;i++){
           const x=this.originX+size*(.12+(i%4)*.25),z=this.originZ+size*(i<4?.25:.75);
-          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xe4e8e6,baseIntensity:13,intensity:13,distance:15,decay:2,fixture:litPanels});
-        }
-      }
-
-      // Windows line the outer office walls. Most have opaque blinds/dark glass;
-      // occasional panes show the rainy, foggy exterior described by Fandom.
-      const addOfficeWindow=(x,z,rotation,index)=>{
-        const windowGroup=new THREE.Group();windowGroup.position.set(x,2.18,z);windowGroup.rotation.y=rotation;
-        const rainy=index%5===0;
-        const pane=box(windowGroup,new THREE.BoxGeometry(2.75,1.42,.035),rainy?lib.officeWindowGlass:lib.windowDark,0,0,0);
-        pane.userData.isLevel4Window=true;pane.userData.rainy=rainy;
-        for(const y of [-.76,.76])box(windowGroup,new THREE.BoxGeometry(2.95,.08,.1),lib.officeFileCabinet,0,y,0);
-        for(const xSide of [-1.43,1.43])box(windowGroup,new THREE.BoxGeometry(.08,1.58,.1),lib.officeFileCabinet,xSide,0,0);
-        if(rainy){
-          for(let streak=0;streak<9;streak++){
-            const sx=-1.25+streak*.31;
-            const drops=box(windowGroup,new THREE.BoxGeometry(.018,.8+rng.next()*.42,.012),lib.officeWindowStreak,sx,(rng.next()-.5)*.1,.03);
-            drops.userData.isLevel4RainStreak=true;
-          }
-        }
-        windowGroup.userData.isLevel4Window=true;
-        g.add(windowGroup);
-      };
-      let windowIndex=0;
-      for(const side of ["north","south","east","west"]){
-        for(const t of [.24,.76]){
-          const x=side==="west"?this.originX+.24:side==="east"?this.originX+size-.24:this.originX+size*t;
-          const z=side==="north"?this.originZ+.24:side==="south"?this.originZ+size-.24:this.originZ+size*t;
-          addOfficeWindow(x,z,side==="west"||side==="east"?Math.PI/2:0,windowIndex++);
+          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xe4e8e6,baseIntensity:30,intensity:30,distance:20,decay:2,fixture:litPanels});
         }
       }
 
@@ -1491,21 +1539,21 @@ class Chunk{
       }
     }else if(level.id==="7"){
       const water=lib.water.clone();
-      water.color.setHex(0x3b8290);water.opacity=.84;water.roughness=.19;water.metalness=.015;
+      water.color.setHex(0x28788a);water.opacity=.89;water.roughness=.09;water.metalness=0;water.emissive.setHex(0x031a22);water.emissiveIntensity=.12;
       water.side=THREE.DoubleSide;water.depthWrite=false;
       const waterUniforms={time:{value:0},offset:{value:new THREE.Vector2(this.originX+size/2,this.originZ+size/2)}};
       water.onBeforeCompile=shader=>{
         shader.uniforms.uBackroomsTime=waterUniforms.time;
         shader.uniforms.uBackroomsWaterOffset=waterUniforms.offset;
-        shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;\nuniform vec2 uBackroomsWaterOffset;");
-        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nvec2 waterP=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nfloat waterDx=.01425*cos(waterP.x*.19+uBackroomsTime*.55)+.00405*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.31);\nfloat waterDz=.00675*cos(waterP.y*.15-uBackroomsTime*.42)+.00405*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.31);\nobjectNormal=normalize(vec3(-waterDx,waterDz,1.0));");
-        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nvec2 waterWorld=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\ntransformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.55)*.075+sin(waterWorld.y*.15-uBackroomsTime*.42)*.045+sin((waterWorld.x+waterWorld.y)*.09+uBackroomsTime*.31)*.028;");
-        shader.fragmentShader=shader.fragmentShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;");
-        shader.fragmentShader=shader.fragmentShader.replace("#include <color_fragment>","#include <color_fragment>\nfloat surfaceGlint=pow(max(0.0,sin(gl_FragCoord.x*.017+gl_FragCoord.y*.011+uBackroomsTime*.8)),12.0)*.075;\ndiffuseColor.rgb*=.96+surfaceGlint;");
+        shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;\nuniform vec2 uBackroomsWaterOffset;\nvarying vec2 vBackroomsWaterWorld;");
+        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nvec2 waterP=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nfloat waterDx=.029*cos(waterP.x*.19+uBackroomsTime*.72)+.005*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.43);\nfloat waterDz=.014*cos(waterP.y*.15-uBackroomsTime*.61)+.005*cos((waterP.x+waterP.y)*.09+uBackroomsTime*.43);\nobjectNormal=normalize(vec3(-waterDx,waterDz,1.0));");
+        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nvec2 waterWorld=vec2(position.x+uBackroomsWaterOffset.x,-position.y+uBackroomsWaterOffset.y);\nvBackroomsWaterWorld=waterWorld;\ntransformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.13+sin(waterWorld.y*.15-uBackroomsTime*.61)*.08+sin((waterWorld.x+waterWorld.y)*.09+uBackroomsTime*.43)*.05;");
+        shader.fragmentShader=shader.fragmentShader.replace("#include <common>","#include <common>\nuniform float uBackroomsTime;\nvarying vec2 vBackroomsWaterWorld;");
+        shader.fragmentShader=shader.fragmentShader.replace("#include <color_fragment>","#include <color_fragment>\nfloat crestA=pow(max(0.0,sin(vBackroomsWaterWorld.x*.19+vBackroomsWaterWorld.y*.09+uBackroomsTime*1.15)),16.0);\nfloat crestB=pow(max(0.0,sin(vBackroomsWaterWorld.y*.16-vBackroomsWaterWorld.x*.055-uBackroomsTime*.82)),19.0);\nfloat surfaceGlint=crestA*.38+crestB*.25;\ndiffuseColor.rgb*=.82+surfaceGlint;\ndiffuseColor.rgb+=vec3(.055,.15,.18)*(crestA+crestB)*.55;");
         water.userData.timeUniform=shader.uniforms.uBackroomsTime;
       };
-      water.customProgramCacheKey=()=>"backrooms-level7-world-waves-v2";water.needsUpdate=true;
-      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,64,64),water);
+      water.customProgramCacheKey=()=>"backrooms-level7-world-waves-v4";water.needsUpdate=true;
+      const surface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,128,128),water);
       surface.rotation.x=-Math.PI/2;surface.position.set(this.originX+size/2,.045,this.originZ+size/2);surface.renderOrder=1;g.add(surface);
       water.userData.timeUniform=waterUniforms.time;
       g.userData.animatedWaterMaterials=[water];
@@ -2028,12 +2076,13 @@ class Chunk{
           const p=center(ix,iz);
           columns.push(new THREE.Matrix4().makeTranslation(p.x,level.wallHeight/2,p.z));
           bases.push(new THREE.Matrix4().makeTranslation(p.x,.08,p.z));
-          const half=.61;
+          const half=.71;
+          this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half});
           this.collisionSegments.push(
-            {x1:p.x-half,z1:p.z-half,x2:p.x+half,z2:p.z-half},
-            {x1:p.x+half,z1:p.z-half,x2:p.x+half,z2:p.z+half},
-            {x1:p.x+half,z1:p.z+half,x2:p.x-half,z2:p.z+half},
-            {x1:p.x-half,z1:p.z+half,x2:p.x-half,z2:p.z-half}
+            {x1:p.x-.61,z1:p.z-.61,x2:p.x+.61,z2:p.z-.61},
+            {x1:p.x+.61,z1:p.z-.61,x2:p.x+.61,z2:p.z+.61},
+            {x1:p.x+.61,z1:p.z+.61,x2:p.x-.61,z2:p.z+.61},
+            {x1:p.x-.61,z1:p.z+.61,x2:p.x-.61,z2:p.z-.61}
           );
         }
       }
@@ -2189,7 +2238,8 @@ class Chunk{
           const px=x,pz=this.originZ+z;
           box(g,new THREE.BoxGeometry(.72,level.wallHeight,.72),lib.level1Pillar,px,level.wallHeight/2,pz);
           box(g,new THREE.BoxGeometry(.94,.12,.94),lib.garageBase,px,.06,pz);
-          const half=.36;
+          const half=.47;
+          this.solidRects.push({minX:px-half,maxX:px+half,minZ:pz-half,maxZ:pz+half});
           this.collisionSegments.push(
             {x1:px-half,z1:pz-half,x2:px+half,z2:pz-half},
             {x1:px+half,z1:pz-half,x2:px+half,z2:pz+half},
@@ -2251,6 +2301,7 @@ class Chunk{
           for(const [ox,oz] of [[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]]){
             const px=p.x+ox*1.15,pz=p.z+oz*1.15,half=.29;
             box(g,new THREE.BoxGeometry(.58,level.wallHeight,.58),lib.level1Pillar,px,level.wallHeight/2,pz);
+            this.solidRects.push({minX:px-.34,maxX:px+.34,minZ:pz-.34,maxZ:pz+.34});
             this.collisionSegments.push(
               {x1:px-half,z1:pz-half,x2:px+half,z2:pz-half},
               {x1:px+half,z1:pz-half,x2:px+half,z2:pz+half},
@@ -2538,7 +2589,7 @@ class WorldStreamer{
     // pending, and reading this.game.level/this.library after an await used to
     // apply Level 0 carpet maps to the next level's ceiling material.
     const assetLibrary=this.library,assetLevel=this.game.level;
-    void (async()=>{
+    const assetLoad=(async()=>{
       try{
         if(assetLevel.id==="1")await applyLevel1Assets(assetLibrary,assetLevel,onProgress);
         else if(assetLevel.id==="2"||assetLevel.id==="3")await applyIndustrialPBR(assetLibrary,assetLevel,onProgress);
@@ -2550,14 +2601,12 @@ class WorldStreamer{
       }catch(error){
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
-      // A superseded configuration must never retile or otherwise mutate the
-      // active level's materials after its own asset load has started.
       if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
       this.updateSurfaceTiling();
       this.updateWallTextureTiling();
     })();
 
-    return true;
+    return assetLoad;
   }
 
   configureLevel0FloorHoles(material){
@@ -2679,7 +2728,7 @@ class WorldStreamer{
       if(!this.chunks.has(k)){
         const c=new Chunk(this,cx+dx,cz+dz);this.chunks.set(k,c);this.game.scene.add(c.group);changed=true;
         const entityChance=this.game.level.id==="3"?.13:this.game.level.id==="4"?.012:.055;
-        if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&c.level3RoomType!=="sanctum"&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<entityChance)c.entitySpawn=true;
+        if(this.game.level.entity!=="none"&&Math.hypot(cx+dx,cz+dz)>=2&&c.level3RoomType!=="switchgear"&&cycleHash(this.game.seed,c.cx,c.cz+449+this.game.level.id.charCodeAt(0))<entityChance)c.entitySpawn=true;
       }
     }
     for(const [k,c] of this.chunks){
@@ -2687,6 +2736,43 @@ class WorldStreamer{
     }
     if(changed)this.refreshFloorPits();
   }
+  async ensureAroundAsync(x,z,onProgress=()=>{}){
+    const offset=this.size/2;
+    const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
+    const centerX=cx*this.size,centerZ=cz*this.size;
+    if(centerX!==this.surfaceCenterX||centerZ!==this.surfaceCenterZ){
+      this.surfaceCenterX=centerX;this.surfaceCenterZ=centerZ;
+      for(const surface of [this.floorSurface,this.ceilingSurface]){
+        if(!surface)continue;
+        surface.position.x=centerX;surface.position.z=centerZ;surface.updateMatrix();
+      }
+      this.updateSurfaceTiling();
+    }
+    const targets=[];
+    for(let dz=-this.radius;dz<=this.radius;dz++)for(let dx=-this.radius;dx<=this.radius;dx++){
+      if(dx*dx+dz*dz>(this.radius+.35)*(this.radius+.35))continue;
+      targets.push([cx+dx,cz+dz]);
+    }
+    let changed=false,done=0;
+    for(const [chunkX,chunkZ] of targets){
+      const key=this.key(chunkX,chunkZ);
+      if(!this.chunks.has(key)){
+        const chunk=new Chunk(this,chunkX,chunkZ);
+        this.chunks.set(key,chunk);this.game.scene.add(chunk.group);changed=true;
+        const entityChance=this.game.level.id==="3"?.13:this.game.level.id==="4"?.012:.055;
+        if(this.game.level.entity!=="none"&&Math.hypot(chunkX,chunkZ)>=2&&chunk.level3RoomType!=="switchgear"&&cycleHash(this.game.seed,chunkX,chunkZ+449+this.game.level.id.charCodeAt(0))<entityChance)chunk.entitySpawn=true;
+      }
+      done++;
+      onProgress(done,targets.length);
+      if(done%2===0&&done<targets.length)await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+    }
+    for(const [key,chunk] of this.chunks){
+      if(Math.hypot(chunk.cx-cx,chunk.cz-cz)>this.radius+1){this.game.scene.remove(chunk.group);this.chunks.delete(key);changed=true;}
+    }
+    if(changed)this.refreshFloorPits();
+    return done;
+  }
+
   setLevel0AllRed(enabled=true){
     this.forceLevel0AllRed=!!enabled;
     if(this.game.level.id!=="0")return;
@@ -2869,6 +2955,18 @@ class WorldStreamer{
         if(dz<0&&z-chunk.originZ>reach)continue;
         if(dz>0&&chunk.originZ+this.size-z>reach)continue;
         const nearby=this.chunks.get(this.key(cx+dx,cz+dz));
+        for(const rect of nearby?.solidRects||[]){
+          if(x<rect.minX-reach||x>rect.maxX+reach||z<rect.minZ-reach||z>rect.maxZ+reach)continue;
+          if(x>rect.minX&&x<rect.maxX&&z>rect.minZ&&z<rect.maxZ){
+            const exits=[
+              {distance:x-rect.minX,axis:'x',value:rect.minX-wallRadius},
+              {distance:rect.maxX-x,axis:'x',value:rect.maxX+wallRadius},
+              {distance:z-rect.minZ,axis:'z',value:rect.minZ-wallRadius},
+              {distance:rect.maxZ-z,axis:'z',value:rect.maxZ+wallRadius}
+            ].sort((a,b)=>a.distance-b.distance);
+            if(exits[0].axis==='x')x=exits[0].value;else z=exits[0].value;
+          }
+        }
         for(const seg of nearby?.obstacleSegments||[]){
           const minX=Math.min(seg.x1,seg.x2)-reach,maxX=Math.max(seg.x1,seg.x2)+reach;
           const minZ=Math.min(seg.z1,seg.z2)-reach,maxZ=Math.max(seg.z1,seg.z2)+reach;
@@ -3063,7 +3161,7 @@ class Player{
       const swimInput=(input.wantsAscend()?1:0)-(input.wantsDive()?1:0);
       const forwardStroke=-mv.y*Math.sin(this.pitch);
       const gravity=-9.81;
-      const buoyancy=9.81*1.28*submerged;
+      const buoyancy=9.81*1.18*submerged;
       const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8);
       const swimForce=swimInput*6.4+forwardStroke*3.2;
       this.verticalVelocity=THREE.MathUtils.clamp(this.verticalVelocity+(gravity+buoyancy+waterDrag+swimForce)*dt,-3.1,3.0);
@@ -3767,7 +3865,7 @@ export class BackroomsGame{
     if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
     this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:queryFlag("admin"),god:false,noclip:false};
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.deathSequenceDuration=3.35;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.deathSequenceDuration=3.35;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.preloadComplete=false;this.loadingProgress=0;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.syncPageTitle();
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
     this.redZoneFontTimer=0;
@@ -3883,35 +3981,59 @@ export class BackroomsGame{
   }
   async mount(){
     document.getElementById("game").appendChild(this.renderer.domElement);
+    const loading=document.getElementById("loading-screen");
+    loading?.classList.remove("hidden");
+    this.setLoadingProgress(.02,"INITIALIZING WORLD","Preparing the starting area...");
     this.resize();
     this.quality.apply();
     this.player.reset();
     this.mounted=true;
-    document.getElementById("boot")?.classList.add("intro-ready");
     this.render();
     this.last=performance.now();
     requestAnimationFrame(this.loop.bind(this));
 
-    // Build the procedural world before allowing the intro to hand control to gameplay.
-    // configure() returns as soon as the fallback geometry exists; optional visual
-    // enhancements continue in the background and can never block starting the game.
     try{
-      // configure() creates the procedural fallback synchronously before any
-      // remote asset work. Start the playable world from that fallback now.
-      const worldLoad=this.world.configure((progress,label,detail)=>{
-        this.setLoadingProgress(progress,label||"BUILDING WORLD",detail||"Generating the environment...");
+      const assetLoad=this.world.configure((progress,label,detail)=>{
+        this.setLoadingProgress(.12+Math.max(0,Math.min(1,progress))*.48,label||"LOADING ASSETS",detail||"Preparing level textures...");
       });
-      this.world.ensureAround(0,0);
+      this.setLoadingProgress(.60,"GENERATING STARTING AREA","Building nearby rooms, corridors and props...");
+      await this.world.ensureAroundAsync(0,0,(done,total)=>{
+        this.setLoadingProgress(.60+(done/Math.max(1,total))*.24,"GENERATING STARTING AREA",`Building nearby sectors ${done} / ${total}`);
+      });
       const requested=this.level.id==="0"?this.world.level0SpawnPoint():{x:0,z:0};
       const spawn=this.world.findSafeSpawn(requested.x,requested.z,.46);
       this.player.position.set(spawn.x,this.player.eyeY+this.world.walkSurfaceHeightAt(spawn.x,spawn.z),spawn.z);
+      this.setLoadingProgress(.86,"FINISHING WORLD","Applying textures and preparing the renderer...");
+      await assetLoad;
+      this.scene.updateMatrixWorld(true);
+      this.render();
+      if(typeof this.renderer.compileAsync==="function"){
+        try{await this.renderer.compileAsync(this.scene,this.camera)}
+        catch(error){console.warn("[Backrooms] Shader prewarm skipped; shaders will compile on first use:",error)}
+      }
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      this.setLoadingProgress(1,"WORLD READY","The recording is ready.");
+      if(loading){
+        await new Promise(resolve=>{
+          const finish=event=>{
+            if(event.target!==loading||event.propertyName!=="opacity")return;
+            loading.removeEventListener("transitionend",finish);
+            resolve();
+          };
+          loading.addEventListener("transitionend",finish);
+          loading.classList.add("hidden");
+          const durations=getComputedStyle(loading).transitionDuration.split(",").map(value=>value.trim()).map(value=>value.endsWith("ms")?parseFloat(value):parseFloat(value)*1000);
+          if(!durations.some(value=>value>0))requestAnimationFrame(()=>{loading.removeEventListener("transitionend",finish);resolve()});
+        });
+      }
       this.worldReady=true;
+      this.preloadComplete=true;
+      document.getElementById("boot")?.classList.add("intro-ready");
+      this.armAudioGateFallback?.();
       if(this.pendingStart)this.beginIntroReveal();
-      worldLoad.catch(error=>{
-        console.warn("[Backrooms] Optional world assets failed:",error);
-      });
     }catch(error){
       console.error("[Backrooms] World initialization failed:",error);
+      this.setLoadingProgress(1,"WORLD INITIALIZATION FAILED","Refresh to retry the recording.");
       this.toast("WORLD INITIALIZATION FAILED",5);
     }
   }
@@ -3956,7 +4078,10 @@ export class BackroomsGame{
       },{once:false});
       // CSS animation timing is fixed, but keep a JS fallback so the gate can
       // never remain untappable if animation events are lost on WebKit.
-      setTimeout(activateAudioGate,16500);
+      this.armAudioGateFallback=()=>{
+        clearTimeout(this.audioGateFallbackTimer);
+        this.audioGateFallbackTimer=setTimeout(activateAudioGate,17000);
+      };
     }
     const handleAudioGesture=event=>{
       if(!audioGateReady&&audioPage?.classList.contains("intro-audio-active"))audioGateReady=true;
@@ -4041,18 +4166,7 @@ export class BackroomsGame{
   }
   beginIntroReveal(){
     if(!this.introActive||!this.mounted)return;
-    // The procedural fallback is enough to start. If startup was triggered
-    // before mount finished, finish the initial chunk setup here instead of
-    // leaving the tap waiting on a readiness flag.
-    if(!this.worldReady){
-      try{
-        this.world.ensureAround(this.player.position.x,this.player.position.z);
-        this.worldReady=true;
-      }catch(error){
-        console.error("[Backrooms] Initial world setup failed:",error);
-        return;
-      }
-    }
+    if(!this.worldReady){this.pendingStart=true;return;}
     this.introActive=false;
     this.introPlaying=false;
     this.pendingStart=false;
@@ -4105,8 +4219,9 @@ export class BackroomsGame{
     const pct=document.getElementById("loading-percent");
     const status=document.getElementById("loading-status");
     const info=document.getElementById("loading-detail");
-    if(fill)fill.style.width=Math.max(0,Math.min(100,progress*100))+"%";
-    if(pct)pct.textContent=Math.round(Math.max(0,Math.min(1,progress))*100).toString().padStart(2,"0");
+    this.loadingProgress=Math.max(this.loadingProgress||0,Math.max(0,Math.min(1,progress)));
+    if(fill)fill.style.width=(this.loadingProgress*100)+"%";
+    if(pct)pct.textContent=Math.round(this.loadingProgress*100).toString().padStart(2,"0");
     if(status)status.textContent=label;
     if(info)info.textContent=detail;
   }
@@ -4135,10 +4250,10 @@ export class BackroomsGame{
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
-    this.sky.visible=openSky&&this.level.id!=="7";
+    this.sky.visible=openSky&&! ["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
     this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
-    this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4:(this.level.theme.fog??0x000000));
+    this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4:this.level.id==="10"?0x8fb8c5:(this.level.theme.fog??0x000000));
     this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
     this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.78:.42;
     this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
@@ -4153,9 +4268,9 @@ export class BackroomsGame{
       this.cloudLayer.material.uniforms.opacity.value=this.level.id==="10"?.78:.42;
       this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="10"?0xb5b9b7:0x343e4b);
     }
-    this.daylight.color.setHex(this.level.id==="9"?0x8499bd:this.level.id==="7"?0xb9d5df:0xe4edf0);
-    this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:80,24);
-    this.daylight.intensity=this.level.id==="10"?.48:this.level.id==="7"?.62:this.level.id==="9"?.035:0;
+    this.daylight.color.setHex(this.level.id==="10"?0xfff0d3:this.level.id==="9"?0x8499bd:this.level.id==="7"?0xb9d5df:0xe4edf0);
+    this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:88,24);
+    this.daylight.intensity=this.level.id==="10"?1.15:this.level.id==="7"?.62:this.level.id==="9"?.035:0;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
@@ -4180,7 +4295,7 @@ export class BackroomsGame{
     this.audio.exit();
     this.setLevel(id);
     if(String(id)==="1"){
-      this.player.position.set(6,this.player.eyeY,3);
+      this.player.position.set(0,this.player.eyeY,0);
     }else{
       this.player.position.set(0,this.player.eyeY,0);
     }

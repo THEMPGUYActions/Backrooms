@@ -2096,3 +2096,19 @@ button,.audio-gate{
 #mobile-controls.level-seven .touch-button.swim{display:block}
 #mobile-swim-up{right:18px;bottom:130px}
 #mobile-swim-down{right:94px;bottom:130px}
+
+/* Startup now holds the intro sequence until its first playable world is ready. */
+.loading-screen{
+  z-index:900;
+  background:#030303;
+  transition:opacity .45s ease,visibility 0s linear 0s;
+}
+.loading-screen.hidden{
+  display:grid!important;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .45s ease,visibility 0s linear .45s;
+}
+.loading-card{position:relative;z-index:1}
+#loading-percent{font-variant-numeric:tabular-nums}

@@ -156,7 +156,7 @@ export const LEVELS = {
     exitStyle: "green",
     exitAfterChunks: 5,
     objective: "Find the stairwell through the empty offices. Check the water stations and leave the blacked-out windows alone.",
-    safe: true, ambientIntensity: 0.24, fogDensity: 0.003
+    safe: true, ambientIntensity: 0.48, fogDensity: 0.0025
   },
   "5": {
     id: "5", number: "LEVEL 5", name: "TERROR HOTEL",
@@ -200,10 +200,10 @@ export const LEVELS = {
   "10": {
     id: "10", number: "LEVEL 10", name: "BUMPER CROP",
     sourceTitle: 'Level 10 - "Bumper Crop"', sourceUrl: "https://backrooms-wiki.wikidot.com/level-10", next: null,
-    theme: { wall: 0x9b916b, wallRough: .98, floor: 0x5b5738, ceiling: 0xb3b0a0, fog: 0xa5aaa7, accent: 0xcbb66d, light: 0xe7dfc4, ambient: 0x555548 },
+    theme: { wall: 0x9b916b, wallRough: .98, floor: 0x5b5738, ceiling: 0xb3b0a0, fog: 0xa8c0c4, accent: 0xcbb66d, light: 0xffefcf, ambient: 0x74735f },
     cellSize: 20, wallHeight: 4.8, darkness: .04, holeChance: 0, pipeChance: 0, entity: "none", exitStyle: "gold", exitAfterChunks: 2, batteryChance: .04,
     objective: "Cross the wheat and barley plots. Find the old farm buildings and the way home.",
-    safe: true, ambientIntensity: .52, fogDensity: .0018
+    safe: true, ambientIntensity: .72, fogDensity: .0012
   }
 };
 
