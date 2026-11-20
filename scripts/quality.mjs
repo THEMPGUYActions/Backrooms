@@ -382,6 +382,9 @@ async function checkLevelEnvironment(){
   if(LEVELS["7"].fog<0x506070)fail("Level 7 sky/fog palette must not be near-black");
   if(LEVELS["10"].fog<0x808080)fail("Level 10 overcast sky must use a visible daylight palette");
   if(LEVELS["10"].fogDensity>.003)fail("Level 10 must use light atmospheric haze, not permanent dense fog");
+  if(LEVELS["4"].fogDensity>=.001||LEVELS["4"].ambientIntensity<.8||LEVELS["4"].theme.fog<0xaaaaaa||LEVELS["4"].theme.ambient<0x777777)fail("Level 4 must retain a pale office atmosphere with low fog density and bright ambient fill");
+  if(!game.includes('this.level.id==="4"?0x788589'))fail("Level 4 hemisphere ground fill must not use the near-black default");
+  if(!game.includes("for(let row=0;row<4;row++)for(let col=0;col<4;col++)")||!game.includes("distance:60,cullRadius:64"))fail("Level 4 must have distributed local ceiling lights with overlapping coverage");
   if(!game.includes('["7","9","10"].includes(String(this.game.level.id))'))fail("Open-air levels 7, 9 and 10 must hide the global ceiling plane");
   if(!game.includes('["7","9","10"].includes(String(this.level.id))'))fail("Level changes must preserve open-air ceiling visibility");
   if(game.includes("0x142b36"))fail("Level 7 surface fog must not be reset to the old near-black tint each frame");
@@ -426,16 +429,19 @@ async function checkStartupAndLevelPresentation(){
   const css=await readFile(join(root,"styles.css"),"utf8");
   const main=await readFile(join(root,"src/main.js"),"utf8");
   const sw=await readFile(join(root,"sw.js"),"utf8");
-  for(const token of ['id="loading-screen"','id="loading-fill"','id="loading-status"','id="loading-detail"']){
-    if(!html.includes(token))fail("Pre-intro loading UI is missing: "+token);
+  if(html.includes('id="loading-screen"')||css.includes(".loading-screen")||game.includes("loading-screen")||game.includes("setLoadingProgress"))fail("A separate progress overlay must not replace the intro cinematic");
+  for(const token of ["async ensureAroundAsync(","const assetLoad=this.world.configure();","await this.world.ensureAroundAsync(0,0);","await assetLoad;","await this.renderer.compileAsync(this.scene,this.camera)","this.worldReady=true;","this.preloadComplete=true"]){
+    if(!game.includes(token))fail("Background world preparation is missing: "+token);
   }
-  for(const token of ["async ensureAroundAsync(","const assetLoad=(async()=>","return assetLoad;","await this.world.ensureAroundAsync(0,0","await assetLoad;","await this.renderer.compileAsync(this.scene,this.camera)","this.preloadComplete=true"]){
-    if(!game.includes(token))fail("Startup must finish real world preparation before the intro starts: "+token);
-  }
-  if(game.indexOf("this.preloadComplete=true")>game.indexOf('document.getElementById("boot")?.classList.add("intro-ready")'))fail("Intro class must only be added after preloading completes");
-  if(!css.includes(".intro-ready .intro-title-page")||!css.includes("animation:intro-title-sequence 8.2s ease-in-out forwards"))fail("Intro cinematic must start its full title animation after preload completion");
+  if(game.indexOf('boot?.classList.add("intro-ready")')>game.indexOf("const assetLoad=this.world.configure();"))fail("The intro must start before asynchronous asset and chunk preloading");
+  if(!game.includes("this.armAudioGateFallback?.()")||!game.includes("if(this.pendingStart)this.beginIntroReveal();"))fail("Intro audio activation and queued gameplay handoff must survive asynchronous preloading");
+  if(game.indexOf("this.worldReady=true;")>game.indexOf("if(this.pendingStart)this.beginIntroReveal();"))fail("Gameplay may only hand off after the prepared world is ready");
+  if(!css.includes(".intro-ready .intro-title-page")||!css.includes("animation:intro-title-sequence 8.2s ease-in-out forwards"))fail("Intro title cinematic animation is missing");
+  if(!css.includes(".intro-ready .intro-credits-page")||!css.includes("animation:intro-credits-sequence 6.4s ease-in-out 8.6s forwards"))fail("Intro credits cinematic animation is missing");
+  if(!css.includes(".intro-ready .intro-audio-page")||!css.includes("animation:intro-audio-sequence 1s ease 15.25s forwards"))fail("Intro audio gate timeline is missing");
+  if(css.includes(".intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{\n    animation-duration:.01ms"))fail("Reduced-motion CSS must not collapse the intro into a near-instant flash");
   if(!main.includes("if(event.persisted)window.location.reload()"))fail("Back-forward cache restoration must start a fresh intro timeline");
-  if(!sw.includes("backrooms-assets-v58"))fail("Service-worker cache version must change when startup and scene bundles change");
+  if(!sw.includes("backrooms-assets-v59"))fail("Service-worker cache version must change when startup and scene bundles change");
   if(!game.includes("this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half})")||!game.includes("for(const rect of nearby?.solidRects||[])"))fail("Level 1 pillar collision must handle spawn points starting inside a solid pillar");
   if(!game.includes("this.player.position.set(0,this.player.eyeY,0)")||!game.includes("addPanel(left+.14,z,Math.PI/2"))fail("Level 1 central spawn or Level 3 wall-mounted electrical panel layout missing");
   if(!game.includes("addGate(cx,cz-size*.22,true)")||!game.includes("addGate(cx+size*.22,cz,false)"))fail("Level 3 barred gates must be located on visible main service corridors");

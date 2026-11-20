@@ -7,7 +7,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
-import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-daylight-ocean-startup2";
+import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-intro-preload-office-lighting1";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level0-spawn-ceiling-level3-uv1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
@@ -1348,9 +1348,9 @@ class Chunk{
         g.add(litPanels);
         // A small number of local sources support the panel rows without
         // creating one PointLight for every ceiling tile.
-        for(let i=0;i<8;i++){
-          const x=this.originX+size*(.12+(i%4)*.25),z=this.originZ+size*(i<4?.25:.75);
-          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xe4e8e6,baseIntensity:30,intensity:30,distance:20,decay:2,fixture:litPanels});
+        for(let row=0;row<4;row++)for(let col=0;col<4;col++){
+          const x=this.originX+size*(.125+col*.25),z=this.originZ+size*(.125+row*.25);
+          this.lightSources.push({position:new THREE.Vector3(x,level.wallHeight-.28,z),color:0xe8edef,baseIntensity:45,intensity:45,distance:60,cullRadius:64,decay:1.7,fixture:litPanels});
         }
       }
 
@@ -3865,7 +3865,7 @@ export class BackroomsGame{
     if(cryptoApi?.getRandomValues)cryptoApi.getRandomValues(seedBuffer);
     this.seed=((seedBuffer[0]^Date.now())||Math.floor(Math.random()*2147483647))|0;
     this.admin={enabled:queryFlag("admin"),god:false,noclip:false};
-    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.deathSequenceDuration=3.35;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.preloadComplete=false;this.loadingProgress=0;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
+    this.levelId="0";this.level=LEVELS["0"];this.paused=true;this.running=false;this.dead=false;this.deathSequenceActive=false;this.deathSequenceTime=0;this.deathSequenceDuration=3.35;this.introActive=true;this.introPlaying=false;this.mounted=false;this.worldReady=false;this.preloadComplete=false;this.pendingStart=false;this.gameTime=0;this.argTimer=9;this.intercomTimer=80+Math.random()*100;
     this.syncPageTitle();
     this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;
     this.redZoneFontTimer=0;
@@ -3981,9 +3981,6 @@ export class BackroomsGame{
   }
   async mount(){
     document.getElementById("game").appendChild(this.renderer.domElement);
-    const loading=document.getElementById("loading-screen");
-    loading?.classList.remove("hidden");
-    this.setLoadingProgress(.02,"INITIALIZING WORLD","Preparing the starting area...");
     this.resize();
     this.quality.apply();
     this.player.reset();
@@ -3992,18 +3989,16 @@ export class BackroomsGame{
     this.last=performance.now();
     requestAnimationFrame(this.loop.bind(this));
 
+    const boot=document.getElementById("boot");
+    boot?.classList.add("intro-ready");
+    this.armAudioGateFallback?.();
+
     try{
-      const assetLoad=this.world.configure((progress,label,detail)=>{
-        this.setLoadingProgress(.12+Math.max(0,Math.min(1,progress))*.48,label||"LOADING ASSETS",detail||"Preparing level textures...");
-      });
-      this.setLoadingProgress(.60,"GENERATING STARTING AREA","Building nearby rooms, corridors and props...");
-      await this.world.ensureAroundAsync(0,0,(done,total)=>{
-        this.setLoadingProgress(.60+(done/Math.max(1,total))*.24,"GENERATING STARTING AREA",`Building nearby sectors ${done} / ${total}`);
-      });
+      const assetLoad=this.world.configure();
+      await this.world.ensureAroundAsync(0,0);
       const requested=this.level.id==="0"?this.world.level0SpawnPoint():{x:0,z:0};
       const spawn=this.world.findSafeSpawn(requested.x,requested.z,.46);
       this.player.position.set(spawn.x,this.player.eyeY+this.world.walkSurfaceHeightAt(spawn.x,spawn.z),spawn.z);
-      this.setLoadingProgress(.86,"FINISHING WORLD","Applying textures and preparing the renderer...");
       await assetLoad;
       this.scene.updateMatrixWorld(true);
       this.render();
@@ -4012,28 +4007,11 @@ export class BackroomsGame{
         catch(error){console.warn("[Backrooms] Shader prewarm skipped; shaders will compile on first use:",error)}
       }
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-      this.setLoadingProgress(1,"WORLD READY","The recording is ready.");
-      if(loading){
-        await new Promise(resolve=>{
-          const finish=event=>{
-            if(event.target!==loading||event.propertyName!=="opacity")return;
-            loading.removeEventListener("transitionend",finish);
-            resolve();
-          };
-          loading.addEventListener("transitionend",finish);
-          loading.classList.add("hidden");
-          const durations=getComputedStyle(loading).transitionDuration.split(",").map(value=>value.trim()).map(value=>value.endsWith("ms")?parseFloat(value):parseFloat(value)*1000);
-          if(!durations.some(value=>value>0))requestAnimationFrame(()=>{loading.removeEventListener("transitionend",finish);resolve()});
-        });
-      }
       this.worldReady=true;
       this.preloadComplete=true;
-      document.getElementById("boot")?.classList.add("intro-ready");
-      this.armAudioGateFallback?.();
       if(this.pendingStart)this.beginIntroReveal();
     }catch(error){
       console.error("[Backrooms] World initialization failed:",error);
-      this.setLoadingProgress(1,"WORLD INITIALIZATION FAILED","Refresh to retry the recording.");
       this.toast("WORLD INITIALIZATION FAILED",5);
     }
   }
@@ -4214,18 +4192,6 @@ export class BackroomsGame{
     }
   }
 
-  setLoadingProgress(progress,label,detail=""){
-    const fill=document.getElementById("loading-fill");
-    const pct=document.getElementById("loading-percent");
-    const status=document.getElementById("loading-status");
-    const info=document.getElementById("loading-detail");
-    this.loadingProgress=Math.max(this.loadingProgress||0,Math.max(0,Math.min(1,progress)));
-    if(fill)fill.style.width=(this.loadingProgress*100)+"%";
-    if(pct)pct.textContent=Math.round(this.loadingProgress*100).toString().padStart(2,"0");
-    if(status)status.textContent=label;
-    if(info)info.textContent=detail;
-  }
-
   isTouchLayout(){return isTouchControlsDevice()}
   start(){if(this.mounted)this.beginIntroReveal();else this.pendingStart=true}
   restart(){
@@ -4248,7 +4214,7 @@ export class BackroomsGame{
     this.levelId=String(id);this.level=levelById(id);this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x788589:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
     this.sky.visible=openSky&&! ["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
