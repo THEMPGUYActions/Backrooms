@@ -427,10 +427,10 @@ body::after{
 .hud-objective span{
   color:rgba(206,211,199,.26);
 }
-.intro-screen,.loading-screen{
+.intro-screen{
   font-family:"Courier New",ui-monospace,monospace;
 }
-.intro-screen::after,.loading-screen::after{
+.intro-screen::after{
   content:"";
   position:absolute;inset:0;pointer-events:none;
   background:
@@ -1569,12 +1569,6 @@ button,.audio-gate{
   .hud-micro{grid-template-columns:auto 42px auto 42px auto;gap:4px;font-size:7px}
   .movie-present{letter-spacing:.16em}
 }
-@media (prefers-reduced-motion:reduce){
-  .intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{
-    animation-duration:.01ms!important;
-    animation-iteration-count:1!important;
-  }
-}
 
 
 /* Cross-browser mobile pass */
@@ -1724,13 +1718,6 @@ button,.audio-gate{
   .touch-button{width:56px;height:56px;min-width:56px;min-height:56px}
   .touch-button.run{right:78px}
 }
-@media (prefers-reduced-motion:reduce){
-  .intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{
-    animation-duration:.01ms!important;
-    animation-iteration-count:1!important;
-    animation-delay:0s!important;
-  }
-}
 
 
 /* Mobile controls hardening: never let the look surface own the control areas. */
@@ -1823,70 +1810,6 @@ button,.audio-gate{
 .touch-device #mobile-controls{display:block!important}
 .touch-device #mobile-controls.hidden{display:none!important}
 
-/* Pre-intro loading gate */
-.loading-screen{
-  position:fixed;
-  inset:0;
-  z-index:500;
-  display:grid;
-  place-items:center;
-  background:#000;
-  color:#e6e6df;
-  opacity:1;
-  visibility:visible;
-  pointer-events:auto;
-  transition:opacity .55s ease,visibility 0s linear 0s;
-}
-.loading-screen.hidden{
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-  transition:opacity .55s ease,visibility 0s linear .55s;
-}
-.loading-card{
-  width:min(520px,82vw);
-  padding:26px 24px 22px;
-  border:1px solid rgba(220,224,211,.12);
-  background:rgba(5,5,4,.94);
-  box-shadow:0 0 60px rgba(0,0,0,.8);
-  font:10px/1.4 "Courier New",ui-monospace,monospace;
-  letter-spacing:.08em;
-}
-.loading-kicker{
-  color:rgba(215,220,207,.3);
-  font-size:8px;
-  letter-spacing:.22em;
-  margin-bottom:14px;
-}
-.loading-title{
-  font-size:clamp(18px,3vw,28px);
-  letter-spacing:.12em;
-  margin-bottom:22px;
-}
-.loading-bar{
-  height:3px;
-  background:rgba(220,224,211,.08);
-  overflow:hidden;
-}
-.loading-bar i{
-  display:block;
-  width:0;
-  height:100%;
-  background:rgba(226,228,216,.72);
-  transition:width .2s ease;
-}
-.loading-meta{
-  display:flex;
-  justify-content:space-between;
-  margin-top:9px;
-  color:rgba(220,224,211,.46);
-  font-size:8px;
-}
-.loading-detail{
-  margin-top:12px;
-  color:rgba(220,224,211,.24);
-  font-size:8px;
-}
 .intro-screen:not(.intro-ready){
   opacity:0;
   visibility:hidden;
@@ -1896,6 +1819,7 @@ button,.audio-gate{
   opacity:1;
   visibility:visible;
   pointer-events:auto;
+  transition:opacity 1.2s ease,visibility 0s linear 0s;
 }
 .intro-title-page,
 .intro-credits-page,
@@ -1912,7 +1836,7 @@ button,.audio-gate{
   animation:intro-audio-sequence 1s ease 15.25s forwards;
 }
 
-/* Mobile controls stay completely hidden through loading and the intro.
+/* Mobile controls stay completely hidden through the intro.
    They only fade in once gameplay is actually active. */
 #mobile-controls{
   opacity:0;
@@ -2096,19 +2020,3 @@ button,.audio-gate{
 #mobile-controls.level-seven .touch-button.swim{display:block}
 #mobile-swim-up{right:18px;bottom:130px}
 #mobile-swim-down{right:94px;bottom:130px}
-
-/* Startup now holds the intro sequence until its first playable world is ready. */
-.loading-screen{
-  z-index:900;
-  background:#030303;
-  transition:opacity .45s ease,visibility 0s linear 0s;
-}
-.loading-screen.hidden{
-  display:grid!important;
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-  transition:opacity .45s ease,visibility 0s linear .45s;
-}
-.loading-card{position:relative;z-index:1}
-#loading-percent{font-variant-numeric:tabular-nums}
