@@ -2533,18 +2533,26 @@ class WorldStreamer{
     this.updateWallTextureTiling();
 
     // The procedural fallback is complete at this point. Do not make startup
-    // depend on remote texture downloads or external asset hosts.
+    // depend on remote texture downloads or external asset hosts. Capture this
+    // level/library pair: a player can change levels while these promises are
+    // pending, and reading this.game.level/this.library after an await used to
+    // apply Level 0 carpet maps to the next level's ceiling material.
+    const assetLibrary=this.library,assetLevel=this.game.level;
     void (async()=>{
       try{
-        if(this.game.level.id==="1")await applyLevel1Assets(this.library,this.game.level,onProgress);
-        else if(this.game.level.id==="2"||this.game.level.id==="3")await applyIndustrialPBR(this.library,this.game.level,onProgress);
-        else if(this.game.level.id==="0"){
-          await applyFoundFootageLevel0Assets(this.library,this.game.level,onProgress);
-          await applyOpenGameArtPBR(this.library,this.game.level,onProgress);
-        }else await applyLevelSpecificPBR(this.library,this.game.level,onProgress);
+        if(assetLevel.id==="1")await applyLevel1Assets(assetLibrary,assetLevel,onProgress);
+        else if(assetLevel.id==="2"||assetLevel.id==="3")await applyIndustrialPBR(assetLibrary,assetLevel,onProgress);
+        else if(assetLevel.id==="0"){
+          await applyFoundFootageLevel0Assets(assetLibrary,assetLevel,onProgress);
+          if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
+          await applyOpenGameArtPBR(assetLibrary,assetLevel,onProgress);
+        }else await applyLevelSpecificPBR(assetLibrary,assetLevel,onProgress);
       }catch(error){
         console.warn("[Backrooms] Surface asset enhancement failed; procedural fallback remains active.",error);
       }
+      // A superseded configuration must never retile or otherwise mutate the
+      // active level's materials after its own asset load has started.
+      if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
       this.updateSurfaceTiling();
       this.updateWallTextureTiling();
     })();

@@ -463,6 +463,7 @@ async function checkLevel2UtilityHallGeometry(){
   if(!assets.includes('const floorPrefix=level.id==="2"?"level2_concrete":"level3_concrete";'))fail("Industrial floors must use the matching level-specific concrete texture set");
   if(!assets.includes('texture.repeat.copy(previous.repeat);texture.offset.copy(previous.offset)'))fail("Async PBR map swaps must preserve configured world-space UV tiling");
   if(!game.includes('this.game.level.wallHeight+.008'))fail("Level 0 ceiling plane must clear wall tops to prevent z-fighting");
+  if(!game.includes('const assetLibrary=this.library,assetLevel=this.game.level;')||!game.includes('if(this.library!==assetLibrary||this.game.level!==assetLevel)return;'))fail("Async level asset loads must be isolated from later level changes");
   if(!game.includes('for(let ring=1;ring<=12;ring++)')||!game.includes('const verify=this.collision(new THREE.Vector3(hit.x,0,hit.z),radius)'))fail("Safe spawn search must reject positions pushed into a second obstacle");
 }
 
