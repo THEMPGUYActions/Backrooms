@@ -1675,33 +1675,45 @@ class Chunk{
           {x1:-4.3,z1:4.3,x2:-1.45,z2:4.3},{x1:1.45,z1:4.3,x2:4.3,z2:4.3}
         );
       }
-      // Additional partially submerged house shells drift in the open ocean.
+      // Partially submerged house shells: water only enters through the front door.
       if(Math.hypot(this.cx,this.cz)>0.5&&rng.next()<.42){
         const hx=this.originX+size*(.2+rng.next()*.6),hz=this.originZ+size*(.2+rng.next()*.6);
         const house=new THREE.Group();house.position.set(hx,-.35,hz);
         house.rotation.y=rng.next()*Math.PI*2;
         const wallMat=lib.concrete;
-        box(house,new THREE.BoxGeometry(6.4,.14,5.2),wallMat,0,.08,0);
-        box(house,new THREE.BoxGeometry(6.4,2.6,.16),wallMat,0,1.35,-2.55);
-        box(house,new THREE.BoxGeometry(6.4,2.6,.16),wallMat,0,1.35,2.55);
-        box(house,new THREE.BoxGeometry(.16,2.6,5.2),wallMat,-3.15,1.35,0);
-        box(house,new THREE.BoxGeometry(.16,2.6,5.2),wallMat,3.15,1.35,0);
-        // Broken roof plane, slightly tilted as if collapsing into the water.
-        const roof=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(6.8,.12,5.6),lib.officeWood),lib.officeWood);
-        roof.position.set(0,2.75,0);roof.rotation.z=(rng.next()-.5)*.18;roof.rotation.x=(rng.next()-.5)*.1;house.add(roof);
-        // Floating furniture silhouettes
-        box(house,new THREE.BoxGeometry(1.4,.4,.7),lib.officeWood,-1.2,.55,.4);
-        box(house,new THREE.BoxGeometry(.7,1.5,.5),lib.officeWood,1.6,.9,-.8);
-        // Interior flood plane
-        const flood=water.clone();flood.opacity=.55;
-        const floodMesh=new THREE.Mesh(new THREE.PlaneGeometry(5.8,4.6,8,8),flood);
-        floodMesh.rotation.x=-Math.PI/2;floodMesh.position.set(0,.42,0);floodMesh.renderOrder=1;house.add(floodMesh);
+        const halfX=3.2,halfZ=2.6,doorHalf=.85,wallH=2.6;
+        box(house,new THREE.BoxGeometry(halfX*2,.12,halfZ*2),wallMat,0,.06,0);
+        box(house,new THREE.BoxGeometry(halfX*2,wallH,.16),wallMat,0,wallH*.5,-halfZ);
+        box(house,new THREE.BoxGeometry(.16,wallH,halfZ*2),wallMat,-halfX,wallH*.5,0);
+        box(house,new THREE.BoxGeometry(.16,wallH,halfZ*2),wallMat,halfX,wallH*.5,0);
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,wallH,.16),wallMat,-(halfX+doorHalf)*.5,wallH*.5,halfZ);
+        box(house,new THREE.BoxGeometry(halfX-doorHalf,wallH,.16),wallMat,(halfX+doorHalf)*.5,wallH*.5,halfZ);
+        box(house,new THREE.BoxGeometry(doorHalf*2,.35,.16),wallMat,0,wallH-.18,halfZ);
+        const roof=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(halfX*2+.4,.12,halfZ*2+.4),lib.officeWood),lib.officeWood);
+        roof.position.set(0,wallH+.12,0);roof.rotation.z=(rng.next()-.5)*.16;roof.rotation.x=(rng.next()-.5)*.08;house.add(roof);
+        const table=new THREE.Group();table.position.set(-1.15,0,-.35);
+        box(table,new THREE.BoxGeometry(1.35,.08,.78),lib.officeWood,0,.78,0);
+        for(const [lx,lz] of [[-.58,-.3],[.58,-.3],[-.58,.3],[.58,.3]])box(table,new THREE.BoxGeometry(.08,.78,.08),lib.officeWood,lx,.39,lz);
+        house.add(table);
+        const chair=new THREE.Group();chair.position.set(1.35,0,-.2);chair.rotation.y=rng.next()*.4;
+        box(chair,new THREE.BoxGeometry(.58,.07,.58),lib.officeWood,0,.48,0);
+        box(chair,new THREE.BoxGeometry(.58,.72,.08),lib.officeWood,0,.88,-.25);
+        for(const [lx,lz] of [[-.22,-.22],[.22,-.22],[-.22,.22],[.22,.22]])box(chair,new THREE.BoxGeometry(.07,.48,.07),lib.officeWood,lx,.24,lz);
+        house.add(chair);
+        const flood=water.clone();
+        flood.opacity=.52;flood.depthWrite=false;
+        flood.polygonOffset=true;flood.polygonOffsetFactor=-1;flood.polygonOffsetUnits=-2;
+        const floodMesh=new THREE.Mesh(new THREE.PlaneGeometry(halfX*2-.45,halfZ*2-.45,10,10),flood);
+        floodMesh.rotation.x=-Math.PI/2;floodMesh.position.set(0,.28,0);floodMesh.renderOrder=2;house.add(floodMesh);
+        const inflow=new THREE.Mesh(new THREE.PlaneGeometry(doorHalf*1.7,1.1,6,4),flood);
+        inflow.rotation.x=-Math.PI/2;inflow.position.set(0,.22,halfZ-.35);inflow.renderOrder=2;house.add(inflow);
         g.add(house);
         this.collisionSegments.push(
-          {x1:hx-3.2,z1:hz-2.6,x2:hx+3.2,z2:hz-2.6},
-          {x1:hx+3.2,z1:hz-2.6,x2:hx+3.2,z2:hz+2.6},
-          {x1:hx+3.2,z1:hz+2.6,x2:hx-3.2,z2:hz+2.6},
-          {x1:hx-3.2,z1:hz+2.6,x2:hx-3.2,z2:hz-2.6}
+          {x1:hx-halfX,z1:hz-halfZ,x2:hx+halfX,z2:hz-halfZ},
+          {x1:hx+halfX,z1:hz-halfZ,x2:hx+halfX,z2:hz+halfZ},
+          {x1:hx+halfX,z1:hz+halfZ,x2:hx+doorHalf,z2:hz+halfZ},
+          {x1:hx-doorHalf,z1:hz+halfZ,x2:hx-halfX,z2:hz+halfZ},
+          {x1:hx-halfX,z1:hz+halfZ,x2:hx-halfX,z2:hz-halfZ}
         );
       }
     }else if(level.id==="8"){
