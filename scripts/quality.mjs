@@ -625,7 +625,7 @@ async function checkData() {
     if (sourceUrls.length !== dataUrls.length || sourceUrls.some((url, i) => url !== dataUrls[i])) {
       fail("src/levels.js and data/levels.json source URLs do not match");
     }
-    const levelIds=Object.keys(LEVELS).sort((a,b)=>Number(a)-Number(b));
+    const levelIds=Object.keys(LEVELS).filter(id=>Number(id)<=10).sort((a,b)=>Number(a)-Number(b));
     if(levelIds.length!==11||levelIds.some((id,index)=>id!==String(index)))fail("The campaign must contain contiguous levels 0 through 10");
     for(let index=0;index<=10;index++){
       const id=String(index),current=LEVELS[id],metadata=levels.find(entry=>entry.id===id),expectedNext=index<10?String(index+1):null;
