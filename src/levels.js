@@ -329,10 +329,10 @@ export const LEVELS = {
       wallRough: 0.96,
       floor: 0x5e5836,
       ceiling: 0xb8b4a0,
-      fog: 0xb0c4c8,
+      fog: 0xdce8ee,
       accent: 0xd0b86c,
       light: 0xfff4d8,
-      ambient: 0x8a8870
+      ambient: 0xa8a888
     },
     cellSize: 20,
     wallHeight: 4.8,
@@ -345,8 +345,8 @@ export const LEVELS = {
     batteryChance: 0.04,
     objective: "Cross the wheat and barley plots. Find the old farm buildings and the way home.",
     safe: true,
-    ambientIntensity: 0.85,
-    fogDensity: 0.0010
+    ambientIntensity: 1.1,
+    fogDensity: 0.00035
   },
   "37": {
     id: "37",
