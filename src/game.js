@@ -1727,10 +1727,24 @@ class Chunk{
       boulders.instanceMatrix.needsUpdate=true;spikes.instanceMatrix.needsUpdate=true;stags.instanceMatrix.needsUpdate=true;g.add(boulders,spikes,stags);
       // Cold pools and M.E.G. 9th Road markers give the karst network a
       // recognizable route through its natural chambers.
-      for(let i=0;i<3;i++){
-        const px=this.originX+size*(.2+i*.3),pz=this.originZ+size*(.28+(i%2)*.42);
-        const pool=new THREE.Mesh(new THREE.CircleGeometry(2.2+rng.next()*1.8,24),lib.water.clone());
-        pool.rotation.x=-Math.PI/2;pool.position.set(px,.018,pz);pool.material.color.setHex(0x25434a);pool.material.opacity=.76;g.add(pool);
+      for(let i=0;i<5;i++){
+        const px=this.originX+size*(.15+rng.next()*.7),pz=this.originZ+size*(.15+rng.next()*.7);
+        const waterMat=lib.water.clone();
+        waterMat.color.setHex(0x1a3840);
+        waterMat.opacity=.82;
+        waterMat.roughness=.08;
+        waterMat.emissive.setHex(0x0a1820);
+        waterMat.emissiveIntensity=.08;
+        const pool=new THREE.Mesh(new THREE.CircleGeometry(1.6+rng.next()*2.4,24),waterMat);
+        pool.rotation.x=-Math.PI/2;pool.position.set(px,.022,pz);pool.renderOrder=1;g.add(pool);
+        // Damp rock rim around the pool
+        box(g,new THREE.BoxGeometry(3.2+rng.next()*1.5,.12,3.2+rng.next()*1.5),lib.concrete,px,.04,pz);
+      }
+      // Wet floor seepage patches along the 9th Road
+      for(let i=0;i<8;i++){
+        const px=this.originX+size*(.08+rng.next()*.84),pz=this.originZ+size*(.4+rng.next()*.2);
+        const seep=new THREE.Mesh(new THREE.CircleGeometry(.4+rng.next()*.9,12),lib.wetAsphalt||lib.water.clone());
+        seep.rotation.x=-Math.PI/2;seep.position.set(px,.016,pz);seep.material.opacity=.5;g.add(seep);
       }
       // A sinuous 9th Road passes through broad chambers linked by natural
       // constrictions. Instanced rock banks keep the cave organic and cheap.
