@@ -489,7 +489,7 @@ export async function applyLevelSpecificPBR(library,level,onProgress=()=>{}){
     ]],
     "8":[
       [library.concrete,"cave-rock",3.4,.96,"Cave limestone"],
-      [library.floor,"soil",3.2,.98,"Cave sediment"]
+      [library.floor,"cave-rock",3.2,.98,"Cave stone floor"]
     ],
     "9":[
       [library.asphalt,"wet-asphalt",3.2,.88,"Residential asphalt"],
@@ -500,6 +500,12 @@ export async function applyLevelSpecificPBR(library,level,onProgress=()=>{}){
       [library.floor,"soil",3.4,.98,"Farm soil"],
       [library.farmDirt,"soil",3.4,.98,"Farm dirt"],
       [library.lawn,"grass",2.4,.99,"Field grass"]
+    ],
+    "37":[
+      [library.floor,"pool-tiles",1.25,.28,"Poolroom ceramic floor"],
+      [library.wall,"pool-tiles",1.25,.28,"Poolroom ceramic wall"],
+      [library.maintenanceWall,"pool-tiles",1.25,.28,"Poolroom tile panels"],
+      [library.ceiling,"pool-tiles",1.4,.85,"Poolroom tile ceiling"]
     ]
   };
   const entries=sets[level.id]||[];
