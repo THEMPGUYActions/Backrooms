@@ -66,7 +66,7 @@
     "source": "https://backrooms-wiki.wikidot.com/level-6",
     "license": "CC BY-SA 3.0",
     "authors": "Original authors u/ThePizzaEater1000 and u/Mileisbored; rewritten by Bart0nius, with earlier rewrites credited to 1000dumplings and Abe Venrick.",
-    "adaptation": "The silent concrete maze, flashlight survival and rare auditory hallucinations are original game adaptations by THEMPGUY.",
+    "adaptation": "Outdoor barren mountain / tundra under perpetual night, sparse light and isolation are original game adaptations by THEMPGUY.",
     "next": "7"
   },
   {
@@ -107,6 +107,16 @@
     "license": "CC BY-SA 3.0",
     "authors": "Original author u/Hertz3241; current page written by scutoid studios and egglord, with a previous rewrite by Stretchsterz.",
     "adaptation": "The overcast wheat plots, tree lines, ponds, barns and final traversal are original game adaptations by THEMPGUY.",
+    "next": null
+  },
+  {
+    "id": "37",
+    "number": "LEVEL 37",
+    "name": "THE POOLROOMS",
+    "source": "https://backrooms-wiki.wikidot.com/level-37",
+    "license": "CC BY-SA 3.0",
+    "authors": "Backrooms Wiki contributors for Level 37 / Poolrooms",
+    "adaptation": "White ceramic tiled chambers, turquoise water, soft lighting and liminal pool architecture are original game adaptations by THEMPGUY.",
     "next": null
   }
 ]
