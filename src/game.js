@@ -4138,8 +4138,8 @@ export class BackroomsGame{
       fragmentShader:"varying vec3 vSkyDirection;uniform vec3 zenith;uniform vec3 horizon;uniform vec3 sunDirection;uniform vec3 sunColor;void main(){vec3 d=normalize(vSkyDirection);float h=clamp(d.y,0.0,1.0);vec3 sky=mix(horizon,zenith,pow(h,.72));float sun=max(dot(d,normalize(sunDirection)),0.0);sky+=sunColor*pow(sun,48.0)*.24;sky=mix(sky,horizon,exp(-abs(d.y)*8.0)*.18);gl_FragColor=vec4(sky,1.0);\n#include <colorspace_fragment>}",
       side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false
     });
-    this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(210,48,32),oceanSkyMaterial);
-    this.oceanSky.renderOrder=-100;this.oceanSky.visible=false;this.scene.add(this.oceanSky);
+    this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(400,48,32),oceanSkyMaterial);
+    this.oceanSky.renderOrder=-100;this.oceanSky.visible=false;this.oceanSky.frustumCulled=false;this.scene.add(this.oceanSky);
     const cloudMaterial=new THREE.ShaderMaterial({
       uniforms:{time:{value:0},coverage:{value:.56},opacity:{value:.55},cloudColor:{value:new THREE.Color(0xc3c8c8)}},
       vertexShader:"varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
@@ -4154,11 +4154,12 @@ export class BackroomsGame{
       ].join("\n"),
       transparent:true,depthWrite:false,depthTest:false,side:THREE.BackSide,toneMapped:true
     });
-    this.cloudLayer=new THREE.Mesh(new THREE.SphereGeometry(216,48,24),cloudMaterial);
+    this.cloudLayer=new THREE.Mesh(new THREE.SphereGeometry(420,48,24),cloudMaterial);
     this.cloudLayer.renderOrder=-9;
     this.cloudLayer.visible=false;
+    this.cloudLayer.frustumCulled=false;
     this.scene.add(this.cloudLayer);
-    this.camera=new THREE.PerspectiveCamera(62,1,.05,240);this.camera.rotation.order="YXZ";
+    this.camera=new THREE.PerspectiveCamera(62,1,.05,800);this.camera.rotation.order="YXZ";
     const touchDevice=isTouchControlsDevice();
     this.renderer=new THREE.WebGLRenderer({antialias:!touchDevice,powerPreference:"high-performance",stencil:false,depth:true,precision:"highp"});
     this.renderer.setPixelRatio(1);this.renderer.setSize(Math.max(1,innerWidth),Math.max(1,innerHeight),false);
@@ -5005,6 +5006,21 @@ export class BackroomsGame{
   }
 
   render(){
+    // L7/L10: re-assert daylight sky every frame so nothing can leave it black.
+    if(this.level.id==="7"){
+      this.scene.background=new THREE.Color(0xc8e4f0);
+      this.oceanSky.visible=true;
+      this.cloudLayer.visible=true;
+      this.sky.visible=false;
+      if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
+      if(this.scene.fog&&!this.player.inOcean){this.scene.fog.color.setHex(0xc8e4f0);this.scene.fog.density=.0004;}
+    }else if(this.level.id==="10"){
+      this.scene.background=new THREE.Color(0xd4e0e8);
+      this.sky.visible=false;
+      this.cloudLayer.visible=true;
+      if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
+      if(this.scene.fog){this.scene.fog.color.setHex(0xd4e0e8);this.scene.fog.density=.0006;}
+    }
     if(this.sky.visible)this.sky.position.copy(this.camera.position);
     if(this.oceanSky.visible)this.oceanSky.position.copy(this.camera.position);
     if(this.cloudLayer.visible){

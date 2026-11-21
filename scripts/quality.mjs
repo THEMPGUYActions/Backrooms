@@ -413,7 +413,7 @@ async function checkGameplayPhysicsAndRendering(){
     if(!game.includes(token))fail("Player physics contract missing: "+token);
   }
   if(game.includes("Math.sin(this.pitch)*swimInput"))fail("Swimming must not be controlled by camera pitch");
-  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(210,48,32),oceanSkyMaterial)",'this.oceanSky.visible=this.level.id==="7"','this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10"',"new THREE.PlaneGeometry(size,size,128,128)","backrooms-level7-world-waves-v4","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.13","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
+  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(400,48,32),oceanSkyMaterial)",'this.oceanSky.visible=this.level.id==="7"','this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10"',"new THREE.PlaneGeometry(size,size,128,128)","backrooms-level7-world-waves-v4","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.13","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
     if(!game.includes(token))fail("Level 7 sky, animated water, or buoyancy surface coupling missing: "+token);
   }
   if(!game.includes('this.scene.background=new THREE.Color(this.level.id==="7"?0xc8e4f0'))fail("Level 7 needs a non-black fallback sky background");
