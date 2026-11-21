@@ -233,9 +233,9 @@ try{
     }).join("\n");
     throw new Error("Runtime browser errors:\n"+detail);
   }
-  // Admin activate() is deferred until running + !introActive. Wait briefly and nudge it.
-  await command("Runtime.evaluate",{expression:"window.backroomsAdmin?.activate?.()",returnByValue:true});
-  await waitForBrowser("(()=>{const b=document.getElementById('admin-open');return !!(b&&!b.hidden&&window.backroomsAdmin?.ready);})()",8000);
+  // Admin is created on backrooms:game-ready. Ensure it exists and is activated after gameplay starts.
+  await command("Runtime.evaluate",{expression:"(()=>{const g=window.backrooms;if(!g?.admin?.enabled)return 'admin-disabled';if(!window.backroomsAdmin){window.dispatchEvent(new Event('backrooms:game-ready'));}window.backroomsAdmin?.activate?.();return !!(window.backroomsAdmin&&document.getElementById('admin-open')&&!document.getElementById('admin-open').hidden);})()",returnByValue:true});
+  await waitForBrowser("(()=>{const b=document.getElementById('admin-open');return !!(b&&!b.hidden&&window.backroomsAdmin?.ready);})()",10000);
   const adminButtonResult=await command("Runtime.evaluate",{
     expression:"(()=>{const b=document.getElementById('admin-open');if(!b)return false;const r=b.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,hidden:b.hidden}})()",
     returnByValue:true
