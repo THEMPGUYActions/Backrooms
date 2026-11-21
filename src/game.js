@@ -103,7 +103,7 @@ const VHSShader={
 const CELLS=16;
 const BASE_RADIUS=1;
 const MAX_DT=.05;
-const LEVELS_WITHOUT_GLOBAL_CEILING=new Set(["4","7","9","10"]);
+const LEVELS_WITHOUT_GLOBAL_CEILING=new Set(["4","6","7","9","10","37"]);
 const QUERY_PARAMS=new URLSearchParams(location.search);
 function queryFlag(name){
   if(!QUERY_PARAMS.has(name))return false;
@@ -462,9 +462,15 @@ class Chunk{
         // The wheat fields are open terrain; the final route is a barn door,
         // not a fake perimeter wall around each streamed chunk.
         this.walls.fill(0);
+      }else if(level.id==="6"){
+        // Lights Out is outdoor mountain / tundra night — open terrain, not sealed cells.
+        this.walls.fill(0);
       }else if(level.id==="8"){
         // Natural karst caves are open chamber networks, not a square-cell maze.
         // Organic rock banks below define the traversable 9th Road.
+        this.walls.fill(0);
+      }else if(level.id==="37"){
+        // Poolrooms are open tiled chambers with water basins, not a maze of sealed boxes.
         this.walls.fill(0);
       }else{
         const visited=new Uint8Array(cells*cells);
@@ -1557,35 +1563,59 @@ class Chunk{
         g.add(boiler);this.lightSources.push({position:new THREE.Vector3(boiler.position.x,2.2,boiler.position.z),color:0xff9a55,baseIntensity:5,intensity:5,distance:9,decay:2});
       }
     }else if(level.id==="6"){
-      // Lights Out: still dark, but cables, wall plates and debris give the
-      // flashlight something to find so rooms are not pure void boxes.
+      // Lights Out: outdoor barren mountain / tundra under perpetual night.
+      // No indoor walls — ridgelines, rock outcrops, sparse dead scrub, moon-only light.
       const rng=new RNG(this.seedKey()^0x6b19);
-      for(let i=0;i<7;i++){
-        const z=this.originZ+1.5+rng.next()*(size-3),x=this.originX+1.5+rng.next()*(size-3);
-        const cable=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,size*.28+rng.next()*size*.12,6),lib.cable);
-        cable.rotation.z=Math.PI/2;cable.position.set(x,.18+rng.next()*.12,z);g.add(cable);
+      const rockGeom=tileGeometryUV(new THREE.IcosahedronGeometry(1,1),lib.concrete);
+      const rocks=new THREE.InstancedMesh(rockGeom,lib.concrete,36),rockDummy=new THREE.Object3D();
+      for(let i=0;i<36;i++){
+        const x=this.originX+1.2+rng.next()*(size-2.4),z=this.originZ+1.2+rng.next()*(size-2.4);
+        const radius=.55+rng.next()*1.8;
+        rockDummy.position.set(x,radius*.42,z);
+        rockDummy.scale.set(radius*1.35,radius*.55+rng.next()*.4,radius*1.05);
+        rockDummy.rotation.set(rng.next()*.5,rng.next()*Math.PI*2,rng.next()*.4);
+        rockDummy.updateMatrix();rocks.setMatrixAt(i,rockDummy.matrix);
+        if(radius>1.15){
+          const hx=radius*1.1,hz=radius*.85;
+          this.collisionSegments.push(
+            {x1:x-hx,z1:z-hz,x2:x+hx,z2:z-hz},{x1:x+hx,z1:z-hz,x2:x+hx,z2:z+hz},
+            {x1:x+hx,z1:z+hz,x2:x-hx,z2:z+hz},{x1:x-hx,z1:z+hz,x2:x-hx,z2:z-hz}
+          );
+        }
       }
-      for(let i=0;i<4;i++){
-        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4);
-        box(g,new THREE.BoxGeometry(.55,.4,.04),lib.dark,x,1.4,z);
-        box(g,new THREE.BoxGeometry(.12,.08,.06),lib.metal,x+.18,1.4,z+.04);
+      rocks.instanceMatrix.needsUpdate=true;g.add(rocks);
+      // Sparse dead scrub / brush that catches the flashlight beam.
+      const scrubGeom=new THREE.ConeGeometry(.18,.55,5);
+      const scrub=new THREE.InstancedMesh(scrubGeom,lib.dark,48),scrubDummy=new THREE.Object3D();
+      for(let i=0;i<48;i++){
+        const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2);
+        scrubDummy.position.set(x,.22,z);
+        scrubDummy.scale.set(.6+rng.next()*1.4,.5+rng.next()*1.2,.6+rng.next()*1.4);
+        scrubDummy.rotation.y=rng.next()*Math.PI*2;
+        scrubDummy.updateMatrix();scrub.setMatrixAt(i,scrubDummy.matrix);
       }
-      for(let i=0;i<3;i++){
-        const x=this.originX+2+rng.next()*(size-4),z=this.originZ+2+rng.next()*(size-4);
-        box(g,new THREE.BoxGeometry(.35+rng.next()*.4,.08,.25+rng.next()*.3),lib.rustMetal,x,.05,z);
+      scrub.instanceMatrix.needsUpdate=true;g.add(scrub);
+      // Low ridgeline banks along two edges so the horizon is not a flat void.
+      for(let i=0;i<8;i++){
+        const t=i/7,x=this.originX+size*t,z=this.originZ+.8+rng.next()*1.4;
+        box(g,new THREE.BoxGeometry(2.2+rng.next()*2.5,1.2+rng.next()*2.4,1.8+rng.next()*1.6),lib.concrete,x,.6+rng.next()*.4,z);
       }
-      // Acoustic wall panels and tactile seams are just visible in the
-      // flashlight beam. Level 6 has no working lights and remains silent.
-      for(let i=0;i<6;i++){
-        const p=this.originX+size*(.1+i*.16);
-        box(g,new THREE.BoxGeometry(1.25,.52,.035),lib.wall2,p,1.72,this.originZ+.12);
-        box(g,new THREE.BoxGeometry(.035,.52,1.25),lib.wall2,this.originX+.12,1.72,p);
-        box(g,new THREE.BoxGeometry(.025,2.4,.04),lib.concrete,p,1.2,this.originZ+.16);
+      for(let i=0;i<8;i++){
+        const t=i/7,x=this.originX+.8+rng.next()*1.4,z=this.originZ+size*t;
+        box(g,new THREE.BoxGeometry(1.6+rng.next()*1.8,1.0+rng.next()*2.2,2.4+rng.next()*2.2),lib.concrete,x,.55+rng.next()*.35,z);
       }
-      for(let i=0;i<3;i++){
-        const x=this.originX+size*(.2+i*.3),z=this.originZ+size*(i%2?.72:.28);
-        box(g,new THREE.BoxGeometry(1.1,2.6,.12),lib.concrete,x,1.3,z);
-        box(g,new THREE.BoxGeometry(.72,2.15,.08),lib.dark,x,1.25,z-.08);
+      // Cold moon wash — single soft blue key so the space stays almost pitch dark.
+      this.lightSources.push({
+        position:new THREE.Vector3(this.originX+size*.55,level.wallHeight+6.5,this.originZ+size*.4),
+        color:0x9eb0c8,baseIntensity:2.4,intensity:2.4,distance:size*1.6,decay:1.6
+      });
+      // Exit cairn / trail marker when this chunk owns the blue exit.
+      if(this.exit){
+        const ex=this.originX+(this.exit.x+.5)*cell,ez=this.originZ+(this.exit.z+.5)*cell;
+        box(g,new THREE.BoxGeometry(1.1,.9,1.1),lib.concrete,ex,.45,ez);
+        box(g,new THREE.BoxGeometry(.55,.7,.55),lib.concrete,ex,1.05,ez);
+        box(g,new THREE.BoxGeometry(.22,.55,.22),lib.metal,ex,1.55,ez);
+        this.lightSources.push({position:new THREE.Vector3(ex,1.9,ez),color:0x6a8ab0,baseIntensity:3.5,intensity:3.5,distance:8,decay:2});
       }
     }else if(level.id==="7"){
       const water=lib.water.clone();
