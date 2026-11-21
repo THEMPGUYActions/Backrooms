@@ -3395,8 +3395,9 @@ class Player{
       if(this.position.y>=surfaceY+1.25&&this.verticalVelocity>0)this.verticalVelocity=Math.min(0,this.verticalVelocity);
       const depthBlend=THREE.MathUtils.clamp((surfaceY+.08-this.position.y)/4.8,0,1);
       if(this.game.scene.fog){
-        this.game.scene.fog.color.setRGB(THREE.MathUtils.lerp(.54,.008,depthBlend),THREE.MathUtils.lerp(.66,.12,depthBlend),THREE.MathUtils.lerp(.70,.18,depthBlend));
-        this.game.scene.fog.density=.0022+depthBlend*.018;
+        // Surface stays bright blue-white; only deep water goes dark.
+        this.game.scene.fog.color.setRGB(THREE.MathUtils.lerp(.78,.05,depthBlend),THREE.MathUtils.lerp(.90,.14,depthBlend),THREE.MathUtils.lerp(.94,.22,depthBlend));
+        this.game.scene.fog.density=.0006+depthBlend*.016;
       }
     }else{
       this.inOcean=false;
@@ -3411,8 +3412,8 @@ class Player{
       this.position.y=this.eyeY+this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z,this.parkingFloor);
       if(this.game.level.id==="7"&&this.game.scene.fog){
         // Daytime surface fog — must stay light or the ocean sky reads black.
-        this.game.scene.fog.color.setHex(0xb0cce0);
-        this.game.scene.fog.density=.0009;
+        this.game.scene.fog.color.setHex(0xc8e4f0);
+        this.game.scene.fog.density=.0005;
       }
     }
     if(this.game.redZoneTrapped&&this.game.redZoneBounds){
@@ -4462,12 +4463,13 @@ export class BackroomsGame{
     this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x6a90a0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
-    this.sky.visible=openSky; // daytime atmospheric sky for L7 ocean + L10 fields
+    // Atmospheric Sky is night-prone; L7 uses custom oceanSky, L10 uses solid daylight bg + clouds.
+    this.sky.visible=openSky&&!["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
     this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
-    this.scene.background=new THREE.Color(this.level.id==="7"?0xb0cce0:this.level.id==="10"?0xc8d8e0:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
+    this.scene.background=new THREE.Color(this.level.id==="7"?0xc8e4f0:this.level.id==="10"?0xd4e0e8:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
     this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
     this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.78:.42;
     this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
@@ -4484,8 +4486,8 @@ export class BackroomsGame{
     }
     this.daylight.color.setHex(this.level.id==="10"?0xfff0d3:this.level.id==="9"?0x8499bd:this.level.id==="7"?0xb9d5df:0xe4edf0);
     this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:88,24);
-    this.daylight.intensity=this.level.id==="10"?1.35:this.level.id==="7"?1.45:this.level.id==="9"?.035:0;
-    this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?1.15:this.level.id==="9"?.95:.78;
+    this.daylight.intensity=this.level.id==="10"?1.55:this.level.id==="7"?1.65:this.level.id==="9"?.035:0;
+    this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?1.35:this.level.id==="9"?.95:.78;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
