@@ -1911,6 +1911,101 @@ class Chunk{
           {x1:x-halfX,z1:z+halfZ,x2:x-halfX,z2:z-halfZ}
         );
       }
+    }else if(level.id==="37"){
+      // Poolrooms: white ceramic tiled chambers, soft turquoise basins, diffuse light.
+      const rng=new RNG(this.seedKey()^0x37a1);
+      const tileMat=lib.maintenanceWall||lib.wall;
+      const waterMat=lib.water.clone();
+      waterMat.color.setHex(0x4ec8c0);
+      waterMat.opacity=.72;
+      waterMat.roughness=.06;
+      waterMat.metalness=.04;
+      waterMat.emissive.setHex(0x1a6058);
+      waterMat.emissiveIntensity=.18;
+      waterMat.transparent=true;
+      waterMat.depthWrite=false;
+      waterMat.side=THREE.DoubleSide;
+      this.lightSources.push({
+        position:new THREE.Vector3(this.originX+size*.5,level.wallHeight-1.2,this.originZ+size*.5),
+        color:0xf4fcf8,baseIntensity:18,intensity:18,distance:size*1.35,decay:1.8
+      });
+      const chamberLayouts=[
+        {cx:.22,cz:.22,w:size*.38,d:size*.36,pool:false,cols:true},
+        {cx:.72,cz:.26,w:size*.42,d:size*.4,pool:true,cols:false},
+        {cx:.28,cz:.72,w:size*.4,d:size*.38,pool:true,cols:true},
+        {cx:.74,cz:.74,w:size*.36,d:size*.34,pool:false,cols:false}
+      ];
+      for(const ch of chamberLayouts){
+        const cx=this.originX+size*ch.cx,cz=this.originZ+size*ch.cz;
+        const hw=ch.w*.5,hd=ch.d*.5,wallH=level.wallHeight;
+        const gap=.95;
+        box(g,new THREE.BoxGeometry(hw-gap,.22,ch.d),tileMat,cx-(hw+gap)*.5,.11,cz);
+        box(g,new THREE.BoxGeometry(hw-gap,.22,ch.d),tileMat,cx+(hw+gap)*.5,.11,cz);
+        box(g,new THREE.BoxGeometry(ch.w,wallH,.18),tileMat,cx,wallH*.5,cz-hd);
+        box(g,new THREE.BoxGeometry(ch.w,wallH,.18),tileMat,cx,wallH*.5,cz+hd);
+        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx-hw,wallH*.5,cz-(hd+gap)*.5);
+        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx-hw,wallH*.5,cz+(hd+gap)*.5);
+        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx+hw,wallH*.5,cz-(hd+gap)*.5);
+        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx+hw,wallH*.5,cz+(hd+gap)*.5);
+        box(g,new THREE.BoxGeometry(ch.w,.08,ch.d),tileMat,cx,.04,cz);
+        this.collisionSegments.push(
+          {x1:cx-hw,z1:cz-hd,x2:cx+hw,z2:cz-hd},
+          {x1:cx-hw,z1:cz+hd,x2:cx+hw,z2:cz+hd},
+          {x1:cx-hw,z1:cz-hd,x2:cx-hw,z2:cz-gap},
+          {x1:cx-hw,z1:cz+gap,x2:cx-hw,z2:cz+hd},
+          {x1:cx+hw,z1:cz-hd,x2:cx+hw,z2:cz-gap},
+          {x1:cx+hw,z1:cz+gap,x2:cx+hw,z2:cz+hd}
+        );
+        if(ch.pool){
+          const poolW=ch.w*.72,poolD=ch.d*.68;
+          const basin=new THREE.Mesh(new THREE.PlaneGeometry(poolW,poolD,32,32),waterMat);
+          basin.rotation.x=-Math.PI/2;basin.position.set(cx,.09,cz);basin.renderOrder=1;g.add(basin);
+          box(g,new THREE.BoxGeometry(poolW+.35,.14,poolD+.35),tileMat,cx,.07,cz);
+          for(const [ox,oz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+            this.lightSources.push({
+              position:new THREE.Vector3(cx+ox*poolW*.42,1.1,cz+oz*poolD*.42),
+              color:0xa8f0e8,baseIntensity:4.5,intensity:4.5,distance:7,decay:2
+            });
+          }
+        }
+        if(ch.cols){
+          for(const [ox,oz] of [[-.32,-.28],[.32,-.28],[-.32,.28],[.32,.28]]){
+            const colX=cx+ox*ch.w,colZ=cz+oz*ch.d;
+            box(g,new THREE.BoxGeometry(.55,wallH,.55),tileMat,colX,wallH*.5,colZ);
+            box(g,new THREE.BoxGeometry(.72,.12,.72),tileMat,colX,wallH-.06,colZ);
+            box(g,new THREE.BoxGeometry(.72,.1,.72),tileMat,colX,.05,colZ);
+            const hx=.32,hz=.32;
+            this.collisionSegments.push(
+              {x1:colX-hx,z1:colZ-hz,x2:colX+hx,z2:colZ-hz},
+              {x1:colX+hx,z1:colZ-hz,x2:colX+hx,z2:colZ+hz},
+              {x1:colX+hx,z1:colZ+hz,x2:colX-hx,z2:colZ+hz},
+              {x1:colX-hx,z1:colZ+hz,x2:colX-hx,z2:colZ-hz}
+            );
+          }
+        }
+        box(g,new THREE.BoxGeometry(ch.w+.4,.12,ch.d+.4),lib.officeCeilingTile||tileMat,cx,wallH-.06,cz);
+        for(let i=0;i<2;i++){
+          const lx=cx+(i-.5)*ch.w*.35,lz=cz;
+          box(g,new THREE.BoxGeometry(1.4,.06,.55),lib.officeCeilingLight||lib.light,lx,wallH-.14,lz);
+          this.lightSources.push({
+            position:new THREE.Vector3(lx,wallH-.35,lz),
+            color:0xf8fcf8,baseIntensity:9,intensity:9,distance:11,decay:2
+          });
+        }
+      }
+      box(g,new THREE.BoxGeometry(size*.18,.05,size*.18),tileMat,this.originX+size*.5,.025,this.originZ+size*.5);
+      if(rng.next()<.55){
+        const ax=this.originX+size*.5,az=this.originZ+size*.48;
+        box(g,new THREE.BoxGeometry(.22,2.4,.22),tileMat,ax-1.1,1.2,az);
+        box(g,new THREE.BoxGeometry(.22,2.4,.22),tileMat,ax+1.1,1.2,az);
+        box(g,new THREE.BoxGeometry(2.6,.2,.22),tileMat,ax,2.5,az);
+      }
+      if(this.exit){
+        const ex=this.originX+(this.exit.x+.5)*cell,ez=this.originZ+(this.exit.z+.5)*cell;
+        box(g,new THREE.BoxGeometry(2.4,.12,2.4),tileMat,ex,.06,ez);
+        box(g,new THREE.BoxGeometry(1.1,2.15,.12),lib.exitDoor||tileMat,ex,1.1,ez);
+        this.lightSources.push({position:new THREE.Vector3(ex,2.4,ez),color:0x88e0d8,baseIntensity:6,intensity:6,distance:8,decay:2});
+      }
     }
   }
 
@@ -2642,6 +2737,9 @@ class WorldStreamer{
       this.library.floor.color.setHex(0x493238);this.library.floor.roughness=.94;
     }else if(this.game.level.id==="6"){
       this.library.floor.color.setHex(0x030406);this.library.ceiling.color.setHex(0x010203);
+    }else if(this.game.level.id==="37"){
+      this.library.floor.color.setHex(0xd4e0dc);this.library.floor.roughness=.42;this.library.floor.metalness=.02;
+      this.library.ceiling.color.setHex(0xf0f4f0);this.library.ceiling.roughness=.85;
     }
 
     if(this.floorSurface)this.game.scene.add(this.floorSurface);
@@ -4311,12 +4409,12 @@ export class BackroomsGame{
     this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x7d898b:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
     this.sky.visible=openSky&&! ["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
     this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
-    this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4:this.level.id==="10"?0x8fb8c5:(this.level.theme.fog??0x000000));
+    this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4:this.level.id==="10"?0x8fb8c5:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
     this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
     this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.78:.42;
     this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
