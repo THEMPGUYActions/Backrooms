@@ -1874,7 +1874,7 @@ class Chunk{
       const headGeometry=new THREE.CylinderGeometry(.018,.028,.34,6,2);
       const kernelGeometry=new THREE.SphereGeometry(.027,5,4);
       const awnGeometry=new THREE.CylinderGeometry(.0015,.005,.24,3);
-      const cropCount=isTouchControlsDevice()?1400:3000;
+      const cropCount=isTouchControlsDevice()?4200:11000;
       const stalks=new THREE.InstancedMesh(stalkGeometry,lib.wheat,cropCount);
       const heads=new THREE.InstancedMesh(headGeometry,lib.wheatHead,cropCount);
       const kernels=new THREE.InstancedMesh(kernelGeometry,lib.wheatHead,cropCount*8);
@@ -1882,8 +1882,9 @@ class Chunk{
       const dummy=new THREE.Object3D(),up=new THREE.Vector3(0,1,0),awnDirection=new THREE.Vector3(),grainColor=new THREE.Color(),stalkColor=new THREE.Color();
       let count=0,kernelCount=0,awnCount=0;
       for(let i=0;i<cropCount;i++){
-        const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2);
-        if(Math.hypot(x-(this.originX+size/2),z-(this.originZ+size/2))<4)continue;
+        const x=this.originX+.4+rng.next()*(size-.8),z=this.originZ+.4+rng.next()*(size-.8);
+        // Keep only a narrow walking gap near chunk center, otherwise pack the field.
+        if(Math.hypot(x-(this.originX+size/2),z-(this.originZ+size/2))<2.2)continue;
         const height=1.0+rng.next()*.58,lean=(rng.next()-.5)*.22,heading=rng.next()*Math.PI*2;
         dummy.position.set(x,height*.5,z);dummy.rotation.set(Math.sin(heading)*lean,heading,Math.cos(heading)*lean);dummy.scale.set(.82+rng.next()*.3,height/1.45,.82+rng.next()*.3);dummy.updateMatrix();stalks.setMatrixAt(count,dummy.matrix);
         stalkColor.setHSL(.19+rng.next()*.025,.34,.28+rng.next()*.10);stalks.setColorAt(count,stalkColor);
@@ -2786,7 +2787,7 @@ class WorldStreamer{
     }else if(this.game.level.id==="9"){
       this.library.floor.color.setHex(0x202527);this.library.floor.roughness=.88;this.library.floor.metalness=.03;
     }else if(this.game.level.id==="10"){
-      this.library.floor.color.setHex(0x68603a);this.library.floor.roughness=.98;this.library.floor.metalness=0;
+      this.library.floor.color.setHex(0x8a7e4a);this.library.floor.roughness=.98;this.library.floor.metalness=0;
     }else if(this.game.level.id==="5"){
       this.library.floor.color.setHex(0x493238);this.library.floor.roughness=.94;
     }else if(this.game.level.id==="6"){
@@ -4476,9 +4477,9 @@ export class BackroomsGame{
     this.sky.visible=openSky&&!["7","10"].includes(this.level.id);
     this.oceanSky.visible=this.level.id==="7";
     this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
-    this.scene.background=new THREE.Color(this.level.id==="7"?0xc8e4f0:this.level.id==="10"?0xd4e0e8:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
+    this.scene.background=new THREE.Color(this.level.id==="7"?0xc8e4f0:this.level.id==="10"?0xdce8ee:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
     this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
-    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.78:.42;
+    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.38:.42;
     this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
     const skyUniforms=this.sky.material.uniforms;
     skyUniforms.turbidity.value=this.level.id==="10"?16:this.level.id==="9"?11:7;
@@ -5015,11 +5016,13 @@ export class BackroomsGame{
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
       if(this.scene.fog&&!this.player.inOcean){this.scene.fog.color.setHex(0xc8e4f0);this.scene.fog.density=.0004;}
     }else if(this.level.id==="10"){
-      this.scene.background=new THREE.Color(0xd4e0e8);
+      this.scene.background=new THREE.Color(0xdce8ee);
       this.sky.visible=false;
       this.cloudLayer.visible=true;
+      this.cloudLayer.material.uniforms.opacity.value=.38;
+      this.cloudLayer.material.uniforms.coverage.value=.42;
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
-      if(this.scene.fog){this.scene.fog.color.setHex(0xd4e0e8);this.scene.fog.density=.0006;}
+      if(this.scene.fog){this.scene.fog.color.setHex(0xdce8ee);this.scene.fog.density=.00028;}
     }
     if(this.sky.visible)this.sky.position.copy(this.camera.position);
     if(this.oceanSky.visible)this.oceanSky.position.copy(this.camera.position);
