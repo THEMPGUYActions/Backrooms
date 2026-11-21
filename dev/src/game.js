@@ -1675,6 +1675,35 @@ class Chunk{
           {x1:-4.3,z1:4.3,x2:-1.45,z2:4.3},{x1:1.45,z1:4.3,x2:4.3,z2:4.3}
         );
       }
+      // Additional partially submerged house shells drift in the open ocean.
+      if(Math.hypot(this.cx,this.cz)>0.5&&rng.next()<.42){
+        const hx=this.originX+size*(.2+rng.next()*.6),hz=this.originZ+size*(.2+rng.next()*.6);
+        const house=new THREE.Group();house.position.set(hx,-.35,hz);
+        house.rotation.y=rng.next()*Math.PI*2;
+        const wallMat=lib.concrete;
+        box(house,new THREE.BoxGeometry(6.4,.14,5.2),wallMat,0,.08,0);
+        box(house,new THREE.BoxGeometry(6.4,2.6,.16),wallMat,0,1.35,-2.55);
+        box(house,new THREE.BoxGeometry(6.4,2.6,.16),wallMat,0,1.35,2.55);
+        box(house,new THREE.BoxGeometry(.16,2.6,5.2),wallMat,-3.15,1.35,0);
+        box(house,new THREE.BoxGeometry(.16,2.6,5.2),wallMat,3.15,1.35,0);
+        // Broken roof plane, slightly tilted as if collapsing into the water.
+        const roof=new THREE.Mesh(tileGeometryUV(new THREE.BoxGeometry(6.8,.12,5.6),lib.officeWood),lib.officeWood);
+        roof.position.set(0,2.75,0);roof.rotation.z=(rng.next()-.5)*.18;roof.rotation.x=(rng.next()-.5)*.1;house.add(roof);
+        // Floating furniture silhouettes
+        box(house,new THREE.BoxGeometry(1.4,.4,.7),lib.officeWood,-1.2,.55,.4);
+        box(house,new THREE.BoxGeometry(.7,1.5,.5),lib.officeWood,1.6,.9,-.8);
+        // Interior flood plane
+        const flood=water.clone();flood.opacity=.55;
+        const floodMesh=new THREE.Mesh(new THREE.PlaneGeometry(5.8,4.6,8,8),flood);
+        floodMesh.rotation.x=-Math.PI/2;floodMesh.position.set(0,.42,0);floodMesh.renderOrder=1;house.add(floodMesh);
+        g.add(house);
+        this.collisionSegments.push(
+          {x1:hx-3.2,z1:hz-2.6,x2:hx+3.2,z2:hz-2.6},
+          {x1:hx+3.2,z1:hz-2.6,x2:hx+3.2,z2:hz+2.6},
+          {x1:hx+3.2,z1:hz+2.6,x2:hx-3.2,z2:hz+2.6},
+          {x1:hx-3.2,z1:hz+2.6,x2:hx-3.2,z2:hz-2.6}
+        );
+      }
     }else if(level.id==="8"){
       // Cave systems: denser floor rock + ceiling spikes + ground stalagmites
       const rng=new RNG(this.seedKey()^0x8ca7e);
