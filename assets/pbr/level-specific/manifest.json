@@ -156,6 +156,29 @@
       "path": "soil/roughness.jpg",
       "sha256": "1fbc95dbbbb022c673169d883a722033f9ad2bbb46708ed2b089250d4aab1367",
       "bytes": 717978
+    },
+    {
+      "path": "pool-tiles/color.jpg",
+      "sha256": "d0780934682e6815bf3c790740ef287407e0312ebff34642e5fabd973565c38c",
+      "bytes": 89168
+    },
+    {
+      "path": "pool-tiles/normalgl.jpg",
+      "sha256": "9c1a0deb3feff23ae81190b6607e98bf58694a0de91b7197f18f395e712af701",
+      "bytes": 122552
+    },
+    {
+      "path": "pool-tiles/roughness.jpg",
+      "sha256": "99d475f1119e01072c2606c5ea988d767e19de933094adf6a623dcca117cbb82",
+      "bytes": 86632
     }
-  ]
+  ],
+  "sources": {
+    "pool-tiles": {
+      "id": "pool_tiles",
+      "source": "https://opengameart.org/content/backrooms-pbr-texture-pack",
+      "license": "CC0",
+      "author": "methodical pixel"
+    }
+  }
 }

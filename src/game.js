@@ -1707,7 +1707,7 @@ class Chunk{
     }else if(level.id==="8"){
       // Cave systems: denser floor rock + ceiling spikes + ground stalagmites
       const rng=new RNG(this.seedKey()^0x8ca7e);
-      const boulders=new THREE.InstancedMesh(tileGeometryUV(new THREE.IcosahedronGeometry(1,1),lib.concrete),lib.concrete,28),rockDummy=new THREE.Object3D();
+      const boulders=new THREE.InstancedMesh(tileGeometryUV(new THREE.BoxGeometry(1,1,1),lib.concrete),lib.concrete,28),rockDummy=new THREE.Object3D();
       for(let i=0;i<28;i++){
         const x=this.originX+1+rng.next()*(size-2),z=this.originZ+1+rng.next()*(size-2),radius=.4+rng.next()*1.25;
         rockDummy.position.set(x,radius*.48,z);rockDummy.scale.set(radius*1.25,radius*.7,radius*.95);rockDummy.rotation.set(rng.next()*.4,rng.next()*Math.PI,rng.next()*.3);rockDummy.updateMatrix();boulders.setMatrixAt(i,rockDummy.matrix);
@@ -1757,7 +1757,7 @@ class Chunk{
         [this.originX+size*.82,this.originZ+size*.34],
         [this.originX+size*.97,this.originZ+size*.34]
       ];
-      const wallGeometry=tileGeometryUV(new THREE.IcosahedronGeometry(1,1),lib.concrete),wallInstances=new THREE.InstancedMesh(wallGeometry,lib.concrete,120);
+      const wallGeometry=tileGeometryUV(new THREE.BoxGeometry(1,1,1),lib.concrete),wallInstances=new THREE.InstancedMesh(wallGeometry,lib.concrete,120);
       const wallDummy=new THREE.Object3D();let wallIndex=0;
       for(let segment=0;segment<road.length-1;segment++){
         const [ax,az]=road[segment],[bx,bz]=road[segment+1],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);
@@ -1767,9 +1767,9 @@ class Chunk{
           for(let distance=3.5;distance<length-2;distance+=4.2){
             const t=distance/length,x=ax+dx*t+nx*(4.8+rng.next()*1.1)*side,z=az+dz*t+nz*(4.8+rng.next()*1.1)*side;
             const scale=1.65+rng.next()*1.1;
-            wallDummy.position.set(x,1.25+rng.next()*.45,z);
-            wallDummy.scale.set(scale*1.2,1.55+rng.next()*1.1,scale);
-            wallDummy.rotation.set(rng.next()*.35,rng.next()*Math.PI*2,rng.next()*.3);
+            wallDummy.position.set(x,1.05+rng.next()*.55,z);
+            wallDummy.scale.set(scale*1.85+rng.next()*.6,1.15+rng.next()*1.65,scale*.55+rng.next()*.35);
+            wallDummy.rotation.set(rng.next()*.18,rng.next()*Math.PI*2,rng.next()*.12);
             wallDummy.updateMatrix();wallInstances.setMatrixAt(wallIndex++,wallDummy.matrix);
           }
         }
@@ -1969,8 +1969,8 @@ class Chunk{
       waterMat.depthWrite=false;
       waterMat.side=THREE.DoubleSide;
       this.lightSources.push({
-        position:new THREE.Vector3(this.originX+size*.5,level.wallHeight-1.2,this.originZ+size*.5),
-        color:0xf4fcf8,baseIntensity:18,intensity:18,distance:size*1.35,decay:1.8
+        position:new THREE.Vector3(this.originX+size*.5,level.wallHeight-0.6,this.originZ+size*.5),
+        color:0xf4fcf8,baseIntensity:5.5,intensity:5.5,distance:size*1.7,decay:1.35
       });
       const chamberLayouts=[
         {cx:.22,cz:.22,w:size*.38,d:size*.36,pool:false,cols:true},
@@ -2000,16 +2000,12 @@ class Chunk{
           {x1:cx+hw,z1:cz+gap,x2:cx+hw,z2:cz+hd}
         );
         if(ch.pool){
-          const poolW=ch.w*.72,poolD=ch.d*.68;
-          const basin=new THREE.Mesh(new THREE.PlaneGeometry(poolW,poolD,32,32),waterMat);
-          basin.rotation.x=-Math.PI/2;basin.position.set(cx,.09,cz);basin.renderOrder=1;g.add(basin);
-          box(g,new THREE.BoxGeometry(poolW+.35,.14,poolD+.35),tileMat,cx,.07,cz);
-          for(const [ox,oz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
-            this.lightSources.push({
-              position:new THREE.Vector3(cx+ox*poolW*.42,1.1,cz+oz*poolD*.42),
-              color:0xa8f0e8,baseIntensity:4.5,intensity:4.5,distance:7,decay:2
-            });
-          }
+          const poolW=ch.w*.78,poolD=ch.d*.74;
+          const surfaceY=1.15;
+          const basin=new THREE.Mesh(new THREE.PlaneGeometry(poolW,poolD,48,48),waterMat);
+          basin.rotation.x=-Math.PI/2;basin.position.set(cx,surfaceY,cz);basin.renderOrder=1;g.add(basin);
+          box(g,new THREE.BoxGeometry(poolW+.5,.16,poolD+.5),tileMat,cx,surfaceY+.08,cz);
+          box(g,new THREE.BoxGeometry(poolW,.08,poolD),tileMat,cx,-.02,cz);
         }
         if(ch.cols){
           for(const [ox,oz] of [[-.32,-.28],[.32,-.28],[-.32,.28],[.32,.28]]){
@@ -2027,14 +2023,7 @@ class Chunk{
           }
         }
         box(g,new THREE.BoxGeometry(ch.w+.4,.12,ch.d+.4),lib.officeCeilingTile||tileMat,cx,wallH-.06,cz);
-        for(let i=0;i<2;i++){
-          const lx=cx+(i-.5)*ch.w*.35,lz=cz;
-          box(g,new THREE.BoxGeometry(1.4,.06,.55),lib.officeCeilingLight||lib.light,lx,wallH-.14,lz);
-          this.lightSources.push({
-            position:new THREE.Vector3(lx,wallH-.35,lz),
-            color:0xf8fcf8,baseIntensity:9,intensity:9,distance:11,decay:2
-          });
-        }
+        // No ceiling light fixtures — Poolrooms use soft ambient/window glow only.
       }
       box(g,new THREE.BoxGeometry(size*.18,.05,size*.18),tileMat,this.originX+size*.5,.025,this.originZ+size*.5);
       if(rng.next()<.55){
@@ -2772,6 +2761,9 @@ class WorldStreamer{
     }
     if(this.game.level.id==="7"){
       this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
+    }else if(this.game.level.id==="8"){
+      this.library.floor.color.setHex(0x3a3e42);this.library.floor.roughness=.96;this.library.floor.metalness=.04;
+      this.library.concrete.color.setHex(0x4a5056);this.library.concrete.roughness=.97;
     }else if(this.game.level.id==="9"){
       this.library.floor.color.setHex(0x202527);this.library.floor.roughness=.88;this.library.floor.metalness=.03;
     }else if(this.game.level.id==="10"){
@@ -4992,7 +4984,7 @@ export class BackroomsGame{
       this.cloudLayer.position.copy(this.camera.position);
       this.cloudLayer.material.uniforms.time.value=this.gameTime;
     }
-    if(this.level.id==="7"){
+    if(this.level.id==="7"||this.level.id==="37"){
       for(const chunk of this.world.chunks.values()){
         for(const material of chunk.group.userData.animatedWaterMaterials||[]){
           if(material.userData.timeUniform)material.userData.timeUniform.value=this.gameTime;
