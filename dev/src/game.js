@@ -1619,7 +1619,7 @@ class Chunk{
       }
     }else if(level.id==="7"){
       const water=lib.water.clone();
-      water.color.setHex(0x28788a);water.opacity=.89;water.roughness=.09;water.metalness=0;water.emissive.setHex(0x031a22);water.emissiveIntensity=.12;
+      water.color.setHex(0x3a9aaa);water.opacity=.82;water.roughness=.08;water.metalness=0;water.emissive.setHex(0x1a5060);water.emissiveIntensity=.28;
       water.side=THREE.DoubleSide;water.depthWrite=false;
       const waterUniforms={time:{value:0},offset:{value:new THREE.Vector2(this.originX+size/2,this.originZ+size/2)}};
       water.onBeforeCompile=shader=>{
@@ -1669,6 +1669,9 @@ class Chunk{
         box(room,new THREE.BoxGeometry(1.0,.12,.62),lib.officeWood,.55,.52,.75);
         for(const x of [-.35,1.45])for(const z of [.5,1.0])box(room,new THREE.BoxGeometry(.07,.48,.07),lib.officeWood,x,.24,z);
         g.add(room);
+        // Daytime fill for the open-top entrance room — without these the start is pitch black.
+        this.lightSources.push({position:new THREE.Vector3(0,4.2,0),color:0xd8eef8,baseIntensity:28,intensity:28,distance:16,decay:1.6});
+        this.lightSources.push({position:new THREE.Vector3(0,2.4,2.2),color:0xc0dce8,baseIntensity:12,intensity:12,distance:10,decay:1.8});
         this.collisionSegments.push(
           {x1:-4.3,z1:-4.3,x2:4.3,z2:-4.3},{x1:-4.3,z1:-4.3,x2:-4.3,z2:4.3},
           {x1:4.3,z1:-4.3,x2:4.3,z2:4.3},
@@ -2772,7 +2775,10 @@ class WorldStreamer{
       this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
     }
     if(this.game.level.id==="7"){
-      this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
+      // Ocean-bottom teal (NOT near-black). Global floor stays under the water plane.
+      this.library.floor.color.setHex(0x1a4a58);this.library.floor.roughness=.55;this.library.floor.metalness=.08;
+      this.library.concrete.color.setHex(0x8aa0a8);this.library.concrete.roughness=.88;
+      if(this.floorSurface)this.floorSurface.visible=false; // water mesh is the visible surface
     }else if(this.game.level.id==="8"){
       // White tint so cave-rock albedo reads as limestone, not soil-brown.
       this.library.floor.color.setHex(0xffffff);this.library.floor.roughness=.96;this.library.floor.metalness=.04;
@@ -4127,7 +4133,7 @@ export class BackroomsGame{
     this.sky.visible=false;
     this.scene.add(this.sky);
     const oceanSkyMaterial=new THREE.ShaderMaterial({
-      uniforms:{zenith:{value:new THREE.Color(0x7ab8d8)},horizon:{value:new THREE.Color(0xd8e8f0)},sunDirection:{value:new THREE.Vector3(.35,.75,-.4).normalize()},sunColor:{value:new THREE.Color(0xfff5e0)}},
+      uniforms:{zenith:{value:new THREE.Color(0xa8d4f0)},horizon:{value:new THREE.Color(0xe8f4fc)},sunDirection:{value:new THREE.Vector3(.35,.75,-.4).normalize()},sunColor:{value:new THREE.Color(0xfff8e8)}},
       vertexShader:"varying vec3 vSkyDirection;void main(){vSkyDirection=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
       fragmentShader:"varying vec3 vSkyDirection;uniform vec3 zenith;uniform vec3 horizon;uniform vec3 sunDirection;uniform vec3 sunColor;void main(){vec3 d=normalize(vSkyDirection);float h=clamp(d.y,0.0,1.0);vec3 sky=mix(horizon,zenith,pow(h,.72));float sun=max(dot(d,normalize(sunDirection)),0.0);sky+=sunColor*pow(sun,48.0)*.24;sky=mix(sky,horizon,exp(-abs(d.y)*8.0)*.18);gl_FragColor=vec4(sky,1.0);\n#include <colorspace_fragment>}",
       side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false
@@ -4463,7 +4469,7 @@ export class BackroomsGame{
     this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
-    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x6a90a0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
+    this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x8ab0c0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.id==="7"||this.level.id==="10"?Math.max(this.level.ambientIntensity??.85,1.05):this.level.id==="37"?Math.max(this.level.ambientIntensity??.9,.95):(this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052));
     const openSky=["7","9","10"].includes(this.level.id);
     // Atmospheric Sky is night-prone; L7 uses custom oceanSky, L10 uses solid daylight bg + clouds.
     this.sky.visible=openSky&&!["7","10"].includes(this.level.id);
