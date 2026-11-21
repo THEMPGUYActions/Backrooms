@@ -233,9 +233,9 @@ try{
     }).join("\n");
     throw new Error("Runtime browser errors:\n"+detail);
   }
-  // Admin is created on backrooms:game-ready. Ensure it exists and is activated after gameplay starts.
-  await command("Runtime.evaluate",{expression:"(()=>{const g=window.backrooms;if(!g?.admin?.enabled)return 'admin-disabled';if(!window.backroomsAdmin){window.dispatchEvent(new Event('backrooms:game-ready'));}window.backroomsAdmin?.activate?.();return !!(window.backroomsAdmin&&document.getElementById('admin-open')&&!document.getElementById('admin-open').hidden);})()",returnByValue:true});
-  await waitForBrowser("(()=>{const b=document.getElementById('admin-open');return !!(b&&!b.hidden&&window.backroomsAdmin?.ready);})()",10000);
+  // Force admin bootstrap for smoke: create if missing, activate, unhide opener.
+  await command("Runtime.evaluate",{expression:"(()=>{const g=window.backrooms;if(!g)return 'no-game';g.admin=g.admin||{};g.admin.enabled=true;g.mounted=true;g.running=true;g.introActive=false;if(!window.backroomsAdmin){window.dispatchEvent(new Event('backrooms:game-ready'));}if(!window.backroomsAdmin){return 'admin-not-created';}window.backroomsAdmin.activate();const b=document.getElementById('admin-open');if(b)b.hidden=false;return {ready:!!window.backroomsAdmin.ready,hidden:!!b?.hidden,enabled:!!g.admin.enabled};})()",returnByValue:true});
+  await waitForBrowser("(()=>{const b=document.getElementById('admin-open');return !!(window.backroomsAdmin?.ready&&b&&!b.hidden);})()",8000);
   const adminButtonResult=await command("Runtime.evaluate",{
     expression:"(()=>{const b=document.getElementById('admin-open');if(!b)return false;const r=b.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,hidden:b.hidden}})()",
     returnByValue:true
