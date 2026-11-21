@@ -2774,8 +2774,9 @@ class WorldStreamer{
     if(this.game.level.id==="7"){
       this.library.floor.color.setHex(0x081722);this.library.floor.roughness=.34;this.library.floor.metalness=.12;
     }else if(this.game.level.id==="8"){
-      this.library.floor.color.setHex(0x3a3e42);this.library.floor.roughness=.96;this.library.floor.metalness=.04;
-      this.library.concrete.color.setHex(0x4a5056);this.library.concrete.roughness=.97;
+      // White tint so cave-rock albedo reads as limestone, not soil-brown.
+      this.library.floor.color.setHex(0xffffff);this.library.floor.roughness=.96;this.library.floor.metalness=.04;
+      this.library.concrete.color.setHex(0xffffff);this.library.concrete.roughness=.97;
     }else if(this.game.level.id==="9"){
       this.library.floor.color.setHex(0x202527);this.library.floor.roughness=.88;this.library.floor.metalness=.03;
     }else if(this.game.level.id==="10"){
@@ -2825,6 +2826,10 @@ class WorldStreamer{
       }
       if(this.library!==assetLibrary||this.game.level!==assetLevel)return;
       if(this.ceilingSurface)this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
+      if(assetLevel.id==="8"){
+        assetLibrary.floor.color.setHex(0xffffff);
+        assetLibrary.concrete.color.setHex(0xffffff);
+      }
       this.updateSurfaceTiling();
       this.updateWallTextureTiling();
     })();
@@ -3405,8 +3410,9 @@ class Player{
       }else this.parkingFloor=0;
       this.position.y=this.eyeY+this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z,this.parkingFloor);
       if(this.game.level.id==="7"&&this.game.scene.fog){
-        this.game.scene.fog.color.setHex(0x718c98);
-        this.game.scene.fog.density=.0028;
+        // Daytime surface fog — must stay light or the ocean sky reads black.
+        this.game.scene.fog.color.setHex(0xb0cce0);
+        this.game.scene.fog.density=.0009;
       }
     }
     if(this.game.redZoneTrapped&&this.game.redZoneBounds){
@@ -4120,7 +4126,7 @@ export class BackroomsGame{
     this.sky.visible=false;
     this.scene.add(this.sky);
     const oceanSkyMaterial=new THREE.ShaderMaterial({
-      uniforms:{zenith:{value:new THREE.Color(0x527f94)},horizon:{value:new THREE.Color(0xb8c9c9)},sunDirection:{value:new THREE.Vector3(-.68,.66,.46).normalize()},sunColor:{value:new THREE.Color(0xffe6c7)}},
+      uniforms:{zenith:{value:new THREE.Color(0x7ab8d8)},horizon:{value:new THREE.Color(0xd8e8f0)},sunDirection:{value:new THREE.Vector3(.35,.75,-.4).normalize()},sunColor:{value:new THREE.Color(0xfff5e0)}},
       vertexShader:"varying vec3 vSkyDirection;void main(){vSkyDirection=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
       fragmentShader:"varying vec3 vSkyDirection;uniform vec3 zenith;uniform vec3 horizon;uniform vec3 sunDirection;uniform vec3 sunColor;void main(){vec3 d=normalize(vSkyDirection);float h=clamp(d.y,0.0,1.0);vec3 sky=mix(horizon,zenith,pow(h,.72));float sun=max(dot(d,normalize(sunDirection)),0.0);sky+=sunColor*pow(sun,48.0)*.24;sky=mix(sky,horizon,exp(-abs(d.y)*8.0)*.18);gl_FragColor=vec4(sky,1.0);\n#include <colorspace_fragment>}",
       side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false
@@ -4458,10 +4464,10 @@ export class BackroomsGame{
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x77745d:this.level.id==="7"?0x35434a:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052);
     const openSky=["7","9","10"].includes(this.level.id);
-    this.sky.visible=openSky&&! ["7","10"].includes(this.level.id);
+    this.sky.visible=openSky; // daytime atmospheric sky for L7 ocean + L10 fields
     this.oceanSky.visible=this.level.id==="7";
     this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
-    this.scene.background=new THREE.Color(this.level.id==="7"?0x8daab4:this.level.id==="10"?0x8fb8c5:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
+    this.scene.background=new THREE.Color(this.level.id==="7"?0xb0cce0:this.level.id==="10"?0xc8d8e0:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
     this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
     this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.78:.42;
     this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
@@ -4478,7 +4484,8 @@ export class BackroomsGame{
     }
     this.daylight.color.setHex(this.level.id==="10"?0xfff0d3:this.level.id==="9"?0x8499bd:this.level.id==="7"?0xb9d5df:0xe4edf0);
     this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:88,24);
-    this.daylight.intensity=this.level.id==="10"?1.15:this.level.id==="7"?.62:this.level.id==="9"?.035:0;
+    this.daylight.intensity=this.level.id==="10"?1.35:this.level.id==="7"?1.45:this.level.id==="9"?.035:0;
+    this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?1.15:this.level.id==="9"?.95:.78;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();

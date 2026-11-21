@@ -231,18 +231,18 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-7",
     next: "8",
     theme: {
-      wall: 0x2a4554,
-      wallRough: 0.90,
-      floor: 0x14303c,
-      ceiling: 0x2a3c44,
-      fog: 0x7a9aa8,
-      accent: 0x6ab0c8,
-      light: 0xc0dce6,
-      ambient: 0x2c4450
+      wall: 0x4a6a78,
+      wallRough: 0.88,
+      floor: 0x2a4a58,
+      ceiling: 0x4a5c64,
+      fog: 0xb8d0dc,
+      accent: 0x8ad0e4,
+      light: 0xe0f0f8,
+      ambient: 0x6a90a0
     },
     cellSize: 14,
     wallHeight: 4.5,
-    darkness: 0.22,
+    darkness: 0.06,
     holeChance: 0.008,
     pipeChance: 0,
     entity: "leviathan",
@@ -251,8 +251,8 @@ export const LEVELS = {
     batteryChance: 0.08,
     objective: "Descend from the flooded entrance room into the ocean. Find the underwater cave.",
     safe: false,
-    ambientIntensity: 0.28,
-    fogDensity: 0.0024
+    ambientIntensity: 0.85,
+    fogDensity: 0.0009
   },
   "8": {
     id: "8",
@@ -262,10 +262,10 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-8",
     next: "9",
     theme: {
-      wall: 0x6a5f52,
+      wall: 0x6a6860,
       wallRough: 1.0,
-      floor: 0x322e28,
-      ceiling: 0x4a453c,
+      floor: 0x5a5850,
+      ceiling: 0x4a4840,
       fog: 0x3a372f,
       accent: 0xa09068,
       light: 0xc8b89a,
