@@ -5056,7 +5056,6 @@ export class BackroomsGame{
           if(material.emissive){material.userData.baseBlackoutEmissive??=material.emissiveIntensity;material.emissiveIntensity=0;}
         }
       });
-      }
       this.totalBlackoutWorldSuppressed=true;
     }
   }
