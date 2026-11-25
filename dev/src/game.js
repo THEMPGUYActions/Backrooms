@@ -37,6 +37,7 @@ const VHSShader={
     uniform float fear;
     uniform vec2 resolution;
     varying vec2 vUv;
+    out vec4 backroomsFragColor;
 
     float hash(vec2 p){
       return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
@@ -54,7 +55,7 @@ const VHSShader={
       uv.x+=(low-.5)*.0017*tracking+(hi-.5)*.00055*tracking;
       float tearSeed=floor(t*2.0);
       float tearY=hash(vec2(tearSeed,41.0));
-      float tear=smoothstep(.014,0.0,abs(uv.y-tearY))*step(.84,hash(vec2(tearSeed,52.0)));
+      float tear=(1.0-smoothstep(0.0,.014,abs(uv.y-tearY)))*step(.84,hash(vec2(tearSeed,52.0)));
       uv.x+=tear*.012;
       uv.y+=tear*(hash(vec2(tearSeed,63.0))-.5)*.002;
       return uv;
@@ -69,9 +70,9 @@ const VHSShader={
       float frame=floor(time*24.0);
       float chroma=(.0017+.0018*fear)*intensity;
 
-      vec3 center=texture2D(tDiffuse,uv).rgb;
-      vec3 left=texture2D(tDiffuse,uv-vec2(chroma,0.0)).rgb;
-      vec3 right=texture2D(tDiffuse,uv+vec2(chroma,0.0)).rgb;
+      vec3 center=texture(tDiffuse,uv).rgb;
+      vec3 left=texture(tDiffuse,uv-vec2(chroma,0.0)).rgb;
+      vec3 right=texture(tDiffuse,uv+vec2(chroma,0.0)).rgb;
       vec3 c=vec3(left.r*.5+center.r*.5,
                   center.g*.8+left.g*.1+right.g*.1,
                   right.b*.5+center.b*.5);
@@ -96,7 +97,7 @@ const VHSShader={
       float vignette=1.0-smoothstep(.55,1.0,max(edge.x,edge.y));
       c*=mix(.7,1.0,vignette);
 
-      gl_FragColor=vec4(max(c,0.0),1.0);
+      backroomsFragColor=vec4(max(c,0.0),1.0);
     }`
 };
 
@@ -355,6 +356,7 @@ class Chunk{
       }
       this.level0SpawnCell={x:Math.floor(cells/2),z:Math.floor(cells/2)};
       this.level0Blackout=this.level0Region.type==="blackout";
+      if(this.level0Blackout&&cycleHash(this.game.seed,this.cx,this.cz+0x4b1)<.34)this.entitySpawn=true;
       this.level0PillarArea=this.level0Region.type==="pillars";
       this.level0HoleArea=this.level0Region.type==="holes";
       this.level0RedRoom=this.level0Region.type==="red";
@@ -2201,6 +2203,20 @@ class Chunk{
     if(region==="blackout"){
       const wetRng=new RNG(this.seedKey()^0x9c31);
       for(let i=0;i<3;i++)if(wetRng.next()<.72){const p=center(wetRng.int(0,cells-1),wetRng.int(0,cells-1));const puddle=new THREE.Mesh(new THREE.CircleGeometry(1.8+wetRng.next()*2.2,18),lib.water);puddle.rotation.x=-Math.PI/2;puddle.position.set(p.x,.009,p.z);g.add(puddle)}
+      // Blackout subzones still have sparse emergency/unstable fluorescent
+      // fixtures. These are the only overhead lights that remain powered
+      // during the outage and they flicker independently.
+      const lampRng=new RNG(this.seedKey()^0x6b1a);
+      const lampCount=2+lampRng.int(0,2);
+      for(let i=0;i<lampCount;i++){
+        const lx=lampRng.int(1,Math.max(1,cells-2)),lz=lampRng.int(1,Math.max(1,cells-2));
+        const p=center(lx,lz),material=lib.light.clone();
+        material.emissive.setHex(0xffd7a0);material.emissiveIntensity=.42;
+        const fixture=box(g,new THREE.BoxGeometry(1.42,.055,.46),material,p.x,level.wallHeight-.1,p.z);
+        fixture.userData.light=true;fixture.userData.baseEmissive=.42;fixture.userData.blackoutFixture=true;
+        this.fixtures.push(fixture);
+        this.lightSources.push({position:new THREE.Vector3(p.x,level.wallHeight-.32,p.z),color:0xffd7a0,baseIntensity:35,intensity:35,distance:10,decay:2,fixture,blackoutFixture:true,cullRadius:12});
+      }
     }
 
     if(region==="maze"&&!this.manilaRoom){
@@ -3402,20 +3418,41 @@ class WorldStreamer{
   }
   nearbyLightSources(x,z,frustum){
     const out=[];
+    const camera=this.game.camera;
+    camera.updateMatrixWorld(true);
+    const cameraPosition=this._lightCameraPosition||(this._lightCameraPosition=new THREE.Vector3());
+    const cameraDirection=this._lightCameraDirection||(this._lightCameraDirection=new THREE.Vector3());
+    camera.getWorldPosition(cameraPosition);
+    camera.getWorldDirection(cameraDirection);
+    const halfVertical=THREE.MathUtils.degToRad((camera.fov||62)*.5);
+    const halfHorizontal=Math.atan(Math.tan(halfVertical)*Math.max(.5,camera.aspect||1));
+    const halfDiagonal=Math.atan(Math.hypot(Math.tan(halfVertical),Math.tan(halfHorizontal)));
     const offset=this.size/2;
     const cx=Math.floor((x+offset)/this.size),cz=Math.floor((z+offset)/this.size);
-    const span=["0","4"].includes(this.game.level.id)?1:2;
+    const span=Math.min(4,Math.max(2,Math.ceil(32/this.size)));
+    const sphere=this._lightCullSphere||(this._lightCullSphere=new THREE.Sphere());
+    const toLight=this._lightCullVector||(this._lightCullVector=new THREE.Vector3());
     for(let dz=-span;dz<=span;dz++)for(let dx=-span;dx<=span;dx++){
       const c=this.chunks.get(this.key(cx+dx,cz+dz));
       if(!c)continue;
       for(const light of c.lightSources){
-        const influenceRadius=light.cullRadius??(light.distance>0?light.distance:96);
-        const influenceSphere=new THREE.Sphere(light.position,influenceRadius);
-        if(!frustum.intersectsSphere(influenceSphere))continue;
-        const range=Math.max(34,light.distance||0);
-        const d=Math.hypot(light.position.x-x,light.position.z-z);
-        if(d>Math.max(96,range+54))continue;
-        out.push({light,d,score:d-Math.min(influenceRadius,48)*.12});
+        const influenceRadius=light.cullRadius??(light.distance>0?light.distance:24);
+        sphere.center.copy(light.position);sphere.radius=influenceRadius;
+        if(!frustum.intersectsSphere(sphere))continue;
+        toLight.copy(light.position).sub(cameraPosition);
+        const cameraDistance=toLight.length();
+        const forward=cameraDistance>.001?cameraDirection.dot(toLight.multiplyScalar(1/cameraDistance)):1;
+        const angle=Math.acos(Math.max(-1,Math.min(1,forward)));
+        const angularRadius=cameraDistance>influenceRadius
+          ? Math.asin(Math.min(1,influenceRadius/cameraDistance))
+          : Math.PI/2;
+        const offAxis=Math.max(0,angle-angularRadius-halfDiagonal);
+        const sourceInFrustum=frustum.containsPoint(light.position);
+        const playerDistance=Math.hypot(light.position.x-x,light.position.z-z);
+        if(playerDistance>Math.max(54,influenceRadius+30))continue;
+        const score=cameraDistance+offAxis*110+(forward<-.1?60:0)
+          +(sourceInFrustum?-18:0)-Math.min(influenceRadius,16)*.25;
+        out.push({light,d:playerDistance,score});
       }
     }
     out.sort((a,b)=>a.score-b.score);
@@ -3457,6 +3494,7 @@ class WorldStreamer{
     const out=[];
     for(const c of this.chunks.values()){
       if(!c.entitySpawn)continue;
+      if(this.game.level.id==="0"&&!c.level0Blackout)continue;
       if(this.game.level.id==="1"&&this.game.lightState!=="BLACKOUT")continue;
       out.push(c);
     }
@@ -3672,7 +3710,7 @@ class Player{
 
     this.game.blackoutLight.position.copy(this.game.camera.position);
     const blackout=this.game.level.id==="0"&&this.game.lightState==="BLACKOUT";
-    this.game.blackoutLight.intensity=blackout?.22:0;
+    this.game.blackoutLight.intensity=blackout?12.0:0;
 
     this.game.flashTarget.position.copy(this.game.camera.position)
       .addScaledVector(flashForward,2.0);
@@ -4021,10 +4059,9 @@ class EntityManager{
     this.game.triggerFear(.12);this.game.toast("SUMMONED "+e.def.label.toUpperCase(),1.4);return true;
   }
   spawnForChunks(){
-    // Current Level 0 canon explicitly leaves entities unconfirmed. Keep it
-    // empty here; visual/audio hallucinations are handled by the horror layer.
-    if(this.game.level.id==="0")return;
+    const level0Blackout=this.game.level.id==="0";
     const pools={
+      "0":["smiler","skinstealer","hound"],
       "1":["duller","hound","skinstealer","smiler","clump","crawler","wretch"],
       "2":["smiler","hound","deathmoth"],
       "3":["hound","deathmoth","skinstealer","faceling","wretch","clump","smiler","deathrat"],
@@ -4037,8 +4074,10 @@ class EntityManager{
       "10":[]
     };
     for(const c of this.game.world.entitySpawns()){
-      const key=c.cx+","+c.cz;if(this.entities.some(e=>e.key===key||e.squadId===key))continue;
+      const key=(level0Blackout?"blackout:":"")+c.cx+","+c.cz;
+      if(this.entities.some(e=>e.key===key||e.squadId===key))continue;
       const pool=pools[this.game.level.id]||[this.game.level.entity];
+      if(!pool.length)continue;
       const rng=new RNG(c.seedKey()^0x4a91);
       const type=pool[Math.floor(rng.next()*pool.length)];
       const def=ENTITY_TYPES[type];if(!def)continue;
@@ -4311,7 +4350,7 @@ export class BackroomsGame{
     this.composer=new EffectComposer(this.renderer);
     this.composer.setPixelRatio(1);
     this.renderPass=new RenderPass(this.scene,this.camera);
-    this.vhsPass=new ShaderPass(VHSShader);
+    this.vhsPass=new ShaderPass(new THREE.ShaderMaterial({name:"Backrooms VHS",glslVersion:THREE.GLSL3,uniforms:THREE.UniformsUtils.clone(VHSShader.uniforms),vertexShader:VHSShader.vertexShader,fragmentShader:VHSShader.fragmentShader}));
     this.outputPass=new OutputPass();
     this.composer.addPass(this.renderPass);
     this.composer.addPass(this.vhsPass);
@@ -5005,7 +5044,20 @@ export class BackroomsGame{
       target.color.setHex(source.color);
       target.distance=source.distance;
       target.decay=source.decay;
-      target.intensity=source.intensity;
+      const blackout=this.level.id==="0"&&this.lightState==="BLACKOUT";
+      if(blackout&&!source.blackoutFixture){
+        target.intensity=0;
+        continue;
+      }
+      if(source.blackoutFixture&&!blackout){
+        target.intensity=0;
+        continue;
+      }
+      const lightScale=this.level.id==="0"?18:4;
+      const flicker=source.blackoutFixture
+        ? (Math.sin(this.gameTime*17.0+source.position.x*1.7+source.position.z*.9)>.12?1:.08)
+        : 1;
+      target.intensity=source.intensity*lightScale*flicker;
     }
   }
   updateIntro(dt){
