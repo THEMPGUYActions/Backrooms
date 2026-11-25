@@ -388,7 +388,7 @@ async function checkLevelEnvironment(){
 
   if(!game.includes("pushLevel0Baseboard")||!game.includes("trimToeGeom")||!game.includes("addLevel0Outlet"))fail("Level 0 needs visible cove baseboards and detailed duplex outlets");
   if(!assets.includes('level.id==="0"?0xd7d3c8'))fail("Level 0 cove base must use its aged ivory trim material");
-  if(!game.includes("this.sky.visible=openSky")||!game.includes("this.sky.visible=true;this.oceanSky.visible=false")||!game.includes("sunY=this.level.id==="))fail("Daylight levels must use an active Preetham sky with an above-horizon sun");
+  if(!game.includes("this.sky.visible=openSky")||!game.includes('this.oceanSky.visible=this.level.id==="7"')||!game.includes("sunY=this.level.id==="))fail("Daylight levels must use their authored sky systems with an above-horizon sun");
   if(!game.includes("isForcedManila")||!game.includes("forceLevel0ManilaRoom"))fail("Manila Room must have a deterministic admin-generation path");
   if(!admin.includes("teleportManilaRoom")||!admin.includes("Manila Room chunk did not generate"))fail("Admin Manila Room teleport must validate its generated destination");
   if(LEVELS["7"].fog<0x506070)fail("Level 7 sky/fog palette must not be near-black");
