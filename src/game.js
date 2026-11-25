@@ -3522,16 +3522,20 @@ class Player{
     this.game.flash.decay=2;
     const warmup=1-Math.min(1,this.flashWarmup/1.15);
     const flashRamp=.12+.88*THREE.MathUtils.smoothstep(warmup,0,1);
+    // SpotLight intensity is candela in current Three.js, not the old
+    // arbitrary point-light scale. Keep the spill broad and restrained.
     this.game.flash.intensity=this.flashlight
-      ? (.34+beamPower*.66)*washScale*flashRamp*flashZoneBoost
+      ? (32+beamPower*128)*washScale*flashRamp*flashZoneBoost
       : 0;
 
     this.game.flashFill.distance=25;
     this.game.flashFill.angle=.25;
     this.game.flashFill.penumbra=.58;
     this.game.flashFill.decay=2;
+    // The tighter center hotspot carries most of the throw; both cones
+    // use inverse-square attenuation (decay=2) over the same 25 m range.
     this.game.flashFill.intensity=this.flashlight
-      ? (.10+beamPower*.55)*beamScale*flashRamp*flashZoneBoost
+      ? (180+beamPower*720)*beamScale*flashRamp*flashZoneBoost
       : 0;
 
     this.game.blackoutLight.position.copy(this.game.camera.position);
