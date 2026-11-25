@@ -1,4 +1,4 @@
-import { BackroomsGame } from "./game.js?v=20261120-level4-office-level1-multifloor1";
+import { BackroomsGame } from "./game.js?v=20261125-directional-flashlight1";
 import { installBackroomsFixes } from "./fixes.js?v=20260926-flashlight2";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20261120-level4-office-pbr1";
