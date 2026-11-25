@@ -2951,14 +2951,17 @@ class Chunk{
     }
 
     if(state==="FLICKER"){
+      const globalPulse=this.game.totalBlackoutActive&&
+        (this.game.totalBlackoutPhase==="flicker-in"||this.game.totalBlackoutPhase==="flicker-out")
+        ?(this.game.totalBlackoutEnvironmentFlicker??1):1;
       for(const fixture of this.fixtures){
         const scale=this.flickerScale(fixture);
         if(fixture.material?.emissive)
-          fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??.8)*scale;
+          fixture.material.emissiveIntensity=(fixture.userData.baseEmissive??.8)*scale*globalPulse;
       }
       for(const light of this.lightSources){
         const scale=this.flickerScale(light.fixture);
-        light.intensity=light.baseIntensity*scale;
+        light.intensity=light.baseIntensity*scale*globalPulse;
       }
       return;
     }
@@ -5198,7 +5201,7 @@ export class BackroomsGame{
   }
   updateTotalBlackoutEnvironment(){
     const phase=this.totalBlackoutPhase;
-    if(!this.totalBlackoutActive||!["7","37"].includes(this.level.id)||(phase!=="flicker-in"&&phase!=="flicker-out")){
+    if(!this.totalBlackoutActive||(phase!=="flicker-in"&&phase!=="flicker-out")){
       this.totalBlackoutEnvironmentFlicker=1;
       return;
     }
@@ -5215,17 +5218,18 @@ export class BackroomsGame{
     if(!base)return;
     this.ambient.intensity=base.ambientIntensity*levelScale;
     this.daylight.intensity=base.daylightIntensity*levelScale;
-    if(this.level.id==="7"){
-      this.oceanSky.visible=!!base.oceanSkyVisible&&levelScale>.2;
-      this.cloudLayer.visible=!!base.cloudVisible&&levelScale>.28;
-      if(this.cloudLayer.material?.uniforms?.opacity)this.cloudLayer.material.uniforms.opacity.value=base.cloudOpacity*levelScale;
-    }
+    this.sky.visible=!!base.skyVisible&&levelScale>.2;
+    this.oceanSky.visible=!!base.oceanSkyVisible&&levelScale>.2;
+    this.cloudLayer.visible=!!base.cloudVisible&&levelScale>.28;
+    if(this.cloudLayer.material?.uniforms?.opacity)
+      this.cloudLayer.material.uniforms.opacity.value=base.cloudOpacity*levelScale;
   }
   applyTotalBlackoutLighting(){
     if(!this.totalBlackoutActive||this.totalBlackoutPhase!=="blackout")return;
     this.ambient.intensity=0;
     this.daylight.intensity=0;
     this.sky.visible=false;
+    this.oceanSky.visible=false;
     this.cloudLayer.visible=false;
     this.scene.background?.setHex?.(0x000000);
     if(this.scene.fog){this.scene.fog.color.setHex(0x000000);this.scene.fog.density=.075;}
@@ -5539,8 +5543,8 @@ export class BackroomsGame{
   render(){
     // Keep the daylight atmosphere stable while chunks stream. The scene
     // background remains a blue fallback if a browser loses the sky dome.
-    if(this.totalBlackoutActive){
-      this.scene.background.setHex(0x000000);this.sky.visible=false;this.cloudLayer.visible=false;
+    if(this.totalBlackoutActive&&this.totalBlackoutPhase==="blackout"){
+      this.scene.background.setHex(0x000000);this.sky.visible=false;this.oceanSky.visible=false;this.cloudLayer.visible=false;
     }else if(this.level.id==="7"){
       const depth=this.player.inOcean?THREE.MathUtils.clamp(this.waterDepthBlend||0,0,1):0;
       this.sky.visible=false;
@@ -5559,9 +5563,10 @@ export class BackroomsGame{
       }
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
     }else if(this.level.id==="10"){
+      const flicker=this.totalBlackoutActive?(this.totalBlackoutEnvironmentFlicker??1):1;
       this.scene.background.setHex(0xc3d2de);
-      this.sky.visible=true;this.oceanSky.visible=false;this.cloudLayer.visible=true;
-      this.cloudLayer.material.uniforms.opacity.value=.48;
+      this.sky.visible=flicker>.2;this.oceanSky.visible=false;this.cloudLayer.visible=flicker>.28;
+      this.cloudLayer.material.uniforms.opacity.value=.48*flicker;
       this.cloudLayer.material.uniforms.coverage.value=.43;
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
       if(this.scene.fog){this.scene.fog.color.setHex(0xc3d2de);this.scene.fog.density=.00028;}

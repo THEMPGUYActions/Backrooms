@@ -1,9 +1,9 @@
-const CACHE_NAME="backrooms-assets-v71";
+const CACHE_NAME="backrooms-assets-v72";
 const CORE=[
   "index.html",
   "styles.css",
-  "src/main.js?v=20261125-poolrooms-underwater1",
-  "src/game.js?v=20261125-poolrooms-underwater1",
+  "src/main.js?v=20261125-poolrooms-flicker2",
+  "src/game.js?v=20261125-poolrooms-flicker2",
   "src/entity-models.js",
   "src/assets.js?v=20261125-level0-architecture-daylight-sky1",
   "src/level1-wet.js?v=20261120-l2-pipe-uv-junctions2",
