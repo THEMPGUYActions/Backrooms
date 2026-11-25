@@ -1,4 +1,4 @@
-const CACHE_NAME="backrooms-assets-v66";
+const CACHE_NAME="backrooms-assets-v67";
 const CORE=[
   "index.html",
   "styles.css",
@@ -11,7 +11,7 @@ const CORE=[
   "src/levels.js?v=20261120-level4-office-level1-multifloor1",
   "src/audio.js",
   "src/admin.js?v=20261125-admin-teleport-queue3",
-  "src/fixes.js?v=20261125-manila-dispatch1",
+  "src/fixes.js?v=20261125-manila-dispatch2",
   "favicon.svg"
 ];
 
