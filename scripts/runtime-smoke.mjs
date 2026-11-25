@@ -383,7 +383,7 @@ try{
     awaitPromise:true,
     returnByValue:true
   },30000);
-  if(blackoutResult.result?.exceptionDetails){const d=blackoutResult.result.exceptionDetails;throw new Error("TOTAL_BLACKOUT_LIGHTING_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
+  if(blackoutResult.result?.exceptionDetails){const d=blackoutResult.result.exceptionDetails;throw new Error("TOTAL_BLACKOUT_LIGHTING_SMOKE failed: "+(d.exception?.description||d.text||JSON.stringify(d)));}
   const blackoutLighting=JSON.parse(blackoutResult.result?.result?.value||"{}");
   console.log("TOTAL_BLACKOUT_LIGHTING_SMOKE "+JSON.stringify(blackoutLighting));
   const blackoutDurationResult=await command("Runtime.evaluate",{
@@ -391,7 +391,7 @@ try{
     awaitPromise:true,
     returnByValue:true
   },30000);
-  if(blackoutDurationResult.result?.exceptionDetails){const d=blackoutDurationResult.result.exceptionDetails;throw new Error("TOTAL_BLACKOUT_DURATION_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
+  if(blackoutDurationResult.result?.exceptionDetails){const d=blackoutDurationResult.result.exceptionDetails;throw new Error("TOTAL_BLACKOUT_DURATION_SMOKE failed: "+(d.exception?.description||d.text||JSON.stringify(d)));}
   const blackoutDuration=JSON.parse(blackoutDurationResult.result?.result?.value||"{}");
   console.log("TOTAL_BLACKOUT_DURATION_SMOKE "+JSON.stringify(blackoutDuration));
   const poolroomsResult=await command("Runtime.evaluate",{
@@ -399,7 +399,7 @@ try{
     awaitPromise:true,
     returnByValue:true
   },30000);
-  if(poolroomsResult.result?.exceptionDetails){const d=poolroomsResult.result.exceptionDetails;throw new Error("LEVEL37_POOLROOMS_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
+  if(poolroomsResult.result?.exceptionDetails){const d=poolroomsResult.result.exceptionDetails;throw new Error("LEVEL37_POOLROOMS_SMOKE failed: "+(d.exception?.description||d.text||JSON.stringify(d)));}
   const poolrooms=JSON.parse(poolroomsResult.result?.result?.value||"{}");
   console.log("LEVEL37_POOLROOMS_SMOKE "+JSON.stringify(poolrooms));
   markSmokeStage("global total blackout lighting");
