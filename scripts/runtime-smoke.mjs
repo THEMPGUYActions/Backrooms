@@ -394,6 +394,14 @@ try{
   if(blackoutDurationResult.result?.exceptionDetails){const d=blackoutDurationResult.result.exceptionDetails;throw new Error("TOTAL_BLACKOUT_DURATION_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
   const blackoutDuration=JSON.parse(blackoutDurationResult.result?.result?.value||"{}");
   console.log("TOTAL_BLACKOUT_DURATION_SMOKE "+JSON.stringify(blackoutDuration));
+  const poolroomsResult=await command("Runtime.evaluate",{
+    expression:"(async()=>{const g=window.backrooms;const previous={running:g.running,paused:g.paused,level:g.level.id,position:g.player.position.clone(),eyeY:g.player.eyeY};g.running=false;g.paused=false;const load=g.setLevel('37');g.player.position.set(0,g.player.eyeY,0);await load;await g.world.ensureAroundAsync(0,0);const c=g.world.chunkAt(0,0);const result={chunks:g.world.chunks.size,waterRegions:c?.waterRegions?.length||0,deepPools:c?.waterRegions?.filter(r=>r.swimmable).length||0,collisionSegments:c?.collisionSegments?.length||0,animatedWater:c?.group.userData.animatedWaterMaterials?.length||0,ceilingVisible:g.world.ceilingSurface?.visible};if(!c||result.waterRegions<2||result.deepPools<1||result.collisionSegments<20||result.animatedWater<1||!result.ceilingVisible)throw new Error('Level 37 generated geometry/water incomplete: '+JSON.stringify(result));const deep=c.waterRegions.find(r=>r.swimmable);const water=g.world.waterRegionAt((deep.minX+deep.maxX)*.5,(deep.minZ+deep.maxZ)*.5);if(!water||water.type!=='deep-pool'||water.floorY>=0)throw new Error('Level 37 deep water lookup failed');g.player.position.set((deep.minX+deep.maxX)*.5,1.72,(deep.minZ+deep.maxZ)*.5);const inPool=g.world.waterRegionAt(g.player.position.x,g.player.position.z);if(!inPool?.swimmable)throw new Error('Level 37 swimming region did not resolve');const saved=g.setLevel(previous.level);g.player.position.copy(previous.position);await saved;g.running=previous.running;g.paused=previous.paused;return JSON.stringify(result)})()",
+    awaitPromise:true,
+    returnByValue:true
+  },30000);
+  if(poolroomsResult.result?.exceptionDetails){const d=poolroomsResult.result.exceptionDetails;throw new Error("LEVEL37_POOLROOMS_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
+  const poolrooms=JSON.parse(poolroomsResult.result?.result?.value||"{}");
+  console.log("LEVEL37_POOLROOMS_SMOKE "+JSON.stringify(poolrooms));
   markSmokeStage("global total blackout lighting");
   markSmokeStage("level 0 lighting");
   console.log("ENTITY_MODEL_ATTACH_SMOKE "+JSON.stringify(modelAttach));
