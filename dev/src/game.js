@@ -2203,20 +2203,6 @@ class Chunk{
     if(region==="blackout"){
       const wetRng=new RNG(this.seedKey()^0x9c31);
       for(let i=0;i<3;i++)if(wetRng.next()<.72){const p=center(wetRng.int(0,cells-1),wetRng.int(0,cells-1));const puddle=new THREE.Mesh(new THREE.CircleGeometry(1.8+wetRng.next()*2.2,18),lib.water);puddle.rotation.x=-Math.PI/2;puddle.position.set(p.x,.009,p.z);g.add(puddle)}
-      // Blackout subzones still have sparse emergency/unstable fluorescent
-      // fixtures. These are the only overhead lights that remain powered
-      // during the outage and they flicker independently.
-      const lampRng=new RNG(this.seedKey()^0x6b1a);
-      const lampCount=2+lampRng.int(0,2);
-      for(let i=0;i<lampCount;i++){
-        const lx=lampRng.int(1,Math.max(1,cells-2)),lz=lampRng.int(1,Math.max(1,cells-2));
-        const p=center(lx,lz),material=lib.light.clone();
-        material.emissive.setHex(0xffd7a0);material.emissiveIntensity=.42;
-        const fixture=box(g,new THREE.BoxGeometry(1.42,.055,.46),material,p.x,level.wallHeight-.1,p.z);
-        fixture.userData.light=true;fixture.userData.baseEmissive=.42;fixture.userData.blackoutFixture=true;
-        this.fixtures.push(fixture);
-        this.lightSources.push({position:new THREE.Vector3(p.x,level.wallHeight-.32,p.z),color:0xffd7a0,baseIntensity:35,intensity:35,distance:10,decay:2,fixture,blackoutFixture:true,cullRadius:12});
-      }
     }
 
     if(region==="maze"&&!this.manilaRoom){
@@ -3717,7 +3703,9 @@ class Player{
     this.game.flashFillTarget.position.copy(this.game.camera.position)
       .addScaledVector(flashForward,2.0);
 
-    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance,this.game.level.id);
+    const audioChunk=this.game.world.chunkAt(this.position.x,this.position.z);
+    const audioZone=this.game.level.id==="0"&&audioChunk?.level0Blackout?"blackout":"normal";
+    this.game.audio.update(dt,moving,run,1-this.sanity/100,this.game.world.lightProximity(this.position.x,this.position.z),this.game.lightState,distance,this.game.level.id,audioZone);
   }
 }
 
@@ -4518,6 +4506,23 @@ export class BackroomsGame{
     bindUiButton($("again-ending"),()=>this.restart());
     bindUiButton($("fullscreen"),()=>this.toggleFullscreen());
     bindUiButton($("fullscreen-settings"),()=>this.toggleFullscreen());
+    this.updateFullscreenLabels=()=>{
+      const label=document.fullscreenElement?"Exit Fullscreen":"Enter Fullscreen";
+      const main=$("fullscreen"),settings=$("fullscreen-settings");
+      if(main)main.textContent=label;
+      if(settings)settings.textContent=label;
+    };
+    this.wasFullscreen=!!document.fullscreenElement;
+    document.addEventListener("fullscreenchange",()=>{
+      const active=!!document.fullscreenElement;
+      if(this.wasFullscreen&&!active){
+        navigator.keyboard?.unlock?.();
+        if(this.running&&!this.paused&&!this.dead&&!this.introPlaying)this.togglePause(true);
+      }
+      this.wasFullscreen=active;
+      this.updateFullscreenLabels();
+    });
+    this.updateFullscreenLabels();
 
     const pauseTabNames={settings:["SETTINGS","SETTINGS"],controls:["CONTROLS","HOW TO PLAY"]};
     this.pauseTabState=tab=>{
@@ -4786,8 +4791,14 @@ export class BackroomsGame{
   }
   async toggleFullscreen(){
     try{
-      if(document.fullscreenElement)await document.exitFullscreen();
-      else await document.documentElement.requestFullscreen?.();
+      if(document.fullscreenElement){
+        navigator.keyboard?.unlock?.();
+        await document.exitFullscreen();
+        return;
+      }
+      const options={navigationUI:"hide"};
+      if(navigator.keyboard?.lock)options.keyboardLock="browser";
+      await document.documentElement.requestFullscreen?.(options);
     }catch(error){
       console.warn("[Backrooms] Fullscreen unavailable:",error);
     }
@@ -5029,6 +5040,12 @@ export class BackroomsGame{
     const frustumMatrix=this._lightFrustumMatrix||(this._lightFrustumMatrix=new THREE.Matrix4());
     frustumMatrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse);
     lightFrustum.setFromProjectionMatrix(frustumMatrix);
+    const currentChunk=this.world.chunkAt(this.player.position.x,this.player.position.z);
+    const insideBlackout=this.level.id==="0"&&currentChunk?.level0Blackout===true;
+    if(insideBlackout|| (this.level.id==="0"&&this.lightState==="BLACKOUT")){
+      for(const light of this.localLights){light.intensity=0;light.visible=false}
+      return;
+    }
     const sources=this.world.nearbyLightSources(this.player.position.x,this.player.position.z,lightFrustum);
     const next=sources.slice(0,this.localLights.length);
     for(let i=0;i<this.localLights.length;i++){
@@ -5045,19 +5062,11 @@ export class BackroomsGame{
       target.distance=source.distance;
       target.decay=source.decay;
       const blackout=this.level.id==="0"&&this.lightState==="BLACKOUT";
-      if(blackout&&!source.blackoutFixture){
+      if(blackout){
         target.intensity=0;
         continue;
       }
-      if(source.blackoutFixture&&!blackout){
-        target.intensity=0;
-        continue;
-      }
-      const lightScale=this.level.id==="0"?18:4;
-      const flicker=source.blackoutFixture
-        ? (Math.sin(this.gameTime*17.0+source.position.x*1.7+source.position.z*.9)>.12?1:.08)
-        : 1;
-      target.intensity=source.intensity*lightScale*flicker;
+      target.intensity=source.intensity*(this.level.id==="0"?18:4);
     }
   }
   updateIntro(dt){
