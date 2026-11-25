@@ -378,6 +378,15 @@ try{
   if(level0LightResult.result?.exceptionDetails){const d=level0LightResult.result.exceptionDetails;throw new Error("LEVEL0_LIGHTING_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
   const level0Lighting=JSON.parse(level0LightResult.result?.result?.value||"{}");
   console.log("LEVEL0_LIGHTING_SMOKE "+JSON.stringify(level0Lighting));
+  const blackoutResult=await command("Runtime.evaluate",{
+    expression:"(()=>{const g=window.backrooms;const before={ambient:g.ambient.intensity,daylight:g.daylight.intensity,sky:g.sky.visible,cloud:g.cloudLayer.visible,background:g.scene.background?.getHex?.(),flash:g.flash.intensity,fill:g.flashFill.intensity};g.captureTotalBlackoutLighting();g.totalBlackoutActive=true;g.lightState='BLACKOUT';g.applyTotalBlackoutLighting();const during={ambient:g.ambient.intensity,daylight:g.daylight.intensity,sky:g.sky.visible,cloud:g.cloudLayer.visible,background:g.scene.background?.getHex?.(),flash:g.flash.intensity,fill:g.flashFill.intensity,localLightsOff:g.localLights.every(light=>!light.visible&&light.intensity===0)};g.totalBlackoutActive=false;g.lightState='ON';g.restoreTotalBlackoutLighting();g.updateLocalLights();const after={ambient:g.ambient.intensity,daylight:g.daylight.intensity,sky:g.sky.visible,cloud:g.cloudLayer.visible,background:g.scene.background?.getHex?.()};if(during.ambient!==0||during.daylight!==0||during.sky||during.cloud||during.background!==0||during.flash!==0||during.fill!==0||!during.localLightsOff)throw new Error('Total blackout leaked light: '+JSON.stringify(during));if(Math.abs(after.ambient-before.ambient)>.0001||Math.abs(after.daylight-before.daylight)>.0001||after.sky!==before.sky||after.cloud!==before.cloud||after.background!==before.background)throw new Error('Total blackout did not restore level lighting: '+JSON.stringify({before,after}));return JSON.stringify({before,during,after})})()",
+    awaitPromise:true,
+    returnByValue:true
+  },30000);
+  if(blackoutResult.result?.exceptionDetails){const d=blackoutResult.result.exceptionDetails;throw new Error("TOTAL_BLACKOUT_LIGHTING_SMOKE failed: "+(d.text||d.exception?.description||JSON.stringify(d)));}
+  const blackoutLighting=JSON.parse(blackoutResult.result?.result?.value||"{}");
+  console.log("TOTAL_BLACKOUT_LIGHTING_SMOKE "+JSON.stringify(blackoutLighting));
+  markSmokeStage("global total blackout lighting");
   markSmokeStage("level 0 lighting");
   console.log("ENTITY_MODEL_ATTACH_SMOKE "+JSON.stringify(modelAttach));
   markSmokeStage("final smoke checks");
