@@ -29,6 +29,14 @@ jobs:
           lfs: true
           fetch-depth: 0
 
+      - name: Ensure FFmpeg for locked audio conversion
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+
       - name: Bootstrap missing entity binaries
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
         run: node scripts/bootstrap-entity-assets.mjs
