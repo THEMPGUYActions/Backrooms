@@ -1,31 +1,5 @@
 import * as THREE from "three";
 
-const MANILA_MACRO_SIZE=20;
-
-function cycleHash(a,b,c=0){
-  let n=(Math.imul(a|0,374761393)+Math.imul(b|0,668265263)+Math.imul(c|0,1442695041))|0;
-  n=Math.imul(n^(n>>>13),1274126177);
-  return ((n^(n>>>16))>>>0)/4294967296;
-}
-
-function positiveMod(n,d){return ((n%d)+d)%d}
-
-function manilaAt(cx,cz,seed){
-  if(cx===0&&cz===0)return null;
-  const macroX=Math.floor(cx/MANILA_MACRO_SIZE),macroZ=Math.floor(cz/MANILA_MACRO_SIZE);
-  const lx=positiveMod(cx,MANILA_MACRO_SIZE),lz=positiveMod(cz,MANILA_MACRO_SIZE);
-  if(lx<1||lx>8||lz<1||lz>8)return null;
-  if(cycleHash(seed^0x6d6e,macroX,macroZ,0x41)>.045)return null;
-  const tx=1+Math.floor(cycleHash(seed^0x6d6f,macroX,macroZ,0x42)*8);
-  const tz=1+Math.floor(cycleHash(seed^0x6d70,macroX,macroZ,0x43)*8);
-  if(lx!==tx||lz!==tz)return null;
-  return {
-    cellX:1+Math.floor(cycleHash(seed^0x6d72,macroX,macroZ,0x45)*3),
-    cellZ:1+Math.floor(cycleHash(seed^0x6d73,macroX,macroZ,0x46)*3),
-    entrySide:["north","east","south","west"][Math.floor(cycleHash(seed^0x6d71,macroX,macroZ,0x44)*4)]
-  };
-}
-
 function installRoof(game){
   const world=game.world;
   if(!world||world.__level0RoofPatched)return;
@@ -189,56 +163,6 @@ function installManilaAdmin(adminClass){
     this.levels?.appendChild(button);
   };
 
-  adminClass.prototype.teleportManilaRoom=async function(){
-    if(this.busy||!this.game.running||this.game.introActive||this.game.dead)return;
-    if(this.game.level?.id!=="0"){
-      this.game.toast("MANILA ROOM IS LEVEL 0",1.4);
-      return;
-    }
-    this.busy=true;
-    try{
-      const p=this.game.player,world=this.game.world,size=world.size;
-      let best=null,bestDistance=Infinity;
-      for(let macroX=-12;macroX<=12;macroX++)for(let macroZ=-12;macroZ<=12;macroZ++){
-        for(let lx=1;lx<=8;lx++)for(let lz=1;lz<=8;lz++){
-          const cx=macroX*MANILA_MACRO_SIZE+lx,cz=macroZ*MANILA_MACRO_SIZE+lz;
-          const room=manilaAt(cx,cz,this.game.seed);
-          if(!room)continue;
-          const wx=cx*size-size/2, wz=cz*size-size/2;
-          const d=Math.hypot(wx-p.position.x,wz-p.position.z);
-          if(d<bestDistance){bestDistance=d;best={cx,cz,room}}
-        }
-      }
-      if(!best){
-        this.game.toast("NO MANILA ROOM FOUND",1.5);
-        return;
-      }
-
-      this.game.paused=true;
-      world.ensureAround(best.cx*size,best.cz*size);
-      const chunk=world.chunks.get(best.cx+","+best.cz);
-      if(!chunk?.manilaRoom){
-        this.game.toast("MANILA ROOM LOAD FAILED",1.5);
-        return;
-      }
-      const cell=this.game.level.cellSize;
-      const x=chunk.originX+best.room.cellX*cell+cell/2;
-      const z=chunk.originZ+best.room.cellZ*cell+cell/2;
-      p.position.set(x,p.eyeY,z);
-      p.yaw=0;p.pitch=0;p.viewYaw=0;p.viewPitch=0;
-      this.game.world.ensureAround(x,z);
-      this.game.paused=false;
-      this.game.syncPageTitle?.();
-      this.game.toast("TELEPORTED TO MANILA ROOM",1.8);
-      this.sync();
-    }catch(error){
-      console.error("[Backrooms] Manila teleport failed:",error);
-      this.game.paused=false;
-      this.game.toast("MANILA TELEPORT FAILED",1.8);
-    }finally{
-      this.busy=false;
-    }
-  };
 }
 
 export function installBackroomsFixes(game,AdminClass){
