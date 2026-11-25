@@ -92,8 +92,8 @@ export class AudioDirector{
       o1.start();o2.start();o3.start();
 
       const noise=this.ctx.createBufferSource();noise.buffer=this.createNoiseLoop();noise.loop=true;
-      const buzzFilter=this.ctx.createBiquadFilter();buzzFilter.type="bandpass";buzzFilter.frequency.value=1450;buzzFilter.Q.value=.9;
-      const noiseGain=this.ctx.createGain();noiseGain.gain.value=.038;
+      const buzzFilter=this.ctx.createBiquadFilter();buzzFilter.type="bandpass";buzzFilter.frequency.value=235;buzzFilter.Q.value=.55;
+      const noiseGain=this.ctx.createGain();noiseGain.gain.value=.006;
       noise.connect(buzzFilter).connect(noiseGain).connect(this.humGain);noise.start();
 
       this.ready=true;
@@ -496,35 +496,7 @@ export class AudioDirector{
     }
   }
   click(){this.tone(420,.03,"square",.02);this.tone(70,.07,"sine",.01)}
-  flickerAt(position=null){
-    if(!this.ready)return;
-    let pan=0;
-    if(position&&this.ctx){
-      const camera=this.game?.camera;
-      const player=this.game?.player;
-      if(player){
-        const dx=position.x-player.position.x,dz=position.z-player.position.z;
-        const angle=Math.atan2(dx,dz);
-        pan=Math.sin(angle-(camera?.rotation?.y??0));
-      }
-    }
-    // Short electrical snap inspired by real fluorescent-flicker recordings.
-    // The researched reference is TemperMode's CC0 "fluorescent light
-    // flickering 1.wav", found on Freesound.
-    this.playBuffer("industrial_switch",{gain:.045,rate:.88+Math.random()*.28,pan,send:.22,delay:.05});
-    this.tone(72+Math.random()*34,.026,"square",.012);
-    this.noise(.055,.018,1050+Math.random()*650);
-    this.playBuffer("electric_buzz",{
-      gain:.018+Math.random()*.012,
-      rate:1.25+Math.random()*.35,
-      pan:clamp(pan,-1,1),
-      send:.16,
-      delay:.035
-    });
-  }
-  flicker(){
-    this.flickerAt();
-  }
+
   entityCue(type,state="alert",distance=8,pan=0){
     if(!this.ready)return;
     const falloff=Math.max(.055,Math.min(1,1/(1+distance*.085)));
@@ -589,9 +561,7 @@ export class AudioDirector{
     this.noise(.45,.08,250);this.tone(43,.5,"sawtooth",.055);this.tone(89,.28,"triangle",.028);
   }
   lightsOut(){
-    if(this.humGain)this.humGain.gain.setTargetAtTime(.00015,this.ctx.currentTime,.045);
-    this.playBuffer("industrial_switch",{gain:.035,rate:.82+Math.random()*.32,pan:(Math.random()-.5)*.25,send:.08,delay:.025});
-    if(Math.random()<.28)this.noise(.045,.006,2200);
+    if(this.humGain)this.humGain.gain.setTargetAtTime(.00001,this.ctx.currentTime,.09);
   }
   ambientSting(gain=.1){
     this.playBuffer("ambient_horror",{gain,rate:.94+Math.random()*.1,pan:(Math.random()-.5)*.5,send:.52,delay:.18});
@@ -700,7 +670,7 @@ export class AudioDirector{
     }
 
     // The ballast buzz becomes audible only in built environments with fixtures.
-    if(this.buzzTimer<=0&&lightState==="ON"&&!(["6","7","9","10"].includes(this.levelId))){
+    if(this.buzzTimer<=0&&lightState==="ON"&&this.levelId!=="0"&&!(["6","7","9","10"].includes(this.levelId))){
       if(p>.03){
         const gain=.035+p*.17;
         this.playBuffer("electric_buzz",{
@@ -716,13 +686,12 @@ export class AudioDirector{
       }
     }
 
-    let target=.008+p*.078+fear*.004;
+    let target=this.levelId==="0"?.003+p*.022+fear*.001:.008+p*.078+fear*.004;
     if(this.levelId==="6")target=.000015;
     else if(this.levelId==="7")target*=.22;
     else if(this.levelId==="10")target*=.16;
-    if(this.zoneId==="blackout")target=.00006;
-    else if(lightState==="FLICKER")target*=.48;
-    else if(lightState==="BLACKOUT")target=.00045;
+    if(this.zoneId==="blackout"||lightState==="BLACKOUT")target=.00001;
+    else if(lightState==="FLICKER")target*=.9;
     if(this.humGain)this.humGain.gain.setTargetAtTime(target,this.ctx.currentTime,.11);
   }
 }
