@@ -1,9 +1,9 @@
-const CACHE_NAME="backrooms-assets-v61";
+const CACHE_NAME="backrooms-assets-v62";
 const CORE=[
   "index.html",
   "styles.css",
-  "src/main.js?v=20261120-level4-office-level1-multifloor1",
-  "src/game.js?v=20261120-level4-office-level1-multifloor1",
+  "src/main.js?v=20261125-directional-flashlight1",
+  "src/game.js?v=20261125-directional-flashlight1",
   "src/entity-models.js",
   "src/assets.js?v=20261120-level4-office-pbr1",
   "src/level1-wet.js?v=20261120-l2-pipe-uv-junctions2",
