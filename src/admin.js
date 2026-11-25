@@ -287,6 +287,13 @@ export class BackroomsAdmin{
       // surfaces and regional state are always switched together.
       const worldLoad=this.game.setLevel(String(id),{manilaRoom:roomSpec});
       if(worldLoad&&typeof worldLoad.then==="function")await worldLoad;
+      if(manilaRoom){
+        // The level switch can finish loading its prior-center chunks before
+        // the admin destination is applied. Rebuild with the override still
+        // explicitly set so the room is generated deterministically at 0,0.
+        this.game.world.forceLevel0ManilaRoom={...roomSpec};
+        await this.game.world.configure();
+      }
       this.game.entityManager.clear();
       this.game.player.reset();
 
