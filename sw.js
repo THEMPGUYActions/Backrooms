@@ -1,9 +1,9 @@
-const CACHE_NAME="backrooms-assets-v69";
+const CACHE_NAME="backrooms-assets-v70";
 const CORE=[
   "index.html",
   "styles.css",
   "src/main.js?v=20261125-manila-dispatch-entry4",
-  "src/game.js?v=20261125-global-flicker-blackout1",
+  "src/game.js?v=20261125-total-flicker-phases2",
   "src/entity-models.js",
   "src/assets.js?v=20261125-level0-architecture-daylight-sky1",
   "src/level1-wet.js?v=20261120-l2-pipe-uv-junctions2",
