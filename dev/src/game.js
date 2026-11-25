@@ -14,6 +14,9 @@ import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3
 function oceanSurfaceHeight(x,z,time){
   return .02+Math.sin(x*.19+time*.72)*.13+Math.sin(z*.15-time*.61)*.08+Math.sin((x+z)*.09+time*.43)*.05;
 }
+function poolWaterSurfaceHeight(x,z,time){
+  return .42+Math.sin(x*.22+time*.64)*.025+Math.sin(z*.17-time*.52)*.018+Math.sin((x-z)*.11+time*.31)*.012;
+}
 
 const LEVEL1_UPPER_FLOOR_Y=LEVELS["1"].wallHeight/2;
 const LEVEL1_FLOOR_SLAB_THICKNESS=.28;
@@ -104,7 +107,7 @@ const VHSShader={
 const CELLS=16;
 const BASE_RADIUS=1;
 const MAX_DT=.05;
-const LEVELS_WITHOUT_GLOBAL_CEILING=new Set(["4","6","7","9","10","37"]);
+const LEVELS_WITHOUT_GLOBAL_CEILING=new Set(["4","6","7","9","10"]);
 const QUERY_PARAMS=new URLSearchParams(location.search);
 function queryFlag(name){
   if(!QUERY_PARAMS.has(name))return false;
@@ -221,7 +224,7 @@ class Chunk{
       Math.sqrt((world.size*.5)**2*2+(this.game.level.wallHeight*.5)**2)
     );
     this.hiddenSince=0;
-    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.obstacleSegments=[];this.solidRects=[];this.baseCollisionSegmentCount=0;this.level1Ramp=null;this.zone="halls";this.rooms=[];
+    this.walls=new Uint8Array(this.gridSize()*this.gridSize());this.hazards=[];this.floorPit=null;this.exit=null;this.falseDoors=[];this.entitySpawn=false;this.fixtures=[];this.lightSources=[];this.waterRegions=[];this.batteries=[];this.crates=[];this.pebbles=[];this.collisionSegments=[];this.obstacleSegments=[];this.solidRects=[];this.baseCollisionSegmentCount=0;this.level1Ramp=null;this.zone="halls";this.rooms=[];
     this.flickerTimer=10+Math.random()*18;
     this.buildMaze();this.buildGeometry();
     if(this.game.level.id==="1")this.obstacleSegments=this.collisionSegments.slice(this.baseCollisionSegmentCount);
@@ -2081,88 +2084,196 @@ class Chunk{
         );
       }
     }else if(level.id==="37"){
-      // Poolrooms: white ceramic tiled chambers, soft turquoise basins, diffuse light.
+      // Connected Poolrooms: nine varied tiled chambers linked by matching arches.
+      // Every chunk shares the same four boundary portals, so streaming never
+      // produces sealed rooms or mismatched connections at chunk edges.
       const rng=new RNG(this.seedKey()^0x37a1);
-      const tileMat=lib.maintenanceWall||lib.wall;
-      const waterMat=lib.water.clone();
-      waterMat.color.setHex(0x4ec8c0);
-      waterMat.opacity=.72;
-      waterMat.roughness=.06;
-      waterMat.metalness=.04;
-      waterMat.emissive.setHex(0x1a6058);
-      waterMat.emissiveIntensity=.18;
-      waterMat.transparent=true;
-      waterMat.depthWrite=false;
-      waterMat.side=THREE.DoubleSide;
-      this.lightSources.push({
-        position:new THREE.Vector3(this.originX+size*.5,level.wallHeight-0.6,this.originZ+size*.5),
-        color:0xf4fcf8,baseIntensity:5.5,intensity:5.5,distance:size*1.7,decay:1.35
-      });
-      const chamberLayouts=[
-        {cx:.22,cz:.22,w:size*.38,d:size*.36,pool:false,cols:true},
-        {cx:.72,cz:.26,w:size*.42,d:size*.4,pool:true,cols:false},
-        {cx:.28,cz:.72,w:size*.4,d:size*.38,pool:true,cols:true},
-        {cx:.74,cz:.74,w:size*.36,d:size*.34,pool:false,cols:false}
-      ];
-      for(const ch of chamberLayouts){
-        const cx=this.originX+size*ch.cx,cz=this.originZ+size*ch.cz;
-        const hw=ch.w*.5,hd=ch.d*.5,wallH=level.wallHeight;
-        const gap=.95;
-        box(g,new THREE.BoxGeometry(hw-gap,.22,ch.d),tileMat,cx-(hw+gap)*.5,.11,cz);
-        box(g,new THREE.BoxGeometry(hw-gap,.22,ch.d),tileMat,cx+(hw+gap)*.5,.11,cz);
-        box(g,new THREE.BoxGeometry(ch.w,wallH,.18),tileMat,cx,wallH*.5,cz-hd);
-        box(g,new THREE.BoxGeometry(ch.w,wallH,.18),tileMat,cx,wallH*.5,cz+hd);
-        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx-hw,wallH*.5,cz-(hd+gap)*.5);
-        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx-hw,wallH*.5,cz+(hd+gap)*.5);
-        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx+hw,wallH*.5,cz-(hd+gap)*.5);
-        box(g,new THREE.BoxGeometry(.18,wallH,hd-gap),tileMat,cx+hw,wallH*.5,cz+(hd+gap)*.5);
-        box(g,new THREE.BoxGeometry(ch.w,.08,ch.d),tileMat,cx,.04,cz);
-        this.collisionSegments.push(
-          {x1:cx-hw,z1:cz-hd,x2:cx+hw,z2:cz-hd},
-          {x1:cx-hw,z1:cz+hd,x2:cx+hw,z2:cz+hd},
-          {x1:cx-hw,z1:cz-hd,x2:cx-hw,z2:cz-gap},
-          {x1:cx-hw,z1:cz+gap,x2:cx-hw,z2:cz+hd},
-          {x1:cx+hw,z1:cz-hd,x2:cx+hw,z2:cz-gap},
-          {x1:cx+hw,z1:cz+gap,x2:cx+hw,z2:cz+hd}
-        );
-        if(ch.pool){
-          const poolW=ch.w*.78,poolD=ch.d*.74;
-          const surfaceY=1.15;
-          const basin=new THREE.Mesh(new THREE.PlaneGeometry(poolW,poolD,48,48),waterMat);
-          basin.rotation.x=-Math.PI/2;basin.position.set(cx,surfaceY,cz);basin.renderOrder=1;g.add(basin);
-          box(g,new THREE.BoxGeometry(poolW+.5,.16,poolD+.5),tileMat,cx,surfaceY+.08,cz);
-          box(g,new THREE.BoxGeometry(poolW,.08,poolD),tileMat,cx,-.02,cz);
-        }
-        if(ch.cols){
-          for(const [ox,oz] of [[-.32,-.28],[.32,-.28],[-.32,.28],[.32,.28]]){
-            const colX=cx+ox*ch.w,colZ=cz+oz*ch.d;
-            box(g,new THREE.BoxGeometry(.55,wallH,.55),tileMat,colX,wallH*.5,colZ);
-            box(g,new THREE.BoxGeometry(.72,.12,.72),tileMat,colX,wallH-.06,colZ);
-            box(g,new THREE.BoxGeometry(.72,.1,.72),tileMat,colX,.05,colZ);
-            const hx=.32,hz=.32;
-            this.collisionSegments.push(
-              {x1:colX-hx,z1:colZ-hz,x2:colX+hx,z2:colZ-hz},
-              {x1:colX+hx,z1:colZ-hz,x2:colX+hx,z2:colZ+hz},
-              {x1:colX+hx,z1:colZ+hz,x2:colX-hx,z2:colZ+hz},
-              {x1:colX-hx,z1:colZ+hz,x2:colX-hx,z2:colZ-hz}
-            );
+      const wallMat=lib.wall, floorMat=lib.floor, trimMat=lib.trim, metalMat=lib.metal;
+      const wallH=level.wallHeight, wallT=.24, shallowY=.42;
+      const third=size/3, portalWidth=12.5, innerPortalWidth=10.5;
+      const addFloorRect=(x,z,width,depth,y=.012)=>{
+        const mesh=new THREE.Mesh(tileGeometryUV(new THREE.PlaneGeometry(width,depth),floorMat),floorMat);
+        mesh.rotation.x=-Math.PI/2;mesh.position.set(x,y,z);mesh.renderOrder=-1;g.add(mesh);
+        return mesh;
+      };
+      const addWallRun=(axis,fixed,start,end,doorCenter,doorWidth,baseY=0,height=wallH,material=wallMat)=>{
+        const addSegment=(a,b)=>{
+          const length=b-a;if(length<.4)return;
+          if(axis==="x"){
+            box(g,new THREE.BoxGeometry(length,height,wallT),material,(a+b)*.5,baseY+height*.5,fixed);
+            box(g,new THREE.BoxGeometry(length,.085,.055),trimMat,(a+b)*.5,baseY+.09,fixed-wallT*.5-.018);
+            box(g,new THREE.BoxGeometry(length,.085,.055),trimMat,(a+b)*.5,baseY+.09,fixed+wallT*.5+.018);
+            this.collisionSegments.push({x1:a,z1:fixed,x2:b,z2:fixed});
+          }else{
+            box(g,new THREE.BoxGeometry(wallT,height,length),material,fixed,baseY+height*.5,(a+b)*.5);
+            box(g,new THREE.BoxGeometry(.055,.085,length),trimMat,fixed-wallT*.5-.018,baseY+.09,(a+b)*.5);
+            box(g,new THREE.BoxGeometry(.055,.085,length),trimMat,fixed+wallT*.5+.018,baseY+.09,(a+b)*.5);
+            this.collisionSegments.push({x1:fixed,z1:a,x2:fixed,z2:b});
           }
+        };
+        if(doorWidth<=0){addSegment(start,end);return;}
+        const half=doorWidth*.5,doorLeft=Math.max(start,doorCenter-half),doorRight=Math.min(end,doorCenter+half);
+        addSegment(start,doorLeft);addSegment(doorRight,end);
+        const radius=doorWidth*.5-.55;
+        if(radius>1){
+          const arch=new THREE.Mesh(new THREE.TorusGeometry(radius,.19,9,36,Math.PI),material);
+          arch.position.set(axis==="x"?doorCenter:fixed,baseY+.04,axis==="x"?fixed:doorCenter);
+          arch.rotation.y=axis==="x"?0:Math.PI/2;
+          g.add(arch);
         }
-        box(g,new THREE.BoxGeometry(ch.w+.4,.12,ch.d+.4),lib.officeCeilingTile||tileMat,cx,wallH-.06,cz);
-        // No ceiling light fixtures — Poolrooms use soft ambient/window glow only.
+      };
+      const addColumn=(x,z,height=wallH)=>{
+        box(g,new THREE.BoxGeometry(.86,height,.86),wallMat,x,height*.5,z);
+        box(g,new THREE.BoxGeometry(1.12,.16,1.12),trimMat,x,height-.08,z);
+        box(g,new THREE.BoxGeometry(1.02,.12,1.02),trimMat,x,.06,z);
+        const r=.46;
+        this.collisionSegments.push(
+          {x1:x-r,z1:z-r,x2:x+r,z2:z-r},
+          {x1:x+r,z1:z-r,x2:x+r,z2:z+r},
+          {x1:x+r,z1:z+r,x2:x-r,z2:z+r},
+          {x1:x-r,z1:z+r,x2:x-r,z2:z-r}
+        );
+      };
+
+      // Shallow lukewarm water continues through every room and doorway.
+      this.waterRegions.push({
+        minX:this.originX-.01,maxX:this.originX+size+.01,
+        minZ:this.originZ-.01,maxZ:this.originZ+size+.01,
+        surfaceY:shallowY,floorY:0,swimmable:false,type:"shallow"
+      });
+
+      // Floors are tiled per chamber; a deep pool cell is left open for its
+      // lowered basin floor rather than drawing a flat floor through the hole.
+      const deepPoolEnabled=(this.cx===0&&this.cz===0)||rng.next()<.72;
+      const deepCell=deepPoolEnabled?(this.cx===0&&this.cz===0?5:rng.int(0,8)):-1;
+      for(let row=0;row<3;row++)for(let col=0;col<3;col++){
+        const index=row*3+col;
+        const left=this.originX+col*third+1.2,right=this.originX+(col+1)*third-1.2;
+        const top=this.originZ+row*third+1.2,bottom=this.originZ+(row+1)*third-1.2;
+        const roomX=(left+right)*.5,roomZ=(top+bottom)*.5,roomW=right-left,roomD=bottom-top;
+        if(index!==deepCell){
+          addFloorRect(roomX,roomZ,roomW,roomD);
+        }else{
+          const poolW=roomW*.62,poolD=roomD*.62,halfW=poolW*.5,halfD=poolD*.5;
+          const poolMinX=roomX-halfW,poolMaxX=roomX+halfW,poolMinZ=roomZ-halfD,poolMaxZ=roomZ+halfD;
+          const stripW=(roomW-poolW)*.5,stripD=(roomD-poolD)*.5;
+          addFloorRect(roomX,top+stripD*.5,roomW,stripD);
+          addFloorRect(roomX,bottom-stripD*.5,roomW,stripD);
+          addFloorRect(left+stripW*.5,roomZ,stripW,poolD);
+          addFloorRect(right-stripW*.5,roomZ,stripW,poolD);
+
+          const floorY=-6.4,basinHeight=shallowY-floorY;
+          const bottomMesh=new THREE.Mesh(tileGeometryUV(new THREE.PlaneGeometry(poolW-.5,poolD-.5),floorMat),floorMat);
+          bottomMesh.rotation.x=-Math.PI/2;bottomMesh.position.set(roomX,floorY,roomZ);g.add(bottomMesh);
+          const basinWall=(axis,fixed,a,b)=>{
+            const length=b-a;
+            if(axis==="x"){
+              box(g,new THREE.BoxGeometry(length,basinHeight,.22),wallMat,(a+b)*.5,floorY+basinHeight*.5,fixed);
+              this.collisionSegments.push({x1:a,z1:fixed,x2:b,z2:fixed});
+            }else{
+              box(g,new THREE.BoxGeometry(.22,basinHeight,length),wallMat,fixed,floorY+basinHeight*.5,(a+b)*.5);
+              this.collisionSegments.push({x1:fixed,z1:a,x2:fixed,z2:b});
+            }
+          };
+          // Three solid sides and one broad stair opening into the deep water.
+          basinWall("z",poolMinX,poolMinZ,poolMaxZ);
+          basinWall("z",poolMaxX,poolMinZ,poolMaxZ);
+          basinWall("x",poolMaxZ,poolMinX,poolMaxX);
+          const stairGap=4.4,entryCenter=roomX;
+          basinWall("x",poolMinZ,poolMinX,entryCenter-stairGap*.5);
+          basinWall("x",poolMinZ,entryCenter+stairGap*.5,poolMaxX);
+          for(let step=0;step<7;step++){
+            const stepY=-(step+1)*.78+.08;
+            const stepZ=poolMinZ+.55+step*.78;
+            box(g,new THREE.BoxGeometry(stairGap,.16,.82),floorMat,entryCenter,stepY,stepZ);
+          }
+          // A stainless ladder makes the deep shaft legible from the surface.
+          for(const x of [roomX-1.25,roomX+1.25]){
+            const rail=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,6.2,8),metalMat);
+            rail.position.set(x,-2.45,poolMaxZ-.6);g.add(rail);
+          }
+          for(let rung=0;rung<9;rung++){
+            const y=-.35-rung*.68;
+            const bar=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,2.5,8),metalMat);
+            bar.rotation.z=Math.PI/2;bar.position.set(roomX,y,poolMaxZ-.6);g.add(bar);
+          }
+          this.waterRegions.push({
+            minX:poolMinX+.2,maxX:poolMaxX-.2,minZ:poolMinZ+.2,maxZ:poolMaxZ-.2,
+            surfaceY:shallowY,floorY,swimmable:true,type:"deep-pool"
+          });
+        }
+
+        // Varied rooms: a few columns, broad pool ledges and occasional light wells.
+        const roomRoll=rng.next();
+        if(roomRoll<.30&&index!==4){
+          addColumn(roomX-roomW*.23,roomZ-roomD*.22);
+          addColumn(roomX+roomW*.23,roomZ+roomD*.22);
+        }else if(roomRoll<.48){
+          addColumn(roomX-roomW*.28,roomZ+roomD*.22);
+          addColumn(roomX+roomW*.28,roomZ-roomD*.22);
+          addColumn(roomX-roomW*.28,roomZ-roomD*.22);
+          addColumn(roomX+roomW*.28,roomZ+roomD*.22);
+        }
+        if(rng.next()<.38){
+          const glowMat=new THREE.MeshBasicMaterial({color:0xb4e5f5,transparent:true,opacity:.62,side:THREE.DoubleSide});
+          const panel=new THREE.Mesh(new THREE.PlaneGeometry(7.5,2.6),glowMat);
+          panel.position.set(roomX,wallH*.67,top+.16);panel.rotation.y=0;g.add(panel);
+          this.lightSources.push({position:new THREE.Vector3(roomX,wallH*.65,top+2.2),color:0xc8efff,baseIntensity:3.8,intensity:3.8,distance:27,decay:1.55});
+        }
       }
-      box(g,new THREE.BoxGeometry(size*.18,.05,size*.18),tileMat,this.originX+size*.5,.025,this.originZ+size*.5);
-      if(rng.next()<.55){
-        const ax=this.originX+size*.5,az=this.originZ+size*.48;
-        box(g,new THREE.BoxGeometry(.22,2.4,.22),tileMat,ax-1.1,1.2,az);
-        box(g,new THREE.BoxGeometry(.22,2.4,.22),tileMat,ax+1.1,1.2,az);
-        box(g,new THREE.BoxGeometry(2.6,.2,.22),tileMat,ax,2.5,az);
+
+      // Four outer walls and four internal partitions form a connected 3x3
+      // network. All portals align with adjacent streamed chunks.
+      addWallRun("x",this.originZ,this.originX,this.originX+size,this.originX+size*.5,portalWidth);
+      addWallRun("x",this.originZ+size,this.originX,this.originX+size,this.originX+size*.5,portalWidth);
+      addWallRun("z",this.originX,this.originZ,this.originZ+size,this.originZ+size*.5,portalWidth);
+      addWallRun("z",this.originX+size,this.originZ,this.originZ+size,this.originZ+size*.5,portalWidth);
+      for(const split of [1,2]){
+        const wallX=this.originX+third*split,wallZ=this.originZ+third*split;
+        addWallRun("z",wallX,this.originZ,this.originZ+size,wallZ+third*.5,innerPortalWidth);
+        addWallRun("x",wallZ,this.originX,this.originX+size,wallX+third*.5,innerPortalWidth);
+      }
+
+      // Rare offset side arches stop every chunk from looking like an identical grid.
+      if(rng.next()<.36){
+        const row=rng.int(0,2),z=this.originZ+row*third+third*.5;
+        const x=this.originX+third*1.5;
+        addWallRun("z",x,this.originZ+row*third+10,this.originZ+(row+1)*third-10,z+third*.22,5.6);
+      }
+
+      // Water surface: subtle vertex waves, moving highlights and a blue-green body.
+      const waterMat=lib.water.clone();
+      waterMat.color.setHex(0x2e9ca7);waterMat.opacity=.76;waterMat.roughness=.095;waterMat.metalness=.025;
+      waterMat.emissive.setHex(0x001c20);waterMat.emissiveIntensity=.035;waterMat.side=THREE.DoubleSide;waterMat.depthWrite=false;
+      const waterUniforms={time:{value:0},offset:{value:new THREE.Vector2(this.originX+size*.5,this.originZ+size*.5)}};
+      waterMat.onBeforeCompile=shader=>{
+        shader.uniforms.uPoolTime=waterUniforms.time;
+        shader.uniforms.uPoolOffset=waterUniforms.offset;
+        shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nuniform float uPoolTime;\nuniform vec2 uPoolOffset;\nvarying vec2 vPoolWorld;");
+        shader.vertexShader=shader.vertexShader.replace("#include <beginnormal_vertex>","#include <beginnormal_vertex>\nvec2 poolP=vec2(position.x+uPoolOffset.x,-position.y+uPoolOffset.y);\nfloat poolDx=.0055*cos(poolP.x*.22+uPoolTime*.64)+.0013*cos((poolP.x-poolP.y)*.11+uPoolTime*.31);\nfloat poolDz=.0031*cos(poolP.y*.17-uPoolTime*.52)-.0013*cos((poolP.x-poolP.y)*.11+uPoolTime*.31);\nobjectNormal=normalize(vec3(-poolDx,poolDz,1.0));");
+        shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nvec2 poolWorld=vec2(position.x+uPoolOffset.x,-position.y+uPoolOffset.y);\nvPoolWorld=poolWorld;\ntransformed.z+=sin(poolWorld.x*.22+uPoolTime*.64)*.025+sin(poolWorld.y*.17-uPoolTime*.52)*.018+sin((poolWorld.x-poolWorld.y)*.11+uPoolTime*.31)*.012;");
+        shader.fragmentShader=shader.fragmentShader.replace("#include <common>","#include <common>\nuniform float uPoolTime;\nvarying vec2 vPoolWorld;");
+        shader.fragmentShader=shader.fragmentShader.replace("#include <color_fragment>","#include <color_fragment>\nfloat causticA=pow(max(0.0,sin(vPoolWorld.x*.31+vPoolWorld.y*.17+uPoolTime*.48)*sin(vPoolWorld.y*.27-vPoolWorld.x*.08-uPoolTime*.37)),8.0);\nfloat causticB=pow(max(0.0,sin(vPoolWorld.x*.16-vPoolWorld.y*.22+uPoolTime*.29)),13.0);\nfloat shimmer=causticA*.24+causticB*.13;\ndiffuseColor.rgb*=.79+shimmer;\ndiffuseColor.rgb+=vec3(.045,.16,.18)*shimmer;");
+        waterMat.userData.timeUniform=shader.uniforms.uPoolTime;
+      };
+      waterMat.customProgramCacheKey=()=>"backrooms-level37-pool-water-v1";waterMat.needsUpdate=true;
+      waterMat.userData.timeUniform=waterUniforms.time;
+      const waterSurface=new THREE.Mesh(new THREE.PlaneGeometry(size,size,112,112),waterMat);
+      waterSurface.rotation.x=-Math.PI/2;waterSurface.position.set(this.originX+size*.5,shallowY,this.originZ+size*.5);waterSurface.renderOrder=1;g.add(waterSurface);
+      g.userData.animatedWaterMaterials=[waterMat];
+
+      // Soft, indirect chamber lighting rather than a single oversized point light.
+      for(const [lx,lz] of [[.22,.22],[.78,.22],[.22,.78],[.78,.78]]){
+        this.lightSources.push({position:new THREE.Vector3(this.originX+size*lx,wallH-.65,this.originZ+size*lz),color:0xe1f8fa,baseIntensity:3.2,intensity:3.2,distance:38,decay:1.65});
       }
       if(this.exit){
         const ex=this.originX+(this.exit.x+.5)*cell,ez=this.originZ+(this.exit.z+.5)*cell;
-        box(g,new THREE.BoxGeometry(2.4,.12,2.4),tileMat,ex,.06,ez);
-        box(g,new THREE.BoxGeometry(1.1,2.15,.12),lib.exitDoor||tileMat,ex,1.1,ez);
-        this.lightSources.push({position:new THREE.Vector3(ex,2.4,ez),color:0x88e0d8,baseIntensity:6,intensity:6,distance:8,decay:2});
+        const portal=new THREE.Group();portal.position.set(ex,0,ez);
+        box(portal,new THREE.BoxGeometry(3.2,.18,3.2),trimMat,0,.09,0);
+        box(portal,new THREE.BoxGeometry(1.25,2.55,.22),lib.exitDoor||wallMat,0,1.28,0);
+        box(portal,new THREE.BoxGeometry(1.55,2.85,.08),trimMat,0,1.42,.16);
+        g.add(portal);
+        this.lightSources.push({position:new THREE.Vector3(ex,2.6,ez),color:0x8ee5e9,baseIntensity:4.6,intensity:4.6,distance:13,decay:1.8});
       }
     }
   }
@@ -2827,9 +2938,9 @@ class Chunk{
       this.group.traverse(object=>{
         const materials=Array.isArray(object.material)?object.material:[object.material];
         for(const material of materials){
-          if(!material?.emissive)continue;
-          material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
-          material.emissiveIntensity=0;
+          if(!material)continue;
+          if(material.color){material.userData.baseBlackoutColor??=material.color.clone();material.color.setRGB(0,0,0);}
+          if(material.emissive){material.userData.baseBlackoutEmissive??=material.emissiveIntensity;material.emissiveIntensity=0;}
         }
       });
       for(const fixture of this.fixtures){
@@ -2860,9 +2971,9 @@ class Chunk{
     this.group.traverse(object=>{
       const materials=Array.isArray(object.material)?object.material:[object.material];
       for(const material of materials){
-        if(!material?.emissive||material.userData.baseBlackoutEmissive===undefined)continue;
-        material.emissiveIntensity=material.userData.baseBlackoutEmissive;
-        delete material.userData.baseBlackoutEmissive;
+        if(!material)continue;
+        if(material.color&&material.userData.baseBlackoutColor){material.color.copy(material.userData.baseBlackoutColor);delete material.userData.baseBlackoutColor;}
+        if(material.emissive&&material.userData.baseBlackoutEmissive!==undefined){material.emissiveIntensity=material.userData.baseBlackoutEmissive;delete material.userData.baseBlackoutEmissive;}
       }
     });
     for(const light of this.lightSources)light.intensity=light.baseIntensity;
@@ -2928,6 +3039,7 @@ class WorldStreamer{
       this.ceilingSurface.renderOrder=-2;
       this.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.game.level.id));
     }
+    if(this.game.level.id==="37"&&this.floorSurface)this.floorSurface.visible=false;
     if(this.game.level.id==="7"){
       // Ocean-bottom teal (NOT near-black). Global floor stays under the water plane.
       this.library.floor.color.setHex(0x1a4a58);this.library.floor.roughness=.55;this.library.floor.metalness=.08;
@@ -2946,8 +3058,9 @@ class WorldStreamer{
     }else if(this.game.level.id==="6"){
       this.library.floor.color.setHex(0x030406);this.library.ceiling.color.setHex(0x010203);
     }else if(this.game.level.id==="37"){
-      this.library.floor.color.setHex(0xd4e0dc);this.library.floor.roughness=.42;this.library.floor.metalness=.02;
-      this.library.ceiling.color.setHex(0xf0f4f0);this.library.ceiling.roughness=.85;
+      this.library.floor.color.setHex(0xe4ece8);this.library.floor.roughness=.24;this.library.floor.metalness=.015;
+      this.library.wall.color.setHex(0xf2f5f2);this.library.wall.roughness=.24;this.library.wall.metalness=.005;
+      this.library.ceiling.color.setHex(0xf7f9f7);this.library.ceiling.roughness=.82;
     }
 
     if(this.floorSurface)this.game.scene.add(this.floorSurface);
@@ -3242,6 +3355,15 @@ class WorldStreamer{
     // Keep the preferred point only as a last-resort fallback; callers still
     // get a finite location if a malformed chunk has no walkable surface.
     return {x,z};
+  }
+  waterRegionAt(x,z){
+    if(this.game.level.id!=="37")return null;
+    const chunk=this.chunkAt(x,z);if(!chunk)return null;
+    for(let i=(chunk.waterRegions?.length||0)-1;i>=0;i--){
+      const region=chunk.waterRegions[i];
+      if(x>=region.minX&&x<=region.maxX&&z>=region.minZ&&z<=region.maxZ)return region;
+    }
+    return null;
   }
   walkSurfaceHeightAt(x,z,floor=this.game.player?.parkingFloor??0){
     if(this.game.level.id!=="1")return 0;
@@ -3542,9 +3664,13 @@ class Player{
     if(wish.lengthSq()>1)wish.normalize();
     const predictedX=this.position.x+wish.x*.2,predictedZ=this.position.z+wish.z*.2;
     const level7Ocean=this.game.level.id==="7"&&(Math.abs(predictedX)>4.5||predictedZ>4.5||predictedZ< -4.5);
+    const predictedPool=this.game.level.id==="37"?this.game.world.waterRegionAt(predictedX,predictedZ):null;
+    const level37Deep=!!predictedPool?.swimmable;
+    const swimming=level7Ocean||level37Deep;
+    const wading=this.game.level.id==="37"&&!!predictedPool&&!level37Deep;
     const run=input.wantsRun()&&this.stamina>4&&Math.hypot(mv.x,mv.y)>.12;
-    const speed=level7Ocean?(run?2.8:1.9):(run?6.2:2.85);
-    const response=level7Ocean?(wish.lengthSq()>.001?4.2:1.65):(wish.lengthSq()>.001?(run?19:16):14);
+    const speed=swimming?(run?2.8:1.9):wading?2.25:(run?6.2:2.85);
+    const response=swimming?(wish.lengthSq()>.001?4.2:1.65):wading?(wish.lengthSq()>.001?8:7):(wish.lengthSq()>.001?(run?19:16):14);
     const targetX=wish.x*speed,targetZ=wish.z*speed;
     const blend=1-Math.exp(-response*dt);
     this.velocity.x+=(targetX-this.velocity.x)*blend;
@@ -3558,14 +3684,18 @@ class Player{
     this.position.x=col.x;this.position.z=col.z;
 
     const nowInOcean=this.game.level.id==="7"&&(Math.abs(this.position.x)>4.5||this.position.z>4.5||this.position.z< -4.5);
-    if(nowInOcean){
+    const poolRegion=this.game.level.id==="37"?this.game.world.waterRegionAt(this.position.x,this.position.z):null;
+    const nowInPool=!!poolRegion?.swimmable&&this.position.y<(poolRegion.surfaceY+1.8);
+    const nowInWater=nowInOcean||nowInPool;
+    if(nowInWater){
       if(!this.inOcean){
         this.inOcean=true;this.verticalVelocity=0;
-        this.game.toast("Swimming: WASD to move, SPACE to surface, CTRL to dive. Look up or down to steer.",4);
+        this.game.toast(this.game.level.id==="37"?"The basin drops away. SPACE to rise, CTRL to dive.":"Swimming: WASD to move, SPACE to surface, CTRL to dive. Look up or down to steer.",4);
       }
-      const surfaceY=oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime);
+      const surfaceY=nowInOcean?oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime):poolWaterSurfaceHeight(this.position.x,this.position.z,this.game.gameTime);
+      const floorY=nowInPool?poolRegion.floorY:-24;
       const bodyBottom=this.position.y-1.55;
-      const submerged=THREE.MathUtils.clamp((surfaceY-bodyBottom)/1.67,0,1);
+      const submerged=THREE.MathUtils.clamp((surfaceY+.05-bodyBottom)/1.67,0,1);
       const swimInput=(input.wantsAscend()?1:0)-(input.wantsDive()?1:0);
       const forwardStroke=-mv.y*Math.sin(this.pitch);
       const gravity=-9.81;
@@ -3573,16 +3703,18 @@ class Player{
       const waterDrag=-this.verticalVelocity*(2.5+submerged*1.8);
       const swimForce=swimInput*6.4+forwardStroke*3.2;
       this.verticalVelocity=THREE.MathUtils.clamp(this.verticalVelocity+(gravity+buoyancy+waterDrag+swimForce)*dt,-3.1,3.0);
-      this.position.y=THREE.MathUtils.clamp(this.position.y+this.verticalVelocity*dt,-24,surfaceY+1.25);
+      this.position.y=THREE.MathUtils.clamp(this.position.y+this.verticalVelocity*dt,floorY+1.72,surfaceY+1.25);
       if(this.position.y>=surfaceY+1.25&&this.verticalVelocity>0)this.verticalVelocity=Math.min(0,this.verticalVelocity);
-      const depthBlend=THREE.MathUtils.clamp((surfaceY+.08-this.position.y)/4.8,0,1);
+      const depthBlend=THREE.MathUtils.clamp((surfaceY+.08-this.position.y)/5.2,0,1);
+      this.game.waterDepthBlend=depthBlend;
       if(this.game.scene.fog){
-        // Surface stays bright blue-white; only deep water goes dark.
-        this.game.scene.fog.color.setRGB(THREE.MathUtils.lerp(.78,.05,depthBlend),THREE.MathUtils.lerp(.90,.14,depthBlend),THREE.MathUtils.lerp(.94,.22,depthBlend));
-        this.game.scene.fog.density=.0006+depthBlend*.016;
+        this.game.scene.fog.color.setHex(this.game.level.id==="7"?0x27627d:0x17606a);
+        this.game.scene.fog.color.lerp(new THREE.Color(0x020d19),depthBlend);
+        this.game.scene.fog.density=.014+depthBlend*.062;
       }
     }else{
       this.inOcean=false;
+      this.game.waterDepthBlend=0;
       this.verticalVelocity=0;
       if(this.game.level.id==="1"){
         const ramp=this.game.world.chunkAt(this.position.x,this.position.z)?.level1Ramp;
@@ -3592,10 +3724,14 @@ class Player{
         }
       }else this.parkingFloor=0;
       this.position.y=this.eyeY+this.game.world.walkSurfaceHeightAt(this.position.x,this.position.z,this.parkingFloor);
-      if(this.game.level.id==="7"&&this.game.scene.fog){
-        // Daytime surface fog — must stay light or the ocean sky reads black.
-        this.game.scene.fog.color.setHex(0xc8e4f0);
-        this.game.scene.fog.density=.0005;
+      if(this.game.scene.fog){
+        if(this.game.level.id==="7"){
+          this.game.scene.fog.color.setHex(0x8bc3e8);
+          this.game.scene.fog.density=.00042;
+        }else if(this.game.level.id==="37"){
+          this.game.scene.fog.color.copy(this.game.baseLevelFogColor||new THREE.Color(0xdce9e6));
+          this.game.scene.fog.density=this.game.baseLevelFogDensity??.0012;
+        }
       }
     }
     if(this.game.redZoneTrapped&&this.game.redZoneBounds){
@@ -3605,7 +3741,7 @@ class Player{
     }
     if(run)this.stamina=Math.max(0,this.stamina-dt*15);else this.stamina=Math.min(100,this.stamina+dt*9);
     this.flashWarmup=Math.max(0,this.flashWarmup-dt);
-    if(this.flashlight&&this.flashBattery>0&&!this.game.totalBlackoutActive){
+    if(this.flashlight&&this.flashBattery>0&&!(this.game.totalBlackoutActive&&this.game.totalBlackoutPhase==="blackout")){
       this.flashBattery=Math.max(0,this.flashBattery-dt*(run?.46:.31));
       if(this.flashBattery<=0)this.flashlight=false;
     }
@@ -3613,7 +3749,7 @@ class Player{
     const dark=this.game.isDark();
     if(!this.game.admin?.god){
       if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
-      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark&&!this.game.totalBlackoutActive)this.sanity+=dt*.12;
+      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark&&!(this.game.totalBlackoutActive&&this.game.totalBlackoutPhase==="blackout"))this.sanity+=dt*.12;
       if(this.game.world.hazardAt(this.position.x,this.position.z))this.health-=dt*34;
     }else{
       this.health=100;this.sanity=100;
@@ -4326,6 +4462,9 @@ export class BackroomsGame{
       side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false
     });
     this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(400,48,32),oceanSkyMaterial);
+    oceanSkyMaterial.uniforms.zenith.value.setHex(0x347fbd);
+    oceanSkyMaterial.uniforms.horizon.value.setHex(0x9ac8e8);
+    oceanSkyMaterial.uniforms.sunColor.value.setHex(0xffedcf);
     this.oceanSky.renderOrder=-100;this.oceanSky.visible=false;this.oceanSky.frustumCulled=false;this.scene.add(this.oceanSky);
     const cloudMaterial=new THREE.ShaderMaterial({
       uniforms:{time:{value:0},coverage:{value:.56},opacity:{value:.55},cloudColor:{value:new THREE.Color(0xc3c8c8)}},
@@ -4394,7 +4533,7 @@ export class BackroomsGame{
     this.flash.target=this.flashTarget;
     this.flashFill.target=this.flashFillTarget;
     this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
-    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutSnapshot=null;this.totalBlackoutWorldSuppressed=false;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
+    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutEndsAt=0;this.totalBlackoutDarkEndsAt=0;this.totalBlackoutRecoveryDuration=0;this.totalBlackoutPhase="idle";this.totalBlackoutPhaseEndsAt=0;this.totalBlackoutPhaseStartedAt=0;this.totalBlackoutEnvironmentFlicker=1;this.waterDepthBlend=0;this.baseLevelFogColor=new THREE.Color(0x8bc3e8);this.baseLevelFogDensity=.00042;this.totalBlackoutSnapshot=null;this.totalBlackoutWorldSuppressed=false;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
     introControls?.classList.add("hidden");
@@ -4669,20 +4808,27 @@ export class BackroomsGame{
     }
   }
   setLevel(id,options={}){
-    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();if(this.totalBlackoutActive)this.totalBlackoutWorldSuppressed=false;this.lightState=this.totalBlackoutActive?"BLACKOUT":"ON";this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();if(this.totalBlackoutActive)this.totalBlackoutWorldSuppressed=false;this.lightState=this.totalBlackoutActive?(this.totalBlackoutPhase==="blackout"?"BLACKOUT":"FLICKER"):"ON";this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
+    this.baseLevelFogColor=this.level.id==="7"?new THREE.Color(0x8bc3e8):new THREE.Color(this.level.theme.fog??0x000000);
+    this.baseLevelFogDensity=this.level.id==="7"?.00042:(this.level.fogDensity??(this.level.id==="37"?.0012:.038));
+    this.waterDepthBlend=0;this.totalBlackoutEnvironmentFlicker=1;
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x8ab0c0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.id==="7"||this.level.id==="10"?Math.max(this.level.ambientIntensity??.85,1.05):this.level.id==="37"?Math.max(this.level.ambientIntensity??.9,.95):(this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052));
-    const openSky=["7","9","10"].includes(this.level.id);
-    // L7 and L10 use the Preetham atmospheric sky. L9 remains an intentional
-    // nocturnal, foggy outdoor environment.
+    const openSky=["9","10"].includes(this.level.id);
+    // Level 7 uses a controlled blue gradient sky; the Preetham dome and
+    // nearly-white cloud sheet were washing the horizon out to white.
     this.sky.visible=openSky;
-    this.oceanSky.visible=false;
-    this.cloudLayer.visible=openSky;
+    this.oceanSky.visible=this.level.id==="7";
+    this.cloudLayer.visible=this.level.id==="7"||openSky;
     this.scene.background=new THREE.Color(this.level.id==="7"?0x8bc3e8:this.level.id==="10"?0xc3d2de:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
-    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.50:this.level.id==="10"?.43:.63;
-    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.42:this.level.id==="10"?.48:.42;
-    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xf1f6fa:this.level.id==="10"?0xe0e5e8:0x343e4b);
+    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.62:this.level.id==="10"?.43:.63;
+    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.21:this.level.id==="10"?.48:.42;
+    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xa9cde4:this.level.id==="10"?0xe0e5e8:0x343e4b);
+    if(this.level.id==="7"){
+      const sky=this.oceanSky.material.uniforms;
+      sky.zenith.value.setHex(0x347fbd);sky.horizon.value.setHex(0x9ac8e8);sky.sunColor.value.setHex(0xffedcf);
+    }
     const skyUniforms=this.sky.material.uniforms;
     skyUniforms.turbidity.value=this.level.id==="10"?8.5:this.level.id==="9"?11:4.2;
     skyUniforms.rayleigh.value=this.level.id==="10"?1.35:this.level.id==="9"?.22:2.6;
@@ -4692,8 +4838,8 @@ export class BackroomsGame{
     skyUniforms.sunPosition.value.set(-.32,sunY,-.74).normalize();
     this.daylight.color.setHex(this.level.id==="10"?0xfff6e8:this.level.id==="9"?0x8499bd:this.level.id==="7"?0xd5eaff:0xe4edf0);
     this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:88,24);
-    this.daylight.intensity=this.level.id==="10"?1.55:this.level.id==="7"?1.65:this.level.id==="9"?.035:0;
-    this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?1.35:this.level.id==="9"?.95:.78;
+    this.daylight.intensity=this.level.id==="10"?1.55:this.level.id==="7"?1.22:this.level.id==="9"?.035:0;
+    this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?(this.level.id==="7"?1.08:1.35):this.level.id==="9"?.95:.78;
     if(this.totalBlackoutActive)this.captureTotalBlackoutLighting();
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
@@ -4982,7 +5128,10 @@ export class BackroomsGame{
       ambientIntensity:this.ambient.intensity,
       daylightIntensity:this.daylight.intensity,
       skyVisible:this.sky.visible,
+      oceanSkyVisible:this.oceanSky.visible,
       cloudVisible:this.cloudLayer.visible,
+      cloudOpacity:this.cloudLayer.material?.uniforms?.opacity?.value??.42,
+      cloudCoverage:this.cloudLayer.material?.uniforms?.coverage?.value??.63,
       background:this.scene.background?.clone?.()??null,
       fog:this.scene.fog?{color:this.scene.fog.color.clone(),density:this.scene.fog.density}:null
     };
@@ -4993,10 +5142,25 @@ export class BackroomsGame{
     this.ambient.intensity=saved.ambientIntensity;
     this.daylight.intensity=saved.daylightIntensity;
     this.sky.visible=saved.skyVisible;
+    this.oceanSky.visible=saved.oceanSkyVisible??false;
     this.cloudLayer.visible=saved.cloudVisible;
+    if(this.cloudLayer.material?.uniforms?.opacity)this.cloudLayer.material.uniforms.opacity.value=saved.cloudOpacity;
+    if(this.cloudLayer.material?.uniforms?.coverage)this.cloudLayer.material.uniforms.coverage.value=saved.cloudCoverage;
     if(saved.background&&this.scene.background?.copy)this.scene.background.copy(saved.background);
     if(saved.fog&&this.scene.fog){this.scene.fog.color.copy(saved.fog.color);this.scene.fog.density=saved.fog.density;}
     this.totalBlackoutSnapshot=null;
+  }
+  restoreTotalBlackoutMaterials(){
+    this.scene.traverse(object=>{
+      if(!object.isMesh)return;
+      const materials=Array.isArray(object.material)?object.material:[object.material];
+      for(const material of materials){
+        if(!material)continue;
+        if(material.color&&material.userData.baseBlackoutColor){material.color.copy(material.userData.baseBlackoutColor);delete material.userData.baseBlackoutColor;}
+        if(material.emissive&&material.userData.baseBlackoutEmissive!==undefined){material.emissiveIntensity=material.userData.baseBlackoutEmissive;delete material.userData.baseBlackoutEmissive;}
+      }
+      if(object.userData.baseBlackoutVisible!==undefined){object.visible=object.userData.baseBlackoutVisible;delete object.userData.baseBlackoutVisible;}
+    });
   }
   beginTotalBlackout(){
     if(this.totalBlackoutActive)return;
@@ -5004,23 +5168,61 @@ export class BackroomsGame{
     this.totalBlackoutActive=true;
     this.totalBlackoutWorldSuppressed=false;
     this.totalBlackoutDuration=24+Math.random()*18;
-    this.lightState="BLACKOUT";
-    this.audio.lightsOut();
+    const flickerInDuration=this.level.id==="0"?2.6:7.5;
+    this.totalBlackoutRecoveryDuration=this.level.id==="0"?2.6:4;
+    this.totalBlackoutPhase="flicker-in";
+    this.totalBlackoutPhaseStartedAt=this.gameTime;
+    this.totalBlackoutEnvironmentFlicker=1;
+    this.totalBlackoutPhaseEndsAt=this.gameTime+flickerInDuration;
+    this.totalBlackoutDarkEndsAt=0;
+    this.totalBlackoutEndsAt=0;
+    this.lightState="FLICKER";
     this.triggerFear(.72);
-    this.showArgMessage("THE FLICKER // TOTAL POWER FAILURE");
+    this.showArgMessage("THE FLICKER // GRID INSTABILITY");
   }
   endTotalBlackout(){
     if(!this.totalBlackoutActive)return;
+    this.restoreTotalBlackoutMaterials();
+    this.restoreTotalBlackoutLighting();
     this.totalBlackoutActive=false;
     this.totalBlackoutDuration=0;
+    this.totalBlackoutEndsAt=0;
+    this.totalBlackoutDarkEndsAt=0;
+    this.totalBlackoutRecoveryDuration=0;
+    this.totalBlackoutPhase="idle";
+    this.totalBlackoutPhaseEndsAt=0;
     this.totalBlackoutWorldSuppressed=false;
     this.lightState="ON";
     this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;
-    this.restoreTotalBlackoutLighting();
     this.totalBlackoutTimer=420+Math.random()*480;
   }
+  updateTotalBlackoutEnvironment(){
+    const phase=this.totalBlackoutPhase;
+    if(!this.totalBlackoutActive||!["7","37"].includes(this.level.id)||(phase!=="flicker-in"&&phase!=="flicker-out")){
+      this.totalBlackoutEnvironmentFlicker=1;
+      return;
+    }
+    const elapsed=Math.max(0,this.gameTime-this.totalBlackoutPhaseStartedAt);
+    const phaseDuration=Math.max(.1,this.totalBlackoutPhaseEndsAt-this.totalBlackoutPhaseStartedAt);
+    const envelope=Math.sin(Math.PI*THREE.MathUtils.clamp(elapsed/phaseDuration,0,1));
+    const pulseA=Math.max(0,Math.sin(elapsed*17.7+.8));
+    const pulseB=Math.max(0,Math.sin(elapsed*9.3+2.1));
+    const pulseC=Math.max(0,Math.sin(elapsed*27.1+1.4));
+    const spikes=Math.pow(Math.max(pulseA,pulseB*.82,pulseC*.64),7.0);
+    const levelScale=.06+.94*envelope*(.12+.88*spikes);
+    this.totalBlackoutEnvironmentFlicker=levelScale;
+    const base=this.totalBlackoutSnapshot;
+    if(!base)return;
+    this.ambient.intensity=base.ambientIntensity*levelScale;
+    this.daylight.intensity=base.daylightIntensity*levelScale;
+    if(this.level.id==="7"){
+      this.oceanSky.visible=!!base.oceanSkyVisible&&levelScale>.2;
+      this.cloudLayer.visible=!!base.cloudVisible&&levelScale>.28;
+      if(this.cloudLayer.material?.uniforms?.opacity)this.cloudLayer.material.uniforms.opacity.value=base.cloudOpacity*levelScale;
+    }
+  }
   applyTotalBlackoutLighting(){
-    if(!this.totalBlackoutActive)return;
+    if(!this.totalBlackoutActive||this.totalBlackoutPhase!=="blackout")return;
     this.ambient.intensity=0;
     this.daylight.intensity=0;
     this.sky.visible=false;
@@ -5034,24 +5236,54 @@ export class BackroomsGame{
     if(!this.totalBlackoutWorldSuppressed){
       for(const chunk of this.world.chunks.values()){
         for(const light of chunk.lightSources)light.intensity=0;
-        chunk.group.traverse(object=>{
-          const materials=Array.isArray(object.material)?object.material:[object.material];
-          for(const material of materials){
-            if(!material?.emissive)continue;
-            material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
-            material.emissiveIntensity=0;
-          }
-        });
       }
+      this.scene.traverse(object=>{
+        if(!object.isMesh)return;
+        const materials=Array.isArray(object.material)?object.material:[object.material];
+        for(const material of materials){
+          if(!material)continue;
+          if(material.isShaderMaterial){object.userData.baseBlackoutVisible??=object.visible;object.visible=false;}
+          if(material.color){material.userData.baseBlackoutColor??=material.color.clone();material.color.setRGB(0,0,0);}
+          if(material.emissive){material.userData.baseBlackoutEmissive??=material.emissiveIntensity;material.emissiveIntensity=0;}
+        }
+      });
       this.totalBlackoutWorldSuppressed=true;
     }
   }
   updateLightEvent(dt){
     if(!this.running||this.paused||this.dead)return;
     if(this.totalBlackoutActive){
-      this.totalBlackoutDuration-=dt;
-      if(this.totalBlackoutDuration<=0)this.endTotalBlackout();
-      else this.lightState="BLACKOUT";
+      if(this.totalBlackoutPhase==="flicker-in"&&this.gameTime>=this.totalBlackoutPhaseEndsAt){
+        this.totalBlackoutPhase="blackout";
+        this.totalBlackoutPhaseStartedAt=this.gameTime;
+        this.totalBlackoutEnvironmentFlicker=0;
+        this.totalBlackoutDarkEndsAt=this.gameTime+this.totalBlackoutDuration;
+        this.totalBlackoutEndsAt=this.totalBlackoutDarkEndsAt+this.totalBlackoutRecoveryDuration;
+        this.lightState="BLACKOUT";
+        this.audio.lightsOut();
+        this.totalBlackoutWorldSuppressed=false;
+      }
+      if(this.totalBlackoutPhase==="blackout"){
+        this.totalBlackoutDuration=Math.max(0,this.totalBlackoutDarkEndsAt-this.gameTime);
+        if(this.gameTime>=this.totalBlackoutDarkEndsAt){
+          this.restoreTotalBlackoutMaterials();
+          this.restoreTotalBlackoutLighting();
+          this.captureTotalBlackoutLighting();
+          this.totalBlackoutPhase="flicker-out";
+          this.totalBlackoutPhaseStartedAt=this.gameTime;
+          this.totalBlackoutEnvironmentFlicker=1;
+          this.totalBlackoutPhaseEndsAt=this.totalBlackoutEndsAt;
+          this.totalBlackoutWorldSuppressed=false;
+          this.lightState="FLICKER";
+        }else{
+          this.lightState="BLACKOUT";
+        }
+      }else if(this.totalBlackoutPhase==="flicker-out"){
+        if(this.gameTime>=this.totalBlackoutEndsAt)this.endTotalBlackout();
+        else this.lightState="FLICKER";
+      }else{
+        this.lightState="FLICKER";
+      }
       return;
     }
     this.totalBlackoutTimer-=dt;
@@ -5073,7 +5305,7 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.12)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      // Short unstable-ballast outages, not multi-minute total darkness.
+      // Short local outages are separate from the Backrooms-wide Flicker.
       this.lightEventTimer=this.level.id==="0"?1.8+Math.random()*2.2:30;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
@@ -5144,7 +5376,7 @@ export class BackroomsGame{
     lightFrustum.setFromProjectionMatrix(frustumMatrix);
     const currentChunk=this.world.chunkAt(this.player.position.x,this.player.position.z);
     const insideBlackout=this.level.id==="0"&&currentChunk?.level0Blackout===true;
-    if(this.totalBlackoutActive||insideBlackout||this.lightState==="BLACKOUT"){
+    if((this.totalBlackoutActive&&this.totalBlackoutPhase==="blackout")||insideBlackout||this.lightState==="BLACKOUT"){
       for(const light of this.localLights){light.intensity=0;light.visible=false}
       return;
     }
@@ -5266,6 +5498,7 @@ export class BackroomsGame{
     }
     this.updateLightEvent(dt);
     this.applyTotalBlackoutLighting();
+    this.updateTotalBlackoutEnvironment();
     this.updateArgLayer(dt);
     this.updateHorror(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
@@ -5309,10 +5542,22 @@ export class BackroomsGame{
     if(this.totalBlackoutActive){
       this.scene.background.setHex(0x000000);this.sky.visible=false;this.cloudLayer.visible=false;
     }else if(this.level.id==="7"){
-      this.scene.background.setHex(0x8bc3e8);
-      this.sky.visible=true;this.oceanSky.visible=false;this.cloudLayer.visible=true;
+      const depth=this.player.inOcean?THREE.MathUtils.clamp(this.waterDepthBlend||0,0,1):0;
+      this.sky.visible=false;
+      this.oceanSky.visible=depth<.08&&this.totalBlackoutEnvironmentFlicker>.2;
+      this.cloudLayer.visible=depth<.08&&this.totalBlackoutEnvironmentFlicker>.28;
+      if(depth<.08){
+        this.scene.background.setHex(0x6aa7d2);
+        this.cloudLayer.material.uniforms.opacity.value=.21*this.totalBlackoutEnvironmentFlicker;
+        this.cloudLayer.material.uniforms.coverage.value=.62;
+        if(this.scene.fog){this.scene.fog.color.setHex(0x8bc3e8);this.scene.fog.density=.00042;}
+      }else{
+        const deep=new THREE.Color(0x020d19),surface=new THREE.Color(0x27627d);
+        this.scene.background.copy(surface.lerp(deep,depth));
+        this.cloudLayer.visible=false;this.oceanSky.visible=false;
+        if(this.scene.fog){this.scene.fog.color.copy(surface.lerp(deep,depth));this.scene.fog.density=.014+depth*.062;}
+      }
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
-      if(this.scene.fog&&!this.player.inOcean){this.scene.fog.color.setHex(0x8bc3e8);this.scene.fog.density=.0004;}
     }else if(this.level.id==="10"){
       this.scene.background.setHex(0xc3d2de);
       this.sky.visible=true;this.oceanSky.visible=false;this.cloudLayer.visible=true;

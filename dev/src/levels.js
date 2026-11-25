@@ -356,18 +356,18 @@ export const LEVELS = {
     sourceUrl: "https://backrooms-wiki.wikidot.com/level-37",
     next: null,
     theme: {
-      // Clean white ceramic tile, soft turquoise water, calm diffuse light.
-      wall: 0xe8ece8,
-      wallRough: 0.28,
-      floor: 0xd4e0dc,
-      ceiling: 0xf0f4f0,
-      fog: 0xd8e8e4,
-      accent: 0x70c8c0,
-      light: 0xf8fcf8,
-      ambient: 0xc8d8d4
+      // Pristine white ceramic, blue-green water and soft cool daylight.
+      wall: 0xf0f3f0,
+      wallRough: 0.22,
+      floor: 0xe0e9e5,
+      ceiling: 0xf7f9f7,
+      fog: 0xdce9e6,
+      accent: 0x64c5ca,
+      light: 0xf0fbff,
+      ambient: 0xc4d8d6
     },
     cellSize: 14,
-    wallHeight: 5.2,
+    wallHeight: 6.0,
     darkness: 0.02,
     holeChance: 0,
     pipeChance: 0,
