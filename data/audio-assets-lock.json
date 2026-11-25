@@ -204,46 +204,6 @@
       "license": "CC0",
       "license_id": "CC0-1.0"
     },
-    "cave_ambience": {
-      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/2135.wav",
-      "source": "https://bigsoundbank.com/cave-1-s2135.html",
-      "author": "Joseph SARDIN",
-      "title": "Cave #1",
-      "provider": "BigSoundBank",
-      "source_id": 2135,
-      "duration_seconds": 71.304396,
-      "license": "CC0",
-      "license_id": "CC0-1.0",
-      "input_format": "wav",
-      "input_bytes": 20536836,
-      "input_sha256": "4420e7f0a5be6a30c9eec2a80ff54833dc5d7e078c00e97da3014add10e10155",
-      "conversion": {
-        "codec": "libvorbis",
-        "quality": 4,
-        "sample_rate": 32000,
-        "channels": 1
-      }
-    },
-    "poolroom_ambience": {
-      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1210.wav",
-      "source": "https://bigsoundbank.com/indoor-pool-1-s1210.html",
-      "author": "Joseph SARDIN",
-      "title": "Indoor pool #1",
-      "provider": "BigSoundBank",
-      "source_id": 1210,
-      "duration_seconds": 350.367583,
-      "license": "CC0",
-      "license_id": "CC0-1.0",
-      "input_format": "wav",
-      "input_bytes": 67271674,
-      "input_sha256": "7d725f19ae6b1a7556e7b3f6cf44eb4c5c6eef1d68209bc079a71bd9af99773e",
-      "conversion": {
-        "codec": "libvorbis",
-        "quality": 3,
-        "sample_rate": 32000,
-        "channels": 1
-      }
-    },
     "footstep_concrete_01.ogg": {
       "url": "https://bigsoundbank.com/UPLOAD/bwf-en/0514.wav",
       "source": "https://bigsoundbank.com/footsteps-shoe-on-concrete-s0514.html",
@@ -530,6 +490,46 @@
         "trim_duration_seconds": 0.46,
         "fade_in_seconds": 0.008,
         "fade_out_seconds": 0.07
+      }
+    },
+    "cave_ambience.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/2135.wav",
+      "source": "https://bigsoundbank.com/cave-1-s2135.html",
+      "author": "Joseph SARDIN",
+      "title": "Cave #1",
+      "provider": "BigSoundBank",
+      "source_id": 2135,
+      "duration_seconds": 71.304396,
+      "license": "CC0",
+      "license_id": "CC0-1.0",
+      "input_format": "wav",
+      "input_bytes": 20536836,
+      "input_sha256": "4420e7f0a5be6a30c9eec2a80ff54833dc5d7e078c00e97da3014add10e10155",
+      "conversion": {
+        "codec": "libvorbis",
+        "quality": 4,
+        "sample_rate": 32000,
+        "channels": 1
+      }
+    },
+    "poolroom_ambience.ogg": {
+      "url": "https://bigsoundbank.com/UPLOAD/bwf-en/1210.wav",
+      "source": "https://bigsoundbank.com/indoor-pool-1-s1210.html",
+      "author": "Joseph SARDIN",
+      "title": "Indoor pool #1",
+      "provider": "BigSoundBank",
+      "source_id": 1210,
+      "duration_seconds": 350.367583,
+      "license": "CC0",
+      "license_id": "CC0-1.0",
+      "input_format": "wav",
+      "input_bytes": 67271674,
+      "input_sha256": "7d725f19ae6b1a7556e7b3f6cf44eb4c5c6eef1d68209bc079a71bd9af99773e",
+      "conversion": {
+        "codec": "libvorbis",
+        "quality": 3,
+        "sample_rate": 32000,
+        "channels": 1
       }
     }
   }
