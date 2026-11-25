@@ -8,7 +8,7 @@ import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
 import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level4-office-level1-multifloor1";
-import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261120-level4-office-pbr1";
+import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261125-level0-architecture-daylight-sky1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
 
 function oceanSurfaceHeight(x,z,time){
@@ -343,10 +343,14 @@ class Chunk{
     }else if(level.id==="0"){
       this.zone="maze";
       this.megaType=null;
-      this.level0Region=this.world.forceLevel0AllRed
-        ? {type:"red",id:"red:global"}
-        : level0RegionAt(this.cx,this.cz,this.game.seed);
-      if(!this.world.forceLevel0AllRed&&this.world.forceLevel0Zone&&Math.abs(this.cx-this.world.forceLevel0Zone.cx)<=1&&Math.abs(this.cz-this.world.forceLevel0Zone.cz)<=1){
+      const forcedManila=this.world.forceLevel0ManilaRoom;
+      const isForcedManila=!!(forcedManila&&forcedManila.cx===this.cx&&forcedManila.cz===this.cz);
+      this.level0Region=isForcedManila
+        ? {type:"maze",id:"manila:admin"}
+        : this.world.forceLevel0AllRed
+          ? {type:"red",id:"red:global"}
+          : level0RegionAt(this.cx,this.cz,this.game.seed);
+      if(!isForcedManila&&!this.world.forceLevel0AllRed&&this.world.forceLevel0Zone&&Math.abs(this.cx-this.world.forceLevel0Zone.cx)<=1&&Math.abs(this.cz-this.world.forceLevel0Zone.cz)<=1){
         this.level0Region={type:this.world.forceLevel0Zone.type,id:"forced:"+this.world.forceLevel0Zone.type};
       }
       this.level0SpawnCell={x:Math.floor(cells/2),z:Math.floor(cells/2)};
@@ -355,7 +359,11 @@ class Chunk{
       this.level0HoleArea=this.level0Region.type==="holes";
       this.level0RedRoom=this.level0Region.type==="red";
       this.level0PoleArea=this.level0PillarArea;
-      this.manilaRoom=this.level0Region.type==="maze"?level0ManilaAt(this.cx,this.cz,this.game.seed):null;
+      this.manilaRoom=this.level0Region.type==="maze"
+        ? (isForcedManila
+          ? {cellX:forcedManila.cellX,cellZ:forcedManila.cellZ,entrySide:forcedManila.entrySide}
+          : level0ManilaAt(this.cx,this.cz,this.game.seed))
+        : null;
 
       if(this.level0Region.type==="pillars"){
         this.walls.fill(0);
@@ -619,22 +627,65 @@ class Chunk{
     const hGeom=new THREE.BoxGeometry(cell,safeWallHeight,wallThickness),vGeom=new THREE.BoxGeometry(wallThickness,safeWallHeight,cell);
     const upperHGeom=level1MultiFloor?new THREE.BoxGeometry(cell,upperWallHeight,wallThickness):null;
     const upperVGeom=level1MultiFloor?new THREE.BoxGeometry(wallThickness,upperWallHeight,cell):null;
-    const trimHGeom=level.id==="0"?new THREE.BoxGeometry(cell,.055,.035):new THREE.BoxGeometry(cell,.11,.12);
-    const trimVGeom=level.id==="0"?new THREE.BoxGeometry(.035,.055,cell):new THREE.BoxGeometry(.12,.11,cell);
+    // Painted 4-inch (101.6 mm) Level 0 cove base. Offset it onto
+    // both visible wall faces instead of burying it in wall thickness.
+    const trimHGeom=level.id==="0"?new THREE.BoxGeometry(cell,.1016,.012):new THREE.BoxGeometry(cell,.11,.12);
+    const trimVGeom=level.id==="0"?new THREE.BoxGeometry(.012,.1016,cell):new THREE.BoxGeometry(.12,.11,cell);
+    const trimToeGeom=level.id==="0"?new THREE.CylinderGeometry(.009,.009,cell,10):null;
     const topHGeom=new THREE.BoxGeometry(cell,.075,.09),topVGeom=new THREE.BoxGeometry(.09,.075,cell);
-    const hData=[],vData=[],upperHData=[],upperVData=[],trimH=[],trimV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
+    const hData=[],vData=[],upperHData=[],upperVData=[],trimH=[],trimV=[],trimToeH=[],trimToeV=[],topH=[],topV=[],edges=[],rngBase=new RNG(this.seedKey());
     const region=level.id==="0"?(this.level0Region?.type||"maze"):"";
     const wallMaterial=level.id==="1"?lib.concrete:region==="red"?lib.redWall:lib.wall;
     const seenH=new Set(),seenV=new Set();
     const pushMat=(arr,x,y,z)=>{const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),new THREE.Quaternion(),new THREE.Vector3(1,1,1));arr.push(m)};
+    const pushRotated=(arr,x,y,z,rx,ry,rz)=>{
+      const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(rx,ry,rz));
+      const m=new THREE.Matrix4();m.compose(new THREE.Vector3(x,y,z),q,new THREE.Vector3(1,1,1));arr.push(m);
+    };
+    const pushLevel0Baseboard=(axis,x,z)=>{
+      const faceOffset=wallThickness/2+.006,toeOffset=wallThickness/2+.013;
+      for(const side of [-1,1]){
+        if(axis==="horizontal"){
+          pushMat(trimH,x,.0508,z+side*faceOffset);
+          pushRotated(trimToeH,x,.009,z+side*toeOffset,0,0,Math.PI/2);
+        }else{
+          pushMat(trimV,x+side*faceOffset,.0508,z);
+          pushRotated(trimToeV,x+side*toeOffset,.009,z,Math.PI/2,0,0);
+        }
+      }
+    };
     const key=(x,z,s)=>s+"|"+x+"|"+z;
-    const addInstanced=(geometry,material,data)=>{if(!data.length)return;const mesh=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingBox();mesh.computeBoundingSphere();g.add(mesh)};
+    const addInstanced=(geometry,material,data)=>{if(!geometry||!data.length)return;const mesh=new THREE.InstancedMesh(tileGeometryUV(geometry,material),material,data.length);mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);data.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingBox();mesh.computeBoundingSphere();g.add(mesh)};
     const buildWallEdge=(x,z,side)=>{
       const px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
-      if(side==="north"){const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz-cell/2);if(level1MultiFloor)pushMat(upperHData,px,upperWallY,pz-cell/2);pushMat(trimH,px,.065,pz-cell/2);pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});}
-      else if(side==="south"){const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);pushMat(hData,px,safeWallY,pz+cell/2);if(level1MultiFloor)pushMat(upperHData,px,upperWallY,pz+cell/2);pushMat(trimH,px,.065,pz+cell/2);pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});}
-      else if(side==="west"){const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);pushMat(vData,px-cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(upperVData,px-cell/2,upperWallY,pz);pushMat(trimV,px-cell/2,.065,pz);pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
-      else{const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);pushMat(vData,px+cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(upperVData,px+cell/2,upperWallY,pz);pushMat(trimV,px+cell/2,.065,pz);pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});}
+      if(level.id==="0"&&this.manilaRoom){
+        const roomX=this.originX+this.manilaRoom.cellX*cell+cell/2;
+        const roomZ=this.originZ+this.manilaRoom.cellZ*cell+cell/2;
+        const edgeX=px+(side==="west"?-cell/2:side==="east"?cell/2:0);
+        const edgeZ=pz+(side==="north"?-cell/2:side==="south"?cell/2:0);
+        if(Math.abs(edgeX-roomX)<3.85&&Math.abs(edgeZ-roomZ)<3.85)return;
+      }
+      if(side==="north"){
+        const k=key(x,z,side);if(seenH.has(k))return;seenH.add(k);
+        pushMat(hData,px,safeWallY,pz-cell/2);if(level1MultiFloor)pushMat(upperHData,px,upperWallY,pz-cell/2);
+        if(level.id==="0")pushLevel0Baseboard("horizontal",px,pz-cell/2);else pushMat(trimH,px,.065,pz-cell/2);
+        pushMat(topH,px,level.wallHeight-.04,pz-cell/2);edges.push({x,z,side});
+      }else if(side==="south"){
+        const k=key(x,z+1,"north");if(seenH.has(k))return;seenH.add(k);
+        pushMat(hData,px,safeWallY,pz+cell/2);if(level1MultiFloor)pushMat(upperHData,px,upperWallY,pz+cell/2);
+        if(level.id==="0")pushLevel0Baseboard("horizontal",px,pz+cell/2);else pushMat(trimH,px,.065,pz+cell/2);
+        pushMat(topH,px,level.wallHeight-.04,pz+cell/2);edges.push({x,z,side});
+      }else if(side==="west"){
+        const k=key(x,z,side);if(seenV.has(k))return;seenV.add(k);
+        pushMat(vData,px-cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(upperVData,px-cell/2,upperWallY,pz);
+        if(level.id==="0")pushLevel0Baseboard("vertical",px-cell/2,pz);else pushMat(trimV,px-cell/2,.065,pz);
+        pushMat(topV,px-cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
+      }else{
+        const k=key(x+1,z,"west");if(seenV.has(k))return;seenV.add(k);
+        pushMat(vData,px+cell/2,safeWallY,pz);if(level1MultiFloor)pushMat(upperVData,px+cell/2,upperWallY,pz);
+        if(level.id==="0")pushLevel0Baseboard("vertical",px+cell/2,pz);else pushMat(trimV,px+cell/2,.065,pz);
+        pushMat(topV,px+cell/2,level.wallHeight-.04,pz);edges.push({x,z,side});
+      }
     };
     for(let z=0;z<cells;z++)for(let x=0;x<cells;x++){
       const mask=this.walls[this.index(x,z)];
@@ -672,11 +723,36 @@ class Chunk{
       g.add(redFloor);
     }
     if(level.id==="0"){
-      // The source has a small, aged skirting board but no bright white cap
-      // stripe at eye level. Leave the top edge as plain wallpaper.
       addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);
+      addInstanced(trimToeGeom,lib.trim,trimToeH);addInstanced(trimToeGeom,lib.trim,trimToeV);
     }else if(level.id!=="1"){addInstanced(trimHGeom,lib.trim,trimH);addInstanced(trimVGeom,lib.trim,trimV);addInstanced(topHGeom,lib.trimTop,topH);addInstanced(topVGeom,lib.trimTop,topV)}
 
+    if(level.id==="0"&&region==="maze"&&!this.manilaRoom){
+      const arches=[];
+      for(let z=1;z<cells-1;z++)for(let x=1;x<cells-1;x++){
+        const mask=this.walls[this.index(x,z)];
+        if(x<cells-1&&!(mask&2)){
+          const score=cycleHash(this.game.seed^0xa2c4,x,z,0x71);
+          if(score<.035)arches.push({axis:"vertical",x,z,score});
+        }
+        if(z<cells-1&&!(mask&4)){
+          const score=cycleHash(this.game.seed^0xa2c4,x,z,0x72);
+          if(score<.035)arches.push({axis:"horizontal",x,z,score});
+        }
+      }
+      arches.sort((a,b)=>a.score-b.score);
+      for(const arch of arches.slice(0,2)){
+        const px=this.originX+(arch.axis==="vertical"?(arch.x+1)*cell:(arch.x+.5)*cell);
+        const pz=this.originZ+(arch.axis==="horizontal"?(arch.z+1)*cell:(arch.z+.5)*cell);
+        const frame=new THREE.Group();frame.position.set(px,0,pz);
+        frame.rotation.y=arch.axis==="vertical"?Math.PI/2:0;
+        box(frame,new THREE.BoxGeometry(.13,1.84,.13),lib.wall,-.74,.92,0);
+        box(frame,new THREE.BoxGeometry(.13,1.84,.13),lib.wall,.74,.92,0);
+        const crown=new THREE.Mesh(new THREE.TorusGeometry(.74,.055,8,20,Math.PI),lib.wall);
+        crown.position.set(0,1.84,0);frame.add(crown);
+        frame.userData.level0Arch=true;g.add(frame);
+      }
+    }
     if(level.id==="1")this.buildLevel1Set(level,lib,rngBase);
     else if(level.id==="0")this.buildLevel0Set(level,lib,rngBase);
 
@@ -718,15 +794,47 @@ class Chunk{
     };
 
 
-    if(level.id!=="0"||(!this.level0RedRoom&&!this.manilaRoom))for(let i=0;i<Math.min(12,edges.length);i++){
-      const e=edges[(rngBase.int(0,edges.length-1)+i*11)%edges.length];
-      if(rngBase.next()<.22){
-        const p=wallPoint(e,.105,.58);
-        box(g,new THREE.BoxGeometry(.24,.32,.035),lib.outlet,p.position.x,p.position.y,p.position.z,0,p.rotation,0);
-        const sx=e.side==="west"||e.side==="east"?p.position.x+(e.side==="west"?-0.002:e.side==="east"?0.002:0):p.position.x;
-        const sz=e.side==="north"||e.side==="south"?p.position.z+(e.side==="north"?-.002:.002):p.position.z;
-        box(g,new THREE.BoxGeometry(.045,.05,.018),lib.socket,sx-.055,p.position.y+.015,sz,0,p.rotation,0);
-        box(g,new THREE.BoxGeometry(.045,.05,.018),lib.socket,sx+.055,p.position.y+.015,sz,0,p.rotation,0);
+    const addLevel0Outlet=e=>{
+      const px=this.originX+e.x*cell+cell/2,pz=this.originZ+e.z*cell+cell/2;
+      const faceOffset=wallThickness/2+.008;
+      let x=px,z=pz,rotation=0;
+      if(e.side==="north"){z=pz-cell/2+faceOffset;rotation=0}
+      else if(e.side==="south"){z=pz+cell/2-faceOffset;rotation=Math.PI}
+      else if(e.side==="west"){x=px-cell/2+faceOffset;rotation=Math.PI/2}
+      else{x=px+cell/2-faceOffset;rotation=-Math.PI/2}
+      const plate=new THREE.Group();plate.position.set(x,.37,z);plate.rotation.y=rotation;
+      box(plate,new THREE.BoxGeometry(.18,.265,.012),lib.outlet,0,0,0);
+      for(const socketY of [.058,-.058]){
+        box(plate,new THREE.BoxGeometry(.009,.046,.004),lib.socket,-.022,socketY,.007);
+        box(plate,new THREE.BoxGeometry(.009,.046,.004),lib.socket,.022,socketY,.007);
+        box(plate,new THREE.CylinderGeometry(.006,.006,.004,8),lib.socket,0,socketY-.034,.007,Math.PI/2,0,0);
+      }
+      for(const screwY of [.116,-.116])
+        box(plate,new THREE.CylinderGeometry(.006,.006,.004,8),lib.intercomSlot,0,screwY,.008,Math.PI/2,0,0);
+      g.add(plate);
+    };
+    if(level.id==="0"){
+      if(!this.level0RedRoom&&!this.manilaRoom&&edges.length){
+        const outletRng=new RNG(this.seedKey()^0x51eaf);
+        if(outletRng.next()<.72){
+          const candidates=edges.slice(),count=1+(outletRng.next()<.42?1:0);
+          for(let i=0;i<Math.min(count,candidates.length);i++){
+            const pick=outletRng.int(0,candidates.length-1);
+            addLevel0Outlet(candidates.splice(pick,1)[0]);
+          }
+        }
+      }
+    }else{
+      for(let i=0;i<Math.min(12,edges.length);i++){
+        const e=edges[(rngBase.int(0,edges.length-1)+i*11)%edges.length];
+        if(rngBase.next()<.22){
+          const p=wallPoint(e,.105,.58);
+          box(g,new THREE.BoxGeometry(.24,.32,.035),lib.outlet,p.position.x,p.position.y,p.position.z,0,p.rotation,0);
+          const sx=e.side==="west"||e.side==="east"?p.position.x+(e.side==="west"?-0.002:e.side==="east"?0.002:0):p.position.x;
+          const sz=e.side==="north"||e.side==="south"?p.position.z+(e.side==="north"?-.002:.002):p.position.z;
+          box(g,new THREE.BoxGeometry(.045,.05,.018),lib.socket,sx-.055,p.position.y+.015,sz,0,p.rotation,0);
+          box(g,new THREE.BoxGeometry(.045,.05,.018),lib.socket,sx+.055,p.position.y+.015,sz,0,p.rotation,0);
+        }
       }
     }
 
@@ -2137,18 +2245,32 @@ class Chunk{
     if(this.manilaRoom&&region==="maze"){
       const p=center(this.manilaRoom.cellX,this.manilaRoom.cellZ),w=8,h=3.15,thick=.42,doorW=1.45,doorH=2.35,side=(w-doorW)/2,wall=lib.manilaWall,wood=lib.officeWood;
       const wallSegments=[];
+      const addManilaBaseboard=(horizontal,x,z,length)=>{
+        const offset=thick/2+.006,toeOffset=thick/2+.013;
+        for(const sign of [-1,1]){
+          if(horizontal){
+            box(g,new THREE.BoxGeometry(length,.1016,.012),lib.trim,x,.0508,z+sign*offset);
+            box(g,new THREE.CylinderGeometry(.009,.009,length,10),lib.trim,x,.009,z+sign*toeOffset,0,0,Math.PI/2);
+          }else{
+            box(g,new THREE.BoxGeometry(.012,.1016,length),lib.trim,x+sign*offset,.0508,z);
+            box(g,new THREE.CylinderGeometry(.009,.009,length,10),lib.trim,x+sign*toeOffset,.009,z,Math.PI/2,0,0);
+          }
+        }
+      };
       const addHorizontal=(z)=>{
-        const y=h/2;
+        const y=h/2,leftX=p.x-(doorW/2+side/2),rightX=p.x+(doorW/2+side/2);
         wallSegments.push({x1:p.x-w/2,z1:z,x2:p.x-doorW/2,z2:z},{x1:p.x+doorW/2,z1:z,x2:p.x+w/2,z2:z});
-        box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x-(doorW/2+side/2),y,z);
-        box(g,new THREE.BoxGeometry(side,h,thick),wall,p.x+(doorW/2+side/2),y,z);
+        box(g,new THREE.BoxGeometry(side,h,thick),wall,leftX,y,z);
+        box(g,new THREE.BoxGeometry(side,h,thick),wall,rightX,y,z);
+        addManilaBaseboard(true,leftX,z,side);addManilaBaseboard(true,rightX,z,side);
         box(g,new THREE.BoxGeometry(doorW,h-doorH,thick),wall,p.x,(h+doorH)/2,z);
       };
       const addVertical=(x)=>{
-        const y=h/2;
+        const y=h/2,nearZ=p.z-(doorW/2+side/2),farZ=p.z+(doorW/2+side/2);
         wallSegments.push({x1:x,z1:p.z-w/2,x2:x,z2:p.z-doorW/2},{x1:x,z1:p.z+doorW/2,x2:x,z2:p.z+w/2});
-        box(g,new THREE.BoxGeometry(thick,h,side),wall,x,y,p.z-(doorW/2+side/2));
-        box(g,new THREE.BoxGeometry(thick,h,side),wall,x,y,p.z+(doorW/2+side/2));
+        box(g,new THREE.BoxGeometry(thick,h,side),wall,x,y,nearZ);
+        box(g,new THREE.BoxGeometry(thick,h,side),wall,x,y,farZ);
+        addManilaBaseboard(false,x,nearZ,side);addManilaBaseboard(false,x,farZ,side);
         box(g,new THREE.BoxGeometry(thick,h-doorH,doorW),wall,x,(h+doorH)/2,p.z);
       };
       addHorizontal(p.z-w/2);addHorizontal(p.z+w/2);addVertical(p.x-w/2);addVertical(p.x+w/2);
@@ -2174,7 +2296,16 @@ class Chunk{
       box(table,new THREE.BoxGeometry(.42,.08,.26),wood,0,.84,0);g.add(table);
       for(const x of [-1,1]){const chair=new THREE.Group();chair.position.set(p.x+x*1.65,0,p.z);chair.rotation.y=x<0?Math.PI/2:-Math.PI/2;box(chair,new THREE.BoxGeometry(.72,.10,.72),wood,0,.48,0);for(const [lx,lz] of [[-.27,-.27],[.27,-.27],[-.27,.27],[.27,.27]])box(chair,new THREE.BoxGeometry(.10,.65,.10),wood,lx,.23,lz);box(chair,new THREE.BoxGeometry(.72,.64,.10),wood,0,.72,-.31);g.add(chair)}
       box(g,new THREE.BoxGeometry(1.15,.55,.42),wood,p.x,.32,p.z+.95);
-      box(g,new THREE.BoxGeometry(.48,.012,.32),lib.outlet,p.x,.86,p.z-.12);
+      const outlet=new THREE.Group();outlet.position.set(p.x,.43,p.z-w/2+thick/2+.012);
+      box(outlet,new THREE.BoxGeometry(.18,.265,.012),lib.outlet,0,0,0);
+      for(const socketY of [.058,-.058]){
+        box(outlet,new THREE.BoxGeometry(.009,.046,.004),lib.socket,-.022,socketY,.007);
+        box(outlet,new THREE.BoxGeometry(.009,.046,.004),lib.socket,.022,socketY,.007);
+        box(outlet,new THREE.CylinderGeometry(.006,.006,.004,8),lib.socket,0,socketY-.034,.007,Math.PI/2,0,0);
+      }
+      for(const screwY of [.116,-.116])
+        box(outlet,new THREE.CylinderGeometry(.006,.006,.004,8),lib.intercomSlot,0,screwY,.008,Math.PI/2,0,0);
+      g.add(outlet);
       if(!this.level0Blackout){
         const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.material.emissiveIntensity=.95;fixture.userData.light=true;fixture.userData.baseEmissive=.95;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffedc8,baseIntensity:24,intensity:24,distance:7.5,decay:2,fixture});
       }
@@ -2723,6 +2854,7 @@ class WorldStreamer{
     this.surfaceSize=0;this.floorSurface=null;this.ceilingSurface=null;
     this.forceLevel0Zone=null;
     this.forceLevel0AllRed=false;
+    this.forceLevel0ManilaRoom=null;
   }
   key(cx,cz){return cx+","+cz}
   async configure(onProgress=()=>{}){
@@ -4473,38 +4605,35 @@ export class BackroomsGame{
       this.scene.remove(light);
     }
   }
-  setLevel(id){
-    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.intercomTimer=80+Math.random()*100;
+  setLevel(id,options={}){
+    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x8ab0c0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.id==="7"||this.level.id==="10"?Math.max(this.level.ambientIntensity??.85,1.05):this.level.id==="37"?Math.max(this.level.ambientIntensity??.9,.95):(this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052));
     const openSky=["7","9","10"].includes(this.level.id);
-    // Atmospheric Sky is night-prone; L7 uses custom oceanSky, L10 uses solid daylight bg + clouds.
-    this.sky.visible=openSky&&!["7","10"].includes(this.level.id);
-    this.oceanSky.visible=this.level.id==="7";
-    this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10";
-    this.scene.background=new THREE.Color(this.level.id==="7"?0xc8e4f0:this.level.id==="10"?0xdce8ee:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
-    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.54:this.level.id==="10"?.48:.63;
-    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.34:this.level.id==="10"?.38:.42;
-    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xc2d0d0:this.level.id==="10"?0xb5b9b7:0x343e4b);
+    // L7 and L10 use the Preetham atmospheric sky. L9 remains an intentional
+    // nocturnal, foggy outdoor environment.
+    this.sky.visible=openSky;
+    this.oceanSky.visible=false;
+    this.cloudLayer.visible=openSky;
+    this.scene.background=new THREE.Color(this.level.id==="7"?0x8bc3e8:this.level.id==="10"?0xc3d2de:this.level.id==="37"?0xd8e8e4:(this.level.theme.fog??0x000000));
+    this.cloudLayer.material.uniforms.coverage.value=this.level.id==="7"?.50:this.level.id==="10"?.43:.63;
+    this.cloudLayer.material.uniforms.opacity.value=this.level.id==="7"?.42:this.level.id==="10"?.48:.42;
+    this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="7"?0xf1f6fa:this.level.id==="10"?0xe0e5e8:0x343e4b);
     const skyUniforms=this.sky.material.uniforms;
-    skyUniforms.turbidity.value=this.level.id==="10"?16:this.level.id==="9"?11:7;
-    skyUniforms.rayleigh.value=this.level.id==="10"?.45:this.level.id==="9"?.22:2.2;
-    skyUniforms.mieCoefficient.value=this.level.id==="10"?.018:this.level.id==="9"?.012:.004;
-    skyUniforms.mieDirectionalG.value=this.level.id==="10"?.72:.82;
-    skyUniforms.sunPosition.value.set(0,this.level.id==="9"?-.18:this.level.id==="10"?.22:.28,-1).normalize();
-    if(this.level.id!=="7"){
-      this.cloudLayer.material.uniforms.coverage.value=this.level.id==="10"?.48:.63;
-      this.cloudLayer.material.uniforms.opacity.value=this.level.id==="10"?.78:.42;
-      this.cloudLayer.material.uniforms.cloudColor.value.setHex(this.level.id==="10"?0xb5b9b7:0x343e4b);
-    }
-    this.daylight.color.setHex(this.level.id==="10"?0xfff0d3:this.level.id==="9"?0x8499bd:this.level.id==="7"?0xb9d5df:0xe4edf0);
+    skyUniforms.turbidity.value=this.level.id==="10"?8.5:this.level.id==="9"?11:4.2;
+    skyUniforms.rayleigh.value=this.level.id==="10"?1.35:this.level.id==="9"?.22:2.6;
+    skyUniforms.mieCoefficient.value=this.level.id==="10"?.009:this.level.id==="9"?.012:.0045;
+    skyUniforms.mieDirectionalG.value=this.level.id==="10"?.78:.76;
+    const sunY=this.level.id==="9"?-.18:this.level.id==="10"?.48:.68;
+    skyUniforms.sunPosition.value.set(-.32,sunY,-.74).normalize();
+    this.daylight.color.setHex(this.level.id==="10"?0xfff6e8:this.level.id==="9"?0x8499bd:this.level.id==="7"?0xd5eaff:0xe4edf0);
     this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:88,24);
     this.daylight.intensity=this.level.id==="10"?1.55:this.level.id==="7"?1.65:this.level.id==="9"?.035:0;
     this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?1.35:this.level.id==="9"?.95:.78;
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
-    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);this.world.configure();
+    this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);const worldLoad=this.world.configure();
     if(this.world.ceilingSurface)this.world.ceilingSurface.visible=!LEVELS_WITHOUT_GLOBAL_CEILING.has(String(this.level.id));
     this.world.ensureAround(this.player.position.x,this.player.position.z);this.entityManager.clear();
     const levelNumber=document.getElementById("level-number");if(levelNumber)levelNumber.textContent=this.level.number;
@@ -4515,6 +4644,7 @@ export class BackroomsGame{
     this.player.velocity.set(0,0,0);this.player.verticalVelocity=0;this.player.inOcean=false;
     const pauseLevel=document.getElementById("pause-level");if(pauseLevel)pauseLevel.textContent=this.level.number;
     this.syncPageTitle();
+    return worldLoad;
   }
   syncPageTitle(){
     const title=this.running&&!this.introActive?"The Backrooms: Level "+this.level.id:"The Backrooms";
@@ -5010,22 +5140,20 @@ export class BackroomsGame{
   }
 
   render(){
-    // L7/L10: re-assert daylight sky every frame so nothing can leave it black.
+    // Keep the daylight atmosphere stable while chunks stream. The scene
+    // background remains a blue fallback if a browser loses the sky dome.
     if(this.level.id==="7"){
-      this.scene.background=new THREE.Color(0xc8e4f0);
-      this.oceanSky.visible=true;
-      this.cloudLayer.visible=true;
-      this.sky.visible=false;
+      this.scene.background.setHex(0x8bc3e8);
+      this.sky.visible=true;this.oceanSky.visible=false;this.cloudLayer.visible=true;
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
-      if(this.scene.fog&&!this.player.inOcean){this.scene.fog.color.setHex(0xc8e4f0);this.scene.fog.density=.0004;}
+      if(this.scene.fog&&!this.player.inOcean){this.scene.fog.color.setHex(0x8bc3e8);this.scene.fog.density=.0004;}
     }else if(this.level.id==="10"){
-      this.scene.background=new THREE.Color(0xdce8ee);
-      this.sky.visible=false;
-      this.cloudLayer.visible=true;
-      this.cloudLayer.material.uniforms.opacity.value=.38;
-      this.cloudLayer.material.uniforms.coverage.value=.42;
+      this.scene.background.setHex(0xc3d2de);
+      this.sky.visible=true;this.oceanSky.visible=false;this.cloudLayer.visible=true;
+      this.cloudLayer.material.uniforms.opacity.value=.48;
+      this.cloudLayer.material.uniforms.coverage.value=.43;
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
-      if(this.scene.fog){this.scene.fog.color.setHex(0xdce8ee);this.scene.fog.density=.00028;}
+      if(this.scene.fog){this.scene.fog.color.setHex(0xc3d2de);this.scene.fog.density=.00028;}
     }
     if(this.sky.visible)this.sky.position.copy(this.camera.position);
     if(this.oceanSky.visible)this.oceanSky.position.copy(this.camera.position);

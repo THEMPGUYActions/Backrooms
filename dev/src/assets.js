@@ -650,7 +650,7 @@ export function makeLibrary(level){
     dark:new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0}),
     dampPatch:new THREE.MeshStandardMaterial({color:0x3b3325,roughness:.98,metalness:0,transparent:true,opacity:.15,depthWrite:false,side:THREE.DoubleSide}),
     crate:new THREE.MeshStandardMaterial({color:0x6e5132,roughness:.92,metalness:0}),
-    trim:new THREE.MeshStandardMaterial({color:level.id==="0"?0x8b7650:0xf4f0e3,roughness:level.id==="0"?.88:.66,metalness:0}),
+    trim:new THREE.MeshStandardMaterial({color:level.id==="0"?0xd7d3c8:0xf4f0e3,roughness:level.id==="0"?.9:.66,metalness:0}),
     trimTop:new THREE.MeshStandardMaterial({color:level.id==="0"?level.theme.wall:0xe8e5dc,roughness:.82,metalness:0}),
     outlet:new THREE.MeshStandardMaterial({color:0xe7e4dc,roughness:.58,metalness:0}),
     socket:new THREE.MeshStandardMaterial({color:0x2a2824,roughness:.88,metalness:0}),

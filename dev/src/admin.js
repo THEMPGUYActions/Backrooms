@@ -8,6 +8,9 @@ export class BackroomsAdmin{
     this.opened=false;
     this.ready=false;
     this.busy=false;
+    this.teleportRevision="manila-queue3";
+    this.lastManilaTeleportCall=null;
+    this.teleportInFlight=null;
     this.opener=null;
   }
   activate(){
@@ -170,6 +173,7 @@ export class BackroomsAdmin{
                 <button data-admin-zone="blackout">BLACKOUT</button>
                 <button data-admin-zone="red">RED ZONE</button>
                 <button data-admin-zone="clear">CLEAR ZONE</button>
+                <button data-admin-zone="manila">MANILA ROOM</button>
               </div>
             </section>
 
@@ -268,36 +272,78 @@ export class BackroomsAdmin{
     });
   }
 
-  async teleportLevel(id){
+  async teleportLevel(id,options={}){
     const level=LEVELS[String(id)];
-    if(!level||this.busy||!this.game.running||this.game.introActive||this.game.dead)return;
+    if(!level){
+      this.lastTeleportResult={id:String(id),status:"error",error:"Unknown level"};
+      return false;
+    }
+
+    // Serialize requests rather than silently dropping a second admin click.
+    while(this.busy){
+      const pending=this.teleportInFlight;
+      if(pending)await pending;
+      else await Promise.resolve();
+    }
     this.busy=true;
+    let releaseFlight;
+    const flight=new Promise(resolve=>{releaseFlight=resolve});
+    this.teleportInFlight=flight;
+    this.lastTeleportResult={id:String(id),status:"running",error:null};
+
     const wasPaused=this.game.paused;
+    const manilaRoom=String(id)==="0"&&options.manilaRoom===true;
+    const roomSpec=manilaRoom?{cx:0,cz:0,cellX:2,cellZ:2,entrySide:"north"}:null;
     if(this.root)this.root.style.pointerEvents="none";
     try{
+      // Admin world teleports are recovery controls: clear active death and
+      // intro states before running the canonical level transition.
+      this.game.dead=false;
+      this.game.deathSequenceActive=false;
+      this.game.deathSequenceTime=0;
+      this.game.running=true;
+      this.game.introActive=false;
+      this.game.introPlaying=false;
       this.game.paused=true;
       document.getElementById("pause")?.classList.add("hidden");
       document.getElementById("death")?.classList.add("hidden");
       document.getElementById("ending")?.classList.add("hidden");
 
-      this.game.levelId=String(id);
-      this.game.level=level;
-      this.game.lightState="ON";
-      this.game.lightEventTimer=48;
-      this.game.intercomTimer=70;
-      const FogClass=this.game.scene.fog?.constructor;
-      if(FogClass)this.game.scene.fog=new FogClass(0x000000,level.id==="0"?.027:level.id==="1"?.024:level.id==="2"?.058:level.id==="3"?.052:.036);
-      this.game.ambient.color.setHex(level.theme.ambient);this.game.ambient.intensity=level.id==="1"?.026:.052;
-      this.game.flash.color.setHex(level.id==="2"?0xd9d7ff:0xffffee);
-
-      await this.game.world.configure();
-      this.game.world.ensureAround(0,0);
+      // setLevel applies the Manila override before configure() constructs
+      // the new chunks. Await its asset/configuration promise before moving.
+      const worldLoad=this.game.setLevel(String(id),{manilaRoom:roomSpec});
+      if(worldLoad&&typeof worldLoad.then==="function")await worldLoad;
       this.game.entityManager.clear();
       this.game.player.reset();
-      if(String(id)==="1")this.game.player.position.set(20,this.game.player.eyeY,20);
-      else this.game.player.position.set(0,this.game.player.eyeY,0);
+
+      let x=0,z=0;
+      if(String(id)==="1"){x=20;z=20}
+      if(manilaRoom){
+        x=(roomSpec.cx*this.game.world.size-this.game.world.size/2)+(roomSpec.cellX+.5)*level.cellSize;
+        // Spawn just inside the north entry instead of on top of the table.
+        z=(roomSpec.cz*this.game.world.size-this.game.world.size/2)+(roomSpec.cellZ+.5)*level.cellSize-2.55;
+      }
+      this.game.player.position.set(x,this.game.player.eyeY,z);
+      this.game.camera.position.copy(this.game.player.position);
+      this.game.world.ensureAround(x,z);
+
+      if(manilaRoom){
+        const chunk=this.game.world.chunkAt(x,z);
+        if(!chunk?.manilaRoom)throw new Error("Manila Room chunk did not generate: "+JSON.stringify({
+          level:this.game.level.id,
+          force:this.game.world.forceLevel0ManilaRoom,
+          chunk:chunk?{cx:chunk.cx,cz:chunk.cz,zone:chunk.zone,region:chunk.level0Region}:null,
+          keys:[...this.game.world.chunks.keys()]
+        }));
+        const resolved=this.game.world.collision({x,y:0,z},.46);
+        const collisionOffset=Math.hypot(resolved.x-x,resolved.z-z);
+        if(collisionOffset>.12)throw new Error("Manila Room spawn blocked by maze collision ("+collisionOffset.toFixed(2)+" m)");
+      }
 
       this.game.running=true;
+      this.game.dead=false;
+      this.game.deathSequenceActive=false;
+      this.game.deathSequenceTime=0;
       this.game.paused=wasPaused;
       this.game.introActive=false;
       this.game.introPlaying=false;
@@ -309,20 +355,42 @@ export class BackroomsAdmin{
       const obj=document.getElementById("objective");if(obj)obj.textContent=level.objective;
       const rec=document.getElementById("recording-level");if(rec)rec.textContent=level.number;
       const pause=document.getElementById("pause-level");if(pause)pause.textContent=level.number;
-      this.game.toast("LOADED "+level.number,1.4);
+      this.game.toast(manilaRoom?"MANILA ROOM LOADED":"LOADED "+level.number,1.4);
       this.sync();
+      this.lastTeleportResult={id:String(id),status:"success",error:null,manilaRoom};
+      return true;
     }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      this.lastTeleportResult={id:String(id),status:"error",error:message,manilaRoom};
       console.error("[Backrooms] Admin teleport failed:",error);
       this.game.running=true;
+      this.game.dead=false;
+      this.game.deathSequenceActive=false;
+      this.game.deathSequenceTime=0;
       this.game.paused=wasPaused;
       this.game.introActive=false;
       this.game.introPlaying=false;
       this.game.syncPageTitle?.();
       this.game.toast("ADMIN TELEPORT FAILED",2);
+      return false;
     }finally{
       this.busy=false;
+      if(this.teleportInFlight===flight)this.teleportInFlight=null;
+      releaseFlight();
       if(this.root)this.root.style.pointerEvents="";
     }
+  }
+
+  async teleportManilaRoom(){
+    this.lastManilaTeleportCall={
+      revision:this.teleportRevision,
+      busyAtRequest:this.busy,
+      inFlightAtRequest:!!this.teleportInFlight
+    };
+    const result=await this.teleportLevel("0",{manilaRoom:true});
+    this.lastManilaTeleportCall.result=result;
+    this.lastManilaTeleportCall.teleportResult=this.lastTeleportResult||null;
+    return result;
   }
 
   action(kind){
@@ -344,6 +412,7 @@ export class BackroomsAdmin{
 
   zone(kind){
     if(!this.ready||!this.game.running||this.game.introActive)return;
+    if(kind==="manila"){this.teleportManilaRoom();return}
     if(this.game.level.id!=="0"){this.game.toast("LEVEL 0 ONLY",1.2);return}
     const cx=Math.floor((this.game.player.position.x+this.game.world.size/2)/this.game.world.size);
     const cz=Math.floor((this.game.player.position.z+this.game.world.size/2)/this.game.world.size);

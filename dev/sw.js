@@ -1,17 +1,17 @@
-const CACHE_NAME="backrooms-assets-v62";
+const CACHE_NAME="backrooms-assets-v67";
 const CORE=[
   "index.html",
   "styles.css",
-  "src/main.js?v=20261125-directional-flashlight1",
-  "src/game.js?v=20261125-directional-flashlight1",
+  "src/main.js?v=20261125-manila-dispatch-entry4",
+  "src/game.js?v=20261125-level0-architecture-daylight-sky1",
   "src/entity-models.js",
-  "src/assets.js?v=20261120-level4-office-pbr1",
+  "src/assets.js?v=20261125-level0-architecture-daylight-sky1",
   "src/level1-wet.js?v=20261120-l2-pipe-uv-junctions2",
   "src/input.js?v=20261120-l2-pipe-uv-junctions2",
   "src/levels.js?v=20261120-level4-office-level1-multifloor1",
   "src/audio.js",
-  "src/admin.js?v=20261120-level4-office-pbr1",
-  "src/fixes.js",
+  "src/admin.js?v=20261125-admin-teleport-queue3",
+  "src/fixes.js?v=20261125-manila-dispatch2",
   "favicon.svg"
 ];
 
