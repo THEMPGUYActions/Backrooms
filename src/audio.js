@@ -8,6 +8,8 @@ export const BACKROOMS_AUDIO_SOURCES=Object.freeze({
   ocean_waves:AUDIO_BASE+"ocean_waves.ogg",
   field_wind:AUDIO_BASE+"field_wind.ogg",
   field_rain:AUDIO_BASE+"field_rain.ogg",
+  cave_ambience:AUDIO_BASE+"cave_ambience.ogg",
+  poolroom_ambience:AUDIO_BASE+"poolroom_ambience.ogg",
   transformer_hum:AUDIO_BASE+"transformer_hum.ogg",
   industrial_switch:AUDIO_BASE+"industrial_switch.ogg",
   steam_hiss:AUDIO_BASE+"steam_hiss.ogg",
@@ -25,7 +27,9 @@ export const BACKROOMS_AUDIO_SOURCES=Object.freeze({
     AUDIO_BASE+"footstep_04.ogg",
     AUDIO_BASE+"footstep_05.ogg",
     AUDIO_BASE+"footstep_06.ogg"
-  ])
+  ]),
+  footstepsConcrete:Object.freeze(Array.from({length:6},(_,i)=>AUDIO_BASE+"footstep_concrete_0"+(i+1)+".ogg")),
+  footstepsWood:Object.freeze(Array.from({length:6},(_,i)=>AUDIO_BASE+"footstep_wood_0"+(i+1)+".ogg"))
 });
 
 function clamp(v,a=0,b=1){return Math.max(a,Math.min(b,v))}
@@ -96,7 +100,9 @@ export class AudioDirector{
 
       const entries=[
         ...Object.entries(BACKROOMS_AUDIO_SOURCES).filter(([key,value])=>key!=="footsteps"&&typeof value==="string"),
-        ...BACKROOMS_AUDIO_SOURCES.footsteps.map((url,i)=>["footstep_"+String(i+1).padStart(2,"0"),url])
+        ...BACKROOMS_AUDIO_SOURCES.footsteps.map((url,i)=>["footstep_"+String(i+1).padStart(2,"0"),url]),
+        ...BACKROOMS_AUDIO_SOURCES.footstepsConcrete.map((url,i)=>["footstep_concrete_"+String(i+1).padStart(2,"0"),url]),
+        ...BACKROOMS_AUDIO_SOURCES.footstepsWood.map((url,i)=>["footstep_wood_"+String(i+1).padStart(2,"0"),url])
       ];
       Promise.allSettled(entries.map(async([key,url])=>{
         const response=await fetch(url,{cache:"force-cache"});
@@ -171,7 +177,7 @@ export class AudioDirector{
       return;
     }
     this.stopBlackoutBed();
-    const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":(this.levelId==="7"||this.levelId==="37")?"ocean_waves":(this.levelId==="9"||this.levelId==="10")?"field_wind":"";
+    const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":this.levelId==="8"?"cave_ambience":this.levelId==="37"?"poolroom_ambience":this.levelId==="7"?"ocean_waves":(this.levelId==="9"||this.levelId==="10")?"field_wind":"";
     const routeKey=key+":"+this.levelId;
     if(routeKey===this.levelAmbienceKey&&this.levelAmbienceSource){this.startFieldRain();return}
     if(this.levelAmbienceSource){try{this.levelAmbienceSource.stop()}catch{}this.levelAmbienceSource.disconnect();this.levelAmbienceSource=null}
@@ -181,14 +187,14 @@ export class AudioDirector{
     this.levelAmbienceKey=routeKey;
     if(key){
       const buffer=this.buffers.get(key);if(!buffer)return;
-      const isPool=this.levelId==="37";
+      const isPool=this.levelId==="37",isCave=this.levelId==="8";
       const source=this.ctx.createBufferSource();source.buffer=buffer;source.loop=true;
       const filter=this.ctx.createBiquadFilter();filter.type="lowpass";
-      filter.frequency.value=isPool?1180:this.levelId==="7"?680:this.levelId==="10"?980:this.levelId==="9"?760:this.levelId==="3"?1450:1150;
+      filter.frequency.value=isPool?1250:isCave?720:this.levelId==="7"?680:this.levelId==="10"?980:this.levelId==="9"?760:this.levelId==="3"?1450:1150;
       filter.Q.value=.45;
       const gain=this.ctx.createGain();
-      gain.gain.value=isPool?.058:this.levelId==="7"?.145:this.levelId==="10"?.12:this.levelId==="9"?.035:this.levelId==="3"?.075:.105;
-      source.connect(filter).connect(gain);this.connectFx(gain,isPool?.2:.11,isPool?.14:.045);source.start();
+      gain.gain.value=isPool?.14:isCave?.12:this.levelId==="7"?.145:this.levelId==="10"?.12:this.levelId==="9"?.035:this.levelId==="3"?.075:.105;
+      source.connect(filter).connect(gain);this.connectFx(gain,isPool?.28:isCave?.42:.11,isPool?.22:isCave?.2:.045);source.start();
       this.levelAmbienceSource=source;this.levelAmbienceGain=gain;
       this.startFieldRain();
     }else if(this.levelId==="3"){
@@ -475,11 +481,19 @@ export class AudioDirector{
     setTimeout(()=>this.noise(.46,.0027,780+Math.random()*260,side*.9),180+Math.random()*260);
   }
   step(intensity=1){
-    const pick=1+Math.floor(Math.random()*6);
-    const played=this.playBuffer("footstep_"+String(pick).padStart(2,"0"),{
-      gain:.28*intensity,rate:.91+Math.random()*.1,pan:(Math.random()-.5)*.18,send:.32,delay:.045
+    const pick=1+Math.floor(Math.random()*6),suffix=String(pick).padStart(2,"0");
+    const surface=this.levelId==="5"?"wood":(["1","2","3","6","8","9","37"].includes(this.levelId)?"concrete":"default");
+    const key=surface==="wood"?"footstep_wood_"+suffix:surface==="concrete"?"footstep_concrete_"+suffix:"footstep_"+suffix;
+    const played=this.playBuffer(key,{
+      gain:(surface==="wood"?.34:surface==="concrete"?.30:.28)*intensity,
+      rate:.93+Math.random()*.12,pan:(Math.random()-.5)*.22,
+      send:surface==="wood"?.42:surface==="concrete"?.28:.32,
+      delay:surface==="wood"?.065:.045
     });
-    if(!played){this.tone(62+Math.random()*17,.055,"triangle",.022*intensity);this.noise(.045,.014*intensity,1300)}
+    if(!played){
+      const fallback=this.playBuffer("footstep_"+suffix,{gain:.28*intensity,rate:.91+Math.random()*.1,pan:(Math.random()-.5)*.18,send:.32,delay:.045});
+      if(!fallback){this.tone(62+Math.random()*17,.055,"triangle",.022*intensity);this.noise(.045,.014*intensity,1300)}
+    }
   }
   click(){this.tone(420,.03,"square",.02);this.tone(70,.07,"sine",.01)}
   flickerAt(position=null){
