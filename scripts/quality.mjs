@@ -402,7 +402,7 @@ async function checkLevelEnvironment(){
     if(!game.includes(token))fail("Level 10 wheat geometry missing realistic grain/awn detail: "+token);
   }
   if(!assets.includes('wheat:new THREE.MeshStandardMaterial({color:0xffffff'))fail("Wheat material must allow per-instance natural straw variation");
-  if(!game.includes('this.sky.visible=openSky&&!["7","10"].includes(this.level.id)'))fail("Level 10 must use the reliable daylight background instead of the night-prone atmospheric sky shader");
+  if(!game.includes('this.sky.visible=openSky')||!game.includes('const sunY=this.level.id==="9"?-.18:this.level.id==="10"?.48:.68'))fail("Outdoor sky must keep the day levels on the physical sky and leave Level 9 nocturnal");
   if(!game.includes('this.daylight.intensity=this.level.id==="10"?1.55'))fail("Level 10 must have direct daylight illumination");
 }
 
@@ -419,10 +419,10 @@ async function checkGameplayPhysicsAndRendering(){
     if(!game.includes(token))fail("Player physics contract missing: "+token);
   }
   if(game.includes("Math.sin(this.pitch)*swimInput"))fail("Swimming must not be controlled by camera pitch");
-  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(400,48,32),oceanSkyMaterial)",'this.oceanSky.visible=this.level.id==="7"','this.cloudLayer.visible=this.level.id==="7"||this.level.id==="9"||this.level.id==="10"',"new THREE.PlaneGeometry(size,size,128,128)","backrooms-level7-world-waves-v4","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.13","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
+  for(const token of ["this.oceanSky=new THREE.Mesh(new THREE.SphereGeometry(400,48,32),oceanSkyMaterial)",'this.oceanSky.visible=false','this.cloudLayer.visible=openSky','const openSky=["7","9","10"].includes(this.level.id)',"new THREE.PlaneGeometry(size,size,128,128)","backrooms-level7-world-waves-v4","new THREE.PlaneGeometry(7.7,7.7,24,24)","roomWater.onBeforeCompile=water.onBeforeCompile","transformed.z+=sin(waterWorld.x*.19+uBackroomsTime*.72)*.13","oceanSurfaceHeight(this.position.x,this.position.z,this.game.gameTime)"]){
     if(!game.includes(token))fail("Level 7 sky, animated water, or buoyancy surface coupling missing: "+token);
   }
-  if(!game.includes('this.scene.background=new THREE.Color(this.level.id==="7"?0xc8e4f0'))fail("Level 7 needs a non-black fallback sky background");
+  if(!game.includes('this.scene.background=new THREE.Color(this.level.id==="7"?0x8bc3e8')||!game.includes('this.scene.background.setHex(0x8bc3e8)'))fail("Level 7 needs a blue fallback background beneath the physical sky");
   if(!input.includes("wantsAscend(){")||!input.includes("wantsDive(){"))fail("Explicit surface/dive input actions are missing");
   if(!html.includes('id="mobile-swim-up"')||!html.includes('id="mobile-swim-down"'))fail("Mobile swimming controls are missing");
   if(!css.includes("#mobile-controls.level-seven .touch-button.swim"))fail("Mobile swimming controls must be scoped to Level 7");
