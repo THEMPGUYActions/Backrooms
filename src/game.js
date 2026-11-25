@@ -5020,8 +5020,8 @@ export class BackroomsGame{
     this.totalBlackoutRecoveryDuration=this.level.id==="0"?2.6:4;
     this.totalBlackoutPhase="flicker-in";
     this.totalBlackoutPhaseEndsAt=this.gameTime+flickerInDuration;
-    this.totalBlackoutDarkEndsAt=this.totalBlackoutPhaseEndsAt+this.totalBlackoutDuration;
-    this.totalBlackoutEndsAt=this.totalBlackoutDarkEndsAt+this.totalBlackoutRecoveryDuration;
+    this.totalBlackoutDarkEndsAt=0;
+    this.totalBlackoutEndsAt=0;
     this.lightState="FLICKER";
     this.triggerFear(.72);
     this.showArgMessage("THE FLICKER // GRID INSTABILITY");
@@ -5074,9 +5074,26 @@ export class BackroomsGame{
   updateLightEvent(dt){
     if(!this.running||this.paused||this.dead)return;
     if(this.totalBlackoutActive){
-      this.totalBlackoutDuration=Math.max(0,this.totalBlackoutDarkEndsAt-this.gameTime);
       if(this.totalBlackoutPhase==="flicker-in"&&this.gameTime>=this.totalBlackoutPhaseEndsAt){
         this.totalBlackoutPhase="blackout";
+        this.totalBlackoutDarkEndsAt=this.gameTime+this.totalBlackoutDuration;
+        this.totalBlackoutEndsAt=this.totalBlackoutDarkEndsAt+this.totalBlackoutRecoveryDuration;
+      }
+      if(this.totalBlackoutPhase==="blackout"){
+        this.totalBlackoutDuration=Math.max(0,this.totalBlackoutDarkEndsAt-this.gameTime);
+      }
+      if(this.totalBlackoutPhase==="blackout"&&this.gameTime>=this.totalBlackoutDarkEndsAt){
+        this.restoreTotalBlackoutMaterials();
+        this.restoreTotalBlackoutLighting();
+        this.totalBlackoutPhase="flicker-out";
+        this.totalBlackoutPhaseEndsAt=this.totalBlackoutEndsAt;
+        this.totalBlackoutWorldSuppressed=false;
+        this.lightState="FLICKER";
+      }else if(this.totalBlackoutPhase==="flicker-in"||this.totalBlackoutPhase==="flicker-out"){
+        this.lightState="FLICKER";
+      }else{
+        this.lightState="BLACKOUT";
+      }
         this.lightState="BLACKOUT";
         this.audio.lightsOut();
         this.totalBlackoutWorldSuppressed=false;
