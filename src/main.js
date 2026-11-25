@@ -1,5 +1,5 @@
-import { BackroomsGame } from "./game.js?v=20261125-admin-teleport-queue3";
-import { installBackroomsFixes } from "./fixes.js?v=20260926-flashlight2";
+import { BackroomsGame } from "./game.js?v=20261125-manila-dispatch-entry4";
+import { installBackroomsFixes } from "./fixes.js?v=20261125-manila-dispatch1";
 /* DEV_ADMIN_START */
 import { BackroomsAdmin } from "./admin.js?v=20261125-admin-teleport-queue3";
 /* DEV_ADMIN_END */
