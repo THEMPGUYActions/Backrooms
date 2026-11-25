@@ -207,12 +207,14 @@ for(const [filename,entry] of Object.entries(pbrLock.files||{})){
   changed=true;
 }
 
-// 3. CC0 sound files: download once into /assets/audio.
+// 3. CC0 sound files: download each unique source once, then convert all locked variants.
+const audioSourceCache=new Map();
 for(const [filename,entry] of Object.entries(audioLock.files||{})){
   const target=join(audioDir,filename);
   if(await validAudio(target))continue;
   console.log("[assets] Downloading audio "+filename+" once...");
-  const downloadedSource=await download(entry.url);
+  let downloadedSource=audioSourceCache.get(entry.url);
+  if(!downloadedSource){downloadedSource=await download(entry.url);audioSourceCache.set(entry.url,downloadedSource)}
   const converted=entry.input_format==="wav"
     ?await convertLockedWav(downloadedSource,entry,filename)
     :{data:downloadedSource,inputBytes:downloadedSource.length,inputSha256:createHash("sha256").update(downloadedSource).digest("hex")};
