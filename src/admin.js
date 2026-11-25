@@ -296,7 +296,8 @@ export class BackroomsAdmin{
         const chunkOriginX=roomSpec.cx*this.game.world.size-this.game.world.size/2;
         const chunkOriginZ=roomSpec.cz*this.game.world.size-this.game.world.size/2;
         x=chunkOriginX+(roomSpec.cellX+.5)*level.cellSize;
-        z=chunkOriginZ+(roomSpec.cellZ+.5)*level.cellSize;
+        // Spawn just inside the north entry instead of on top of the table.
+        z=chunkOriginZ+(roomSpec.cellZ+.5)*level.cellSize-2.55;
       }
       this.game.player.position.set(x,this.game.player.eyeY,z);
       this.game.camera.position.copy(this.game.player.position);
