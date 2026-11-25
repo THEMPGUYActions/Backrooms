@@ -5007,6 +5007,7 @@ export class BackroomsGame{
         if(material.color&&material.userData.baseBlackoutColor){material.color.copy(material.userData.baseBlackoutColor);delete material.userData.baseBlackoutColor;}
         if(material.emissive&&material.userData.baseBlackoutEmissive!==undefined){material.emissiveIntensity=material.userData.baseBlackoutEmissive;delete material.userData.baseBlackoutEmissive;}
       }
+      if(object.userData.baseBlackoutVisible!==undefined){object.visible=object.userData.baseBlackoutVisible;delete object.userData.baseBlackoutVisible;}
     });
   }
   beginTotalBlackout(){
@@ -5052,6 +5053,7 @@ export class BackroomsGame{
         const materials=Array.isArray(object.material)?object.material:[object.material];
         for(const material of materials){
           if(!material)continue;
+          if(material.isShaderMaterial){object.userData.baseBlackoutVisible??=object.visible;object.visible=false;}
           if(material.color){material.userData.baseBlackoutColor??=material.color.clone();material.color.setRGB(0,0,0);}
           if(material.emissive){material.userData.baseBlackoutEmissive??=material.emissiveIntensity;material.emissiveIntensity=0;}
         }
