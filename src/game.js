@@ -4394,7 +4394,7 @@ export class BackroomsGame{
     this.flash.target=this.flashTarget;
     this.flashFill.target=this.flashFillTarget;
     this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
-    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutEndsAt=0;this.totalBlackoutPhase="idle";this.totalBlackoutPhaseEndsAt=0;this.totalBlackoutSnapshot=null;this.totalBlackoutWorldSuppressed=false;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
+    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutEndsAt=0;this.totalBlackoutDarkEndsAt=0;this.totalBlackoutRecoveryDuration=0;this.totalBlackoutPhase="idle";this.totalBlackoutPhaseEndsAt=0;this.totalBlackoutSnapshot=null;this.totalBlackoutWorldSuppressed=false;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
     introControls?.classList.add("hidden");
@@ -5016,9 +5016,12 @@ export class BackroomsGame{
     this.totalBlackoutActive=true;
     this.totalBlackoutWorldSuppressed=false;
     this.totalBlackoutDuration=24+Math.random()*18;
-    this.totalBlackoutEndsAt=this.gameTime+this.totalBlackoutDuration;
+    const flickerInDuration=this.level.id==="0"?2.6:7.5;
+    this.totalBlackoutRecoveryDuration=this.level.id==="0"?2.6:4;
     this.totalBlackoutPhase="flicker-in";
-    this.totalBlackoutPhaseEndsAt=this.gameTime+(this.level.id==="0"?2.6:7.5);
+    this.totalBlackoutPhaseEndsAt=this.gameTime+flickerInDuration;
+    this.totalBlackoutDarkEndsAt=this.totalBlackoutPhaseEndsAt+this.totalBlackoutDuration;
+    this.totalBlackoutEndsAt=this.totalBlackoutDarkEndsAt+this.totalBlackoutRecoveryDuration;
     this.lightState="FLICKER";
     this.triggerFear(.72);
     this.showArgMessage("THE FLICKER // GRID INSTABILITY");
@@ -5030,6 +5033,8 @@ export class BackroomsGame{
     this.totalBlackoutActive=false;
     this.totalBlackoutDuration=0;
     this.totalBlackoutEndsAt=0;
+    this.totalBlackoutDarkEndsAt=0;
+    this.totalBlackoutRecoveryDuration=0;
     this.totalBlackoutPhase="idle";
     this.totalBlackoutPhaseEndsAt=0;
     this.totalBlackoutWorldSuppressed=false;
@@ -5069,23 +5074,23 @@ export class BackroomsGame{
   updateLightEvent(dt){
     if(!this.running||this.paused||this.dead)return;
     if(this.totalBlackoutActive){
-      const remaining=this.totalBlackoutEndsAt-this.gameTime;
-      this.totalBlackoutDuration=Math.max(0,remaining);
-      const recoveryWindow=this.level.id==="0"?2.6:4;
-      if(remaining<=0){this.endTotalBlackout();return;}
+      this.totalBlackoutDuration=Math.max(0,this.totalBlackoutDarkEndsAt-this.gameTime);
       if(this.totalBlackoutPhase==="flicker-in"&&this.gameTime>=this.totalBlackoutPhaseEndsAt){
         this.totalBlackoutPhase="blackout";
         this.lightState="BLACKOUT";
         this.audio.lightsOut();
         this.totalBlackoutWorldSuppressed=false;
       }
-      if(this.totalBlackoutPhase==="blackout"&&remaining<=recoveryWindow){
+      if(this.totalBlackoutPhase==="blackout"&&this.gameTime>=this.totalBlackoutDarkEndsAt){
         this.restoreTotalBlackoutMaterials();
         this.restoreTotalBlackoutLighting();
         this.totalBlackoutPhase="flicker-out";
         this.totalBlackoutPhaseEndsAt=this.totalBlackoutEndsAt;
         this.totalBlackoutWorldSuppressed=false;
         this.lightState="FLICKER";
+      }
+      if(this.totalBlackoutPhase==="flicker-out"&&this.gameTime>=this.totalBlackoutEndsAt){
+        this.endTotalBlackout();
       }else if(this.totalBlackoutPhase==="flicker-in"||this.totalBlackoutPhase==="flicker-out"){
         this.lightState="FLICKER";
       }else{
