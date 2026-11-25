@@ -457,13 +457,16 @@ async function checkStartupAndLevelPresentation(){
   if(!css.includes(".intro-ready .intro-audio-page")||!css.includes("animation:intro-audio-sequence 1s ease 15.25s forwards"))fail("Intro audio gate timeline is missing");
   if(css.includes(".intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{\n    animation-duration:.01ms"))fail("Reduced-motion CSS must not collapse the intro into a near-instant flash");
   if(!main.includes("if(event.persisted)window.location.reload()"))fail("Back-forward cache restoration must start a fresh intro timeline");
-  if(!sw.includes("backrooms-assets-v71"))fail("Service-worker cache version must change when startup and scene bundles change");
+  if(!sw.includes("backrooms-assets-v72"))fail("Service-worker cache version must change when startup and scene bundles change");
   for(const token of ["this.totalBlackoutActive=false","this.beginTotalBlackout()","this.endTotalBlackout()","this.ambient.intensity=0","this.daylight.intensity=0","this.flash.intensity=0","this.flashFill.intensity=0","this.scene.background?.setHex?.(0x000000","(this.totalBlackoutActive&&this.totalBlackoutPhase===\"blackout\")||insideBlackout"]){
     if(!game.includes(token))fail("Backrooms-wide total blackout is missing a required all-lights-off control: "+token);
   }
   for(const token of ["this.waterRegions=[]","waterRegionAt(x,z)","backrooms-level37-pool-water-v1","poolWaterSurfaceHeight","minX:poolMinX+.2","swimmable:true,type:\"deep-pool\"","this.floorSurface.visible=false","this.updateTotalBlackoutEnvironment()","this.oceanSky.visible=this.level.id===\"7\""]){
     if(!game.includes(token))fail("Poolrooms/deep-water/environment-flicker implementation missing: "+token);
   }
+  if(!game.includes('const globalPulse=this.game.totalBlackoutActive&&')||!game.includes('light.intensity=light.baseIntensity*scale*globalPulse'))fail("Global flicker must dim authored chunk lights as well as fixtures");
+  if(!game.includes('this.oceanSky.visible=!!base.oceanSkyVisible&&levelScale>.2')||!game.includes('this.sky.visible=!!base.skyVisible&&levelScale>.2'))fail("Global flicker must affect both custom ocean skies and standard daylight skies");
+  if(!game.includes('this.oceanSky.visible=false;\n    this.cloudLayer.visible=false;'))fail("Full blackout must hide both standard and custom sky domes");
   if(!game.includes("this.game.scene.fog.density=.014+depthBlend*.062")||!game.includes("this.oceanSky.visible=depth<.08"))fail("Level 7 underwater attenuation or blue-sky handling is missing");
   if(!game.includes("material.emissiveIntensity=0")||!game.includes("baseBlackoutEmissive")||!game.includes("baseBlackoutColor"))fail("Total blackout must suppress and restore emissive and unlit meshes, not only point lights");
   if(!game.includes('this.totalBlackoutPhase==="blackout"?"BLACKOUT":"FLICKER"'))fail("Total blackout phase must persist across level transitions");
