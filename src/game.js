@@ -5078,40 +5078,27 @@ export class BackroomsGame{
         this.totalBlackoutPhase="blackout";
         this.totalBlackoutDarkEndsAt=this.gameTime+this.totalBlackoutDuration;
         this.totalBlackoutEndsAt=this.totalBlackoutDarkEndsAt+this.totalBlackoutRecoveryDuration;
-      }
-      if(this.totalBlackoutPhase==="blackout"){
-        this.totalBlackoutDuration=Math.max(0,this.totalBlackoutDarkEndsAt-this.gameTime);
-      }
-      if(this.totalBlackoutPhase==="blackout"&&this.gameTime>=this.totalBlackoutDarkEndsAt){
-        this.restoreTotalBlackoutMaterials();
-        this.restoreTotalBlackoutLighting();
-        this.totalBlackoutPhase="flicker-out";
-        this.totalBlackoutPhaseEndsAt=this.totalBlackoutEndsAt;
-        this.totalBlackoutWorldSuppressed=false;
-        this.lightState="FLICKER";
-      }else if(this.totalBlackoutPhase==="flicker-in"||this.totalBlackoutPhase==="flicker-out"){
-        this.lightState="FLICKER";
-      }else{
-        this.lightState="BLACKOUT";
-      }
         this.lightState="BLACKOUT";
         this.audio.lightsOut();
         this.totalBlackoutWorldSuppressed=false;
       }
-      if(this.totalBlackoutPhase==="blackout"&&this.gameTime>=this.totalBlackoutDarkEndsAt){
-        this.restoreTotalBlackoutMaterials();
-        this.restoreTotalBlackoutLighting();
-        this.totalBlackoutPhase="flicker-out";
-        this.totalBlackoutPhaseEndsAt=this.totalBlackoutEndsAt;
-        this.totalBlackoutWorldSuppressed=false;
-        this.lightState="FLICKER";
-      }
-      if(this.totalBlackoutPhase==="flicker-out"&&this.gameTime>=this.totalBlackoutEndsAt){
-        this.endTotalBlackout();
-      }else if(this.totalBlackoutPhase==="flicker-in"||this.totalBlackoutPhase==="flicker-out"){
-        this.lightState="FLICKER";
+      if(this.totalBlackoutPhase==="blackout"){
+        this.totalBlackoutDuration=Math.max(0,this.totalBlackoutDarkEndsAt-this.gameTime);
+        if(this.gameTime>=this.totalBlackoutDarkEndsAt){
+          this.restoreTotalBlackoutMaterials();
+          this.restoreTotalBlackoutLighting();
+          this.totalBlackoutPhase="flicker-out";
+          this.totalBlackoutPhaseEndsAt=this.totalBlackoutEndsAt;
+          this.totalBlackoutWorldSuppressed=false;
+          this.lightState="FLICKER";
+        }else{
+          this.lightState="BLACKOUT";
+        }
+      }else if(this.totalBlackoutPhase==="flicker-out"){
+        if(this.gameTime>=this.totalBlackoutEndsAt)this.endTotalBlackout();
+        else this.lightState="FLICKER";
       }else{
-        this.lightState="BLACKOUT";
+        this.lightState="FLICKER";
       }
       return;
     }
@@ -5134,7 +5121,7 @@ export class BackroomsGame{
     if(this.lightEventTimer>0)return;
     if((this.level.id==="0"&&Math.random()<.12)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
-      // Short unstable-ballast outages, not multi-minute total darkness.
+      // Short local outages are separate from the Backrooms-wide Flicker.
       this.lightEventTimer=this.level.id==="0"?1.8+Math.random()*2.2:30;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
