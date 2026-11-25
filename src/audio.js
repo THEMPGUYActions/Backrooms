@@ -137,6 +137,7 @@ export class AudioDirector{
     const lowpass=this.ctx.createBiquadFilter();lowpass.type="lowpass";lowpass.frequency.value=210;lowpass.Q.value=.4;
     const gain=this.ctx.createGain();gain.gain.value=.0055;
     source.connect(highpass).connect(lowpass).connect(gain);this.connectFx(gain,.08,.035);source.start();
+    source.onended=()=>{source.disconnect();highpass.disconnect();lowpass.disconnect();gain.disconnect()};
     this.blackoutBedSource=source;this.blackoutBedGain=gain;
   }
   stopBlackoutBed(){
@@ -165,18 +166,19 @@ export class AudioDirector{
       if(this.levelRainSource){try{this.levelRainSource.stop()}catch{}this.levelRainSource.disconnect();this.levelRainSource=null}
       this.levelAmbienceGain?.disconnect();this.levelAmbienceGain=null;
       this.levelRainGain?.disconnect();this.levelRainGain=null;
-      this.levelAmbienceKey="blackout";
+      this.levelAmbienceKey="blackout:0";
       this.startBlackoutBed();
       return;
     }
     this.stopBlackoutBed();
     const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":(this.levelId==="7"||this.levelId==="37")?"ocean_waves":(this.levelId==="9"||this.levelId==="10")?"field_wind":"";
-    if(key===this.levelAmbienceKey&&this.levelAmbienceSource){this.startFieldRain();return}
+    const routeKey=key+":"+this.levelId;
+    if(routeKey===this.levelAmbienceKey&&this.levelAmbienceSource){this.startFieldRain();return}
     if(this.levelAmbienceSource){try{this.levelAmbienceSource.stop()}catch{}this.levelAmbienceSource.disconnect();this.levelAmbienceSource=null}
     if(this.levelRainSource){try{this.levelRainSource.stop()}catch{}this.levelRainSource.disconnect();this.levelRainSource=null}
     this.levelAmbienceGain?.disconnect();this.levelAmbienceGain=null;
     this.levelRainGain?.disconnect();this.levelRainGain=null;
-    this.levelAmbienceKey=key;
+    this.levelAmbienceKey=routeKey;
     if(key){
       const buffer=this.buffers.get(key);if(!buffer)return;
       const isPool=this.levelId==="37";
@@ -704,8 +706,9 @@ export class AudioDirector{
     if(this.levelId==="6")target=.000015;
     else if(this.levelId==="7")target*=.22;
     else if(this.levelId==="10")target*=.16;
-    if(lightState==="FLICKER")target*=.48;
-    if(lightState==="BLACKOUT")target=.00045;
+    if(this.zoneId==="blackout")target=.00006;
+    else if(lightState==="FLICKER")target*=.48;
+    else if(lightState==="BLACKOUT")target=.00045;
     if(this.humGain)this.humGain.gain.setTargetAtTime(target,this.ctx.currentTime,.11);
   }
 }
