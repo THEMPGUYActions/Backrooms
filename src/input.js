@@ -31,7 +31,11 @@ export class InputManager {
       if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
       this.keys.add(e.code);
       if(e.code==="KeyF" && !e.repeat) this.game.toggleFlashlight();
-      if(e.code==="Escape"){e.preventDefault();this.game.togglePause();}
+      if(e.code==="Escape"){
+        e.preventDefault();
+        if(document.fullscreenElement)e.stopImmediatePropagation();
+        this.game.togglePause();
+      }
       if(e.code==="KeyR" && e.shiftKey && !e.repeat) this.game.restart();
     });
     addEventListener("keyup", e => this.keys.delete(e.code));
