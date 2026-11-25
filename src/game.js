@@ -2824,12 +2824,7 @@ class Chunk{
     if(enteredFlicker)this.startFlickerEvent();
 
     if(state==="BLACKOUT"){
-      for(const fixture of this.fixtures){
-        if(fixture.material?.emissive)
-          fixture.material.emissiveIntensity=0;
-      }
-      for(const light of this.lightSources)light.intensity=0;
-      for(const chunk of this.game.world.chunks.values())chunk.group.traverse(object=>{
+      this.group.traverse(object=>{
         const materials=Array.isArray(object.material)?object.material:[object.material];
         for(const material of materials){
           if(!material?.emissive)continue;
@@ -2837,6 +2832,10 @@ class Chunk{
           material.emissiveIntensity=0;
         }
       });
+      for(const fixture of this.fixtures){
+        if(fixture.material?.emissive)fixture.material.emissiveIntensity=0;
+      }
+      for(const light of this.lightSources)light.intensity=0;
       return;
     }
 
@@ -2858,7 +2857,7 @@ class Chunk{
         fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
       fixture.userData.flickerPulses=null;
     }
-    for(const chunk of this.game.world.chunks.values())chunk.group.traverse(object=>{
+    this.group.traverse(object=>{
       const materials=Array.isArray(object.material)?object.material:[object.material];
       for(const material of materials){
         if(!material?.emissive||material.userData.baseBlackoutEmissive===undefined)continue;
@@ -3614,7 +3613,7 @@ class Player{
     const dark=this.game.isDark();
     if(!this.game.admin?.god){
       if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
-      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;
+      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark&&!this.game.totalBlackoutActive)this.sanity+=dt*.12;
       if(this.game.world.hazardAt(this.position.x,this.position.z))this.health-=dt*34;
     }else{
       this.health=100;this.sanity=100;
@@ -4395,7 +4394,7 @@ export class BackroomsGame{
     this.flash.target=this.flashTarget;
     this.flashFill.target=this.flashFillTarget;
     this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
-    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutSnapshot=null;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
+    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutSnapshot=null;this.totalBlackoutWorldSuppressed=false;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
     introControls?.classList.add("hidden");
@@ -4670,7 +4669,7 @@ export class BackroomsGame{
     }
   }
   setLevel(id,options={}){
-    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState=this.totalBlackoutActive?"BLACKOUT":"ON";this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();if(this.totalBlackoutActive)this.totalBlackoutWorldSuppressed=false;this.lightState=this.totalBlackoutActive?"BLACKOUT":"ON";this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x8ab0c0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.id==="7"||this.level.id==="10"?Math.max(this.level.ambientIntensity??.85,1.05):this.level.id==="37"?Math.max(this.level.ambientIntensity??.9,.95):(this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052));
@@ -5003,6 +5002,7 @@ export class BackroomsGame{
     if(this.totalBlackoutActive)return;
     this.captureTotalBlackoutLighting();
     this.totalBlackoutActive=true;
+    this.totalBlackoutWorldSuppressed=false;
     this.totalBlackoutDuration=24+Math.random()*18;
     this.lightState="BLACKOUT";
     this.audio.lightsOut();
@@ -5013,7 +5013,9 @@ export class BackroomsGame{
     if(!this.totalBlackoutActive)return;
     this.totalBlackoutActive=false;
     this.totalBlackoutDuration=0;
+    this.totalBlackoutWorldSuppressed=false;
     this.lightState="ON";
+    this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;
     this.restoreTotalBlackoutLighting();
     this.totalBlackoutTimer=420+Math.random()*480;
   }
