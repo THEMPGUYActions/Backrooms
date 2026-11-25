@@ -271,16 +271,30 @@ export class BackroomsAdmin{
 
   async teleportLevel(id,options={}){
     const level=LEVELS[String(id)];
-    if(!level||this.busy)return;
+    if(!level){
+      this.lastTeleportResult={id:String(id),status:"error",error:"Unknown level"};
+      return false;
+    }
+
+    // Serialize requests rather than silently dropping a second admin click.
+    while(this.busy){
+      const pending=this.teleportInFlight;
+      if(pending)await pending;
+      else await Promise.resolve();
+    }
     this.busy=true;
+    let releaseFlight;
+    const flight=new Promise(resolve=>{releaseFlight=resolve});
+    this.teleportInFlight=flight;
+    this.lastTeleportResult={id:String(id),status:"running",error:null};
+
     const wasPaused=this.game.paused;
     const manilaRoom=String(id)==="0"&&options.manilaRoom===true;
     const roomSpec=manilaRoom?{cx:0,cz:0,cellX:2,cellZ:2,entrySide:"north"}:null;
     if(this.root)this.root.style.pointerEvents="none";
     try{
-      // Admin world teleports are a recovery control too. Clear an active
-      // death sequence before changing levels so it cannot silently reject
-      // the request after a hostile level or long loading interval.
+      // Admin world teleports are recovery controls: clear active death and
+      // intro states before running the canonical level transition.
       this.game.dead=false;
       this.game.deathSequenceActive=false;
       this.game.deathSequenceTime=0;
@@ -292,28 +306,19 @@ export class BackroomsAdmin{
       document.getElementById("death")?.classList.add("hidden");
       document.getElementById("ending")?.classList.add("hidden");
 
-      // Use the canonical game transition so fog, daylight, lighting, streamed
-      // surfaces and regional state are always switched together.
+      // setLevel applies the Manila override before configure() constructs
+      // the new chunks. Await its asset/configuration promise before moving.
       const worldLoad=this.game.setLevel(String(id),{manilaRoom:roomSpec});
       if(worldLoad&&typeof worldLoad.then==="function")await worldLoad;
-      if(manilaRoom){
-        // The level switch can finish loading its prior-center chunks before
-        // the admin destination is applied. Rebuild with the override still
-        // explicitly set so the room is generated deterministically at 0,0.
-        this.game.world.forceLevel0ManilaRoom={...roomSpec};
-        await this.game.world.configure();
-      }
       this.game.entityManager.clear();
       this.game.player.reset();
 
       let x=0,z=0;
       if(String(id)==="1"){x=20;z=20}
       if(manilaRoom){
-        const chunkOriginX=roomSpec.cx*this.game.world.size-this.game.world.size/2;
-        const chunkOriginZ=roomSpec.cz*this.game.world.size-this.game.world.size/2;
-        x=chunkOriginX+(roomSpec.cellX+.5)*level.cellSize;
+        x=(roomSpec.cx*this.game.world.size-this.game.world.size/2)+(roomSpec.cellX+.5)*level.cellSize;
         // Spawn just inside the north entry instead of on top of the table.
-        z=chunkOriginZ+(roomSpec.cellZ+.5)*level.cellSize-2.55;
+        z=(roomSpec.cz*this.game.world.size-this.game.world.size/2)+(roomSpec.cellZ+.5)*level.cellSize-2.55;
       }
       this.game.player.position.set(x,this.game.player.eyeY,z);
       this.game.camera.position.copy(this.game.player.position);
@@ -321,13 +326,21 @@ export class BackroomsAdmin{
 
       if(manilaRoom){
         const chunk=this.game.world.chunkAt(x,z);
-        if(!chunk?.manilaRoom)throw new Error("Manila Room chunk did not generate at the admin destination");
+        if(!chunk?.manilaRoom)throw new Error("Manila Room chunk did not generate: "+JSON.stringify({
+          level:this.game.level.id,
+          force:this.game.world.forceLevel0ManilaRoom,
+          chunk:chunk?{cx:chunk.cx,cz:chunk.cz,zone:chunk.zone,region:chunk.level0Region}:null,
+          keys:[...this.game.world.chunks.keys()]
+        }));
         const resolved=this.game.world.collision({x,y:0,z},.46);
         const collisionOffset=Math.hypot(resolved.x-x,resolved.z-z);
-        if(collisionOffset>.12)throw new Error("Manila Room spawn is blocked by generated maze collision ("+collisionOffset.toFixed(2)+" m)");
+        if(collisionOffset>.12)throw new Error("Manila Room spawn blocked by maze collision ("+collisionOffset.toFixed(2)+" m)");
       }
 
       this.game.running=true;
+      this.game.dead=false;
+      this.game.deathSequenceActive=false;
+      this.game.deathSequenceTime=0;
       this.game.paused=wasPaused;
       this.game.introActive=false;
       this.game.introPlaying=false;
@@ -341,16 +354,26 @@ export class BackroomsAdmin{
       const pause=document.getElementById("pause-level");if(pause)pause.textContent=level.number;
       this.game.toast(manilaRoom?"MANILA ROOM LOADED":"LOADED "+level.number,1.4);
       this.sync();
+      this.lastTeleportResult={id:String(id),status:"success",error:null,manilaRoom};
+      return true;
     }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      this.lastTeleportResult={id:String(id),status:"error",error:message,manilaRoom};
       console.error("[Backrooms] Admin teleport failed:",error);
       this.game.running=true;
+      this.game.dead=false;
+      this.game.deathSequenceActive=false;
+      this.game.deathSequenceTime=0;
       this.game.paused=wasPaused;
       this.game.introActive=false;
       this.game.introPlaying=false;
       this.game.syncPageTitle?.();
       this.game.toast("ADMIN TELEPORT FAILED",2);
+      return false;
     }finally{
       this.busy=false;
+      if(this.teleportInFlight===flight)this.teleportInFlight=null;
+      releaseFlight();
       if(this.root)this.root.style.pointerEvents="";
     }
   }
