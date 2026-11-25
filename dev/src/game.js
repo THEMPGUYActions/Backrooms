@@ -3495,7 +3495,7 @@ class Player{
     // the light origin. This matters most when the player is inches from a wall.
     const flashOrigin=this.game.camera.position.clone().addScaledVector(flashForward,-.22);
     this.game.flash.position.copy(flashOrigin);
-    this.game.flashFill.position.copy(flashOrigin).addScaledVector(flashForward,1.35);
+    this.game.flashFill.position.copy(flashOrigin);
 
     const wallDistance=this.game.level.id==="0"
       ? this.game.world.flashlightWallDistance(
@@ -3517,25 +3517,33 @@ class Player{
     const beamScale=.05+.95*wallFade;
 
     this.game.flash.distance=25;
+    this.game.flash.angle=.55;
+    this.game.flash.penumbra=.82;
     this.game.flash.decay=2;
     const warmup=1-Math.min(1,this.flashWarmup/1.15);
     const flashRamp=.12+.88*THREE.MathUtils.smoothstep(warmup,0,1);
+    // SpotLight intensity is candela in current Three.js, not the old
+    // arbitrary point-light scale. Keep the spill broad and restrained.
     this.game.flash.intensity=this.flashlight
-      ? (.34+beamPower*.66)*washScale*flashRamp*flashZoneBoost
+      ? (32+beamPower*128)*washScale*flashRamp*flashZoneBoost
       : 0;
 
     this.game.flashFill.distance=25;
-    // flashFill is a forward-biased point light; its position provides the directional falloff.
-    this.game.flashFill.penumbra=.94;
+    this.game.flashFill.angle=.25;
+    this.game.flashFill.penumbra=.58;
     this.game.flashFill.decay=2;
+    // The tighter center hotspot carries most of the throw; both cones
+    // use inverse-square attenuation (decay=2) over the same 25 m range.
     this.game.flashFill.intensity=this.flashlight
-      ? (.10+beamPower*.55)*beamScale*flashRamp*flashZoneBoost
+      ? (180+beamPower*720)*beamScale*flashRamp*flashZoneBoost
       : 0;
 
     this.game.blackoutLight.position.copy(this.game.camera.position);
     const blackout=this.game.level.id==="0"&&this.game.lightState==="BLACKOUT";
     this.game.blackoutLight.intensity=blackout?.22:0;
 
+    this.game.flashTarget.position.copy(this.game.camera.position)
+      .addScaledVector(flashForward,2.0);
     this.game.flashFillTarget.position.copy(this.game.camera.position)
       .addScaledVector(flashForward,2.0);
 
@@ -4198,16 +4206,14 @@ export class BackroomsGame{
     this.blackoutLight.name="level0_blackout_proximity";
     this.blackoutLight.castShadow=false;
     this.scene.add(this.blackoutLight);
-    // SpacePotato uses two deferred AreaLights for the flashlight: one broad
-    // wash and one 0.25-radian directional beam. Two spotlights are the closest
-    // portable WebGL equivalent without introducing a screen-space light decal.
-    // Source uses two deferred AreaLights: one broad wash plus one
-    // 0.25-radian directional beam. A Three.js point light is a closer visual
-    // match for the broad component than another concentrated spotlight.
-    this.flash=new THREE.PointLight(0xfff1d5,0,25,2);
-    this.flashFill=new THREE.PointLight(0xfff1d5,0,28,2);
+    // Two camera-aimed spotlights approximate a practical flashlight's
+    // central hotspot and wider spill. PointLight ignores target, which made
+    // the old "forward" fill omnidirectional and lit areas outside the view.
+    this.flash=new THREE.SpotLight(0xfff1d5,0,25,0.55,0.82,2);
+    this.flashFill=new THREE.SpotLight(0xfff1d5,0,25,0.25,0.58,2);
     this.flash.castShadow=false;
     this.flashFill.castShadow=false;
+    this.flash.target=this.flashTarget;
     this.flashFill.target=this.flashFillTarget;
     this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
     this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
@@ -4507,7 +4513,6 @@ export class BackroomsGame{
     const mobileControls=document.getElementById("mobile-controls");
     mobileControls?.classList.toggle("level-seven",this.level.id==="7");
     this.player.velocity.set(0,0,0);this.player.verticalVelocity=0;this.player.inOcean=false;
-    const recordingLevel=document.getElementById("recording-level");if(recordingLevel)recordingLevel.textContent=this.level.number;
     const pauseLevel=document.getElementById("pause-level");if(pauseLevel)pauseLevel.textContent=this.level.number;
     this.syncPageTitle();
   }
@@ -4986,8 +4991,6 @@ export class BackroomsGame{
     if(battery)battery.textContent="BAT "+Math.round(this.player.flashBattery)+"%";
   }
   updateArgLayer(dt){
-    const t=Math.floor(this.gameTime),h=String(Math.floor(t/3600)%24).padStart(2,"0"),m=String(Math.floor(t/60)%60).padStart(2,"0"),s=String(t%60).padStart(2,"0");
-    const rec=document.getElementById("rec-time");if(rec)rec.textContent=h+":"+m+":"+s;
     if(this.argTimer<=0&&this.running&&!this.paused){
       this.argTimer=14+Math.random()*28;
       const messages=this.level.id==="0"

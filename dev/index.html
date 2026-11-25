@@ -53,16 +53,9 @@
 
   <section id="hud" class="hidden">
     <div class="hud-rec">
-      <div class="rec-left">
-        <span class="rec-dot"></span>
-        <span>REC</span>
-        <span id="rec-time">00:00:00</span>
-      </div>
-      <div class="rec-center">CAM 01 // <span id="recording-level">LEVEL 0</span></div>
       <div class="rec-right">
         <span id="status">LIGHT ON</span>
         <span id="flash-battery">BAT 100%</span>
-        <span class="tape-mark">SP</span>
       </div>
     </div>
     <div class="hud-location">
@@ -79,10 +72,6 @@
         <span>H2O</span><div class="micro-bar"><i id="hydration-bar"></i></div>
         <span>SAN</span><div class="micro-bar"><i id="sanity-bar"></i></div>
         <span id="coords">0 : 0</span>
-      </div>
-      <div class="hud-objective">
-        <span>OBJECTIVE</span>
-        <strong id="objective">Find a way out.</strong>
       </div>
     </div>
     <div class="tape-noise" aria-hidden="true"></div>
@@ -104,7 +93,7 @@
     <div class="minecraft-pause">
       <div class="pause-brand">
         <div><span class="pause-kicker">THE BACKROOMS</span><h1>PAUSED</h1></div>
-        <div class="pause-camera">CAM 01<br><b id="pause-level">LEVEL 0</b></div>
+        <div class="pause-camera"><b id="pause-level">LEVEL 0</b></div>
       </div>
       <div class="pause-layout">
         <nav class="pause-menu" aria-label="Pause menu">
@@ -120,8 +109,6 @@
             <div class="pause-status-grid">
               <div><span>LEVEL</span><b id="pause-status-level">LEVEL 0</b></div>
               <div><span>STATUS</span><b>PAUSED</b></div>
-              <div><span>OBJECTIVE</span><b id="pause-status-objective">Find a way out.</b></div>
-              <div><span>CAMERA</span><b>CAM 01 / VHS</b></div>
             </div>
             <div class="pause-note">The world is frozen. Resume when you're ready to keep walking.</div>
           </div>
@@ -277,6 +264,6 @@
   })();
   </script>
   <!-- DEV_DEBUG_END -->
-  <script type="module" src="./src/main.js?v=20261120-intro-preload-office-lighting1"></script>
+  <script type="module" src="./src/main.js?v=20261125-directional-flashlight1"></script>
 </body>
 </html>

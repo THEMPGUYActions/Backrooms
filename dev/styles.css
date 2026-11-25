@@ -260,19 +260,12 @@ canvas{filter:none;image-rendering:auto}
 }
 .hud-rec{
   position:absolute;left:16px;right:16px;top:14px;
-  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  display:flex;align-items:center;justify-content:flex-end;
   padding:8px 10px;border-top:1px solid rgba(255,255,255,.07);
   font:8px/1 "Courier New",monospace;letter-spacing:.16em;
   color:rgba(230,225,213,.39)
 }
-.rec-left,.rec-right{display:flex;align-items:center;gap:10px}
-.rec-center{text-align:center;color:rgba(230,225,213,.2)}
-.rec-right{justify-content:flex-end}
-.rec-dot{
-  width:6px;height:6px;border-radius:50%;background:#c66a5e;
-  box-shadow:0 0 8px rgba(198,106,94,.4);animation:rec-pulse 1.4s steps(1,end) infinite
-}
-@keyframes rec-pulse{0%,76%,100%{opacity:1}77%,84%{opacity:.25}}
+.rec-right{display:flex;align-items:center;gap:10px;justify-content:flex-end}
 
 .hud-location{
   position:absolute;left:18px;top:76px;
@@ -293,12 +286,6 @@ canvas{filter:none;image-rendering:auto}
 .micro-bar i{display:block;height:100%;width:100%;background:#ddd5bf}
 #health-bar{background:#bc6b5f!important}
 #stamina-bar{background:#cdbc72!important}
-.hud-objective{
-  display:grid;gap:5px;text-align:right;max-width:min(440px,54vw)
-}
-.hud-objective span{font:8px "Courier New",monospace;letter-spacing:.25em;color:rgba(230,225,213,.22)}
-.hud-objective strong{font:10px "Courier New",monospace;font-weight:400;letter-spacing:.08em;color:rgba(230,225,213,.42)}
-
 #arg-message{
   top:68px;right:18px;left:auto;transform:none;
   padding:7px 9px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);
@@ -326,11 +313,11 @@ canvas{filter:none;image-rendering:auto}
 
 @media(max-width:720px){
   .hud-rec{grid-template-columns:1fr auto;top:9px;padding:7px 6px}
-  .rec-center{display:none}
+
   .hud-location{left:12px;top:58px}
   .hud-bottom{left:12px;right:12px;bottom:10px}
   .hud-micro{grid-template-columns:auto 52px auto 52px auto;gap:5px}
-  .hud-objective{max-width:46vw}
+
   .loading-shell{width:84vw}
   .intro-card{padding:12px}
 }
@@ -424,9 +411,7 @@ body::after{
   color:var(--vhs-white);
   text-shadow:1px 0 rgba(255,70,70,.1),-1px 0 rgba(90,130,255,.1);
 }
-.hud-objective span{
-  color:rgba(206,211,199,.26);
-}
+
 .intro-screen{
   font-family:"Courier New",ui-monospace,monospace;
 }
@@ -648,7 +633,7 @@ body::after{
     gap:4px;
   }
   .hud-micro span:nth-child(9){margin-left:2px}
-  .hud-objective{max-width:42vw}
+
   .vhs-panel{
     max-height:92vh;
     padding:22px 18px 18px!important;
@@ -707,7 +692,7 @@ body::after{
 #hud{
   filter:blur(.06px);
 }
-.rec-left,.rec-right,.hud-location,.hud-objective,.hud-micro,.rec-center{
+.rec-right,.hud-location,.hud-micro{
   white-space:nowrap;
 }
 .rec-left,.rec-right{
@@ -1534,10 +1519,7 @@ button,.audio-gate{
     right:max(12px,env(safe-area-inset-right));
     bottom:max(10px,env(safe-area-inset-bottom));
   }
-  .hud-objective{
-    max-width:48vw;
-    overflow-wrap:anywhere;
-  }
+
   .panel{
     width:calc(100vw - 24px);
     max-height:calc(100dvh - 24px);
@@ -1689,10 +1671,7 @@ button,.audio-gate{
     right:max(12px,env(safe-area-inset-right));
     bottom:max(10px,env(safe-area-inset-bottom));
   }
-  .hud-objective{
-    max-width:48vw;
-    overflow-wrap:anywhere;
-  }
+
   #pause.screen{
     padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
   }
