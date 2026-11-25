@@ -271,13 +271,19 @@ export class BackroomsAdmin{
 
   async teleportLevel(id,options={}){
     const level=LEVELS[String(id)];
-    if(!level||this.busy||!this.game.running||this.game.introActive||this.game.dead)return;
+    if(!level||this.busy||!this.game.running||this.game.introActive)return;
     this.busy=true;
     const wasPaused=this.game.paused;
     const manilaRoom=String(id)==="0"&&options.manilaRoom===true;
     const roomSpec=manilaRoom?{cx:0,cz:0,cellX:2,cellZ:2,entrySide:"north"}:null;
     if(this.root)this.root.style.pointerEvents="none";
     try{
+      // Admin world teleports are a recovery control too. Clear an active
+      // death sequence before changing levels so it cannot silently reject
+      // the request after a hostile level or long loading interval.
+      this.game.dead=false;
+      this.game.deathSequenceActive=false;
+      this.game.deathSequenceTime=0;
       this.game.paused=true;
       document.getElementById("pause")?.classList.add("hidden");
       document.getElementById("death")?.classList.add("hidden");
