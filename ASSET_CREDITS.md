@@ -33,6 +33,10 @@ License: CC0 1.0 Universal, https://creativecommons.org/publicdomain/zero/1.0/
 - **Sea Waves** - Joseph SARDIN: https://bigsoundbank.com/sea-waves-s0698.html
 - **Wind in a cornfield** - Joseph SARDIN: https://bigsoundbank.com/wind-in-a-cornfield-s1097.html
 - **Summer Rain on Terrace** - Joseph SARDIN: https://bigsoundbank.com/summer-rain-on-terrace-s1019.html
+- **Cave #1** - Joseph SARDIN: https://bigsoundbank.com/cave-1-s2135.html
+- **Indoor pool #1** - Joseph SARDIN: https://bigsoundbank.com/indoor-pool-1-s1210.html
+- **Steps on a wooden floor #1** - Joseph SARDIN: https://bigsoundbank.com/steps-on-a-wooden-floor-1-s1515.html
+- **Footsteps: shoe on concrete** - Joseph SARDIN: https://bigsoundbank.com/footsteps-shoe-on-concrete-s0514.html
 
 The converted OGG files are bundled at assets/audio/. The full lock and manifest record their source IDs, authors, licenses, original WAV URLs, byte counts and SHA-256 hashes.
 
