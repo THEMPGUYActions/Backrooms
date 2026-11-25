@@ -123,8 +123,8 @@ function installRoof(game){
   };
 
   const originalSetLevel=game.setLevel.bind(game);
-  game.setLevel=(id)=>{
-    const result=originalSetLevel(id);
+  game.setLevel=(id,options={})=>{
+    const result=originalSetLevel(id,options);
     world.__level0RoofSignature="";
     if(!["0","9","10"].includes(String(game.level?.id))&&world.ceilingSurface)world.ceilingSurface.visible=true;
     if(game.level?.id==="0")queueMicrotask(rebuild);
