@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, readdir, stat, writeFile, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, stat, writeFile, rm, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const root = process.cwd();
 const MAX_ENTITY_BYTES = 95 * 1024 * 1024;
@@ -73,8 +74,43 @@ async function validPng(path){
 async function validAudio(path){
   try{
     const info=await stat(path);
-    return info.isFile()&&info.size>0&&info.size<=MAX_AUDIO_BYTES;
+    if(!info.isFile()||info.size<32||info.size>MAX_AUDIO_BYTES)return false;
+    const data=await readFile(path);
+    return data.subarray(0,4).equals(Buffer.from("OggS"));
   }catch{return false}
+}
+async function convertLockedWav(data,entry,filename){
+  if(data.length!==entry.input_bytes)throw new Error("Audio source byte count changed: "+filename);
+  const inputHash=createHash("sha256").update(data).digest("hex");
+  if(inputHash!==entry.input_sha256)throw new Error("Audio source SHA-256 changed: "+filename);
+  const conversion=entry.conversion||{};
+  const temp=await mkdtemp(join(tmpdir(),"backrooms-audio-"));
+  const inputPath=join(temp,"source.wav"),outputPath=join(temp,"converted.ogg");
+  try{
+    await writeFile(inputPath,data);
+    const args=["-hide_banner","-loglevel","error","-nostdin","-y"];
+    if(Number.isFinite(entry.trim_start_seconds))args.push("-ss",String(entry.trim_start_seconds));
+    args.push("-i",inputPath);
+    if(Number.isFinite(conversion.trim_duration_seconds))args.push("-t",String(conversion.trim_duration_seconds));
+    args.push("-vn","-ac",String(conversion.channels||1),"-ar",String(conversion.sample_rate||32000),
+      "-c:a",String(conversion.codec||"libvorbis"),"-q:a",String(conversion.quality??4));
+    if(Number.isFinite(conversion.trim_duration_seconds)){
+      const fadeIn=Math.max(.001,Number(conversion.fade_in_seconds||.008));
+      const fadeOut=Math.max(.02,Number(conversion.fade_out_seconds||.07));
+      const fadeStart=Math.max(0,conversion.trim_duration_seconds-fadeOut);
+      args.push("-af","afade=t=in:d="+fadeIn+",afade=t=out:st="+fadeStart+":d="+fadeOut);
+    }
+    args.push("-map_metadata","-1",outputPath);
+    const {execFile}=await import("node:child_process");
+    const {promisify}=await import("node:util");
+    await promisify(execFile)("ffmpeg",args,{maxBuffer:4*1024*1024});
+    const output=await readFile(outputPath);
+    if(output.length<32||output.length>MAX_AUDIO_BYTES||!output.subarray(0,4).equals(Buffer.from("OggS")))
+      throw new Error("Converted OGG failed validation: "+filename+" ("+output.length+" bytes)");
+    return {data:output,inputBytes:data.length,inputSha256:inputHash};
+  }finally{
+    await rm(temp,{recursive:true,force:true});
+  }
 }
 async function download(url){
   const r=await fetch(url,{redirect:"follow",headers:{"User-Agent":"THEMPGUY-Backrooms-asset-bootstrap/1.0"}});
@@ -176,10 +212,13 @@ for(const [filename,entry] of Object.entries(audioLock.files||{})){
   const target=join(audioDir,filename);
   if(await validAudio(target))continue;
   console.log("[assets] Downloading audio "+filename+" once...");
-  const data=await download(entry.url);
-  if(data.length>MAX_AUDIO_BYTES)throw new Error("Audio exceeds 8 MiB: "+filename);
-  const meta=await saveChecked(target,data,"audio");
-  downloaded.audio.push({file:filename,url:entry.url,source:entry.source,author:entry.author,license:entry.license,bytes:meta.bytes,sha256:meta.sha256});
+  const downloadedSource=await download(entry.url);
+  const converted=entry.input_format==="wav"
+    ?await convertLockedWav(downloadedSource,entry,filename)
+    :{data:downloadedSource,inputBytes:downloadedSource.length,inputSha256:createHash("sha256").update(downloadedSource).digest("hex")};
+  if(converted.data.length>MAX_AUDIO_BYTES)throw new Error("Audio exceeds 8 MiB: "+filename);
+  const meta=await saveChecked(target,converted.data,"audio");
+  downloaded.audio.push({file:filename,url:entry.url,source:entry.source,author:entry.author,license:entry.license,inputBytes:converted.inputBytes,inputSha256:converted.inputSha256,bytes:meta.bytes,sha256:meta.sha256});
   changed=true;
 }
 
@@ -246,6 +285,10 @@ await writeManifestIfChanged(join(ffDir,"manifest.json"),{
 
 if(!changed){
   console.log("[assets] All bootstrap assets are already committed. No external downloads performed.");
+  process.exit(0);
+}
+if(process.env.ASSET_BOOTSTRAP_DRY_RUN==="1"){
+  console.log("[assets] Dry run complete. Downloaded and validated media without committing or pushing.");
   process.exit(0);
 }
 
