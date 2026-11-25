@@ -313,11 +313,11 @@ canvas{filter:none;image-rendering:auto}
 
 @media(max-width:720px){
   .hud-rec{grid-template-columns:1fr auto;top:9px;padding:7px 6px}
-  .rec-center{display:none}
+
   .hud-location{left:12px;top:58px}
   .hud-bottom{left:12px;right:12px;bottom:10px}
   .hud-micro{grid-template-columns:auto 52px auto 52px auto;gap:5px}
-  .hud-objective{max-width:46vw}
+
   .loading-shell{width:84vw}
   .intro-card{padding:12px}
 }
@@ -411,9 +411,7 @@ body::after{
   color:var(--vhs-white);
   text-shadow:1px 0 rgba(255,70,70,.1),-1px 0 rgba(90,130,255,.1);
 }
-.hud-objective span{
-  color:rgba(206,211,199,.26);
-}
+
 .intro-screen{
   font-family:"Courier New",ui-monospace,monospace;
 }
@@ -635,7 +633,7 @@ body::after{
     gap:4px;
   }
   .hud-micro span:nth-child(9){margin-left:2px}
-  .hud-objective{max-width:42vw}
+
   .vhs-panel{
     max-height:92vh;
     padding:22px 18px 18px!important;
@@ -694,7 +692,7 @@ body::after{
 #hud{
   filter:blur(.06px);
 }
-.rec-left,.rec-right,.hud-location,.hud-objective,.hud-micro,.rec-center{
+.rec-right,.hud-location,.hud-micro{
   white-space:nowrap;
 }
 .rec-left,.rec-right{
@@ -1521,10 +1519,7 @@ button,.audio-gate{
     right:max(12px,env(safe-area-inset-right));
     bottom:max(10px,env(safe-area-inset-bottom));
   }
-  .hud-objective{
-    max-width:48vw;
-    overflow-wrap:anywhere;
-  }
+
   .panel{
     width:calc(100vw - 24px);
     max-height:calc(100dvh - 24px);
@@ -1676,10 +1671,7 @@ button,.audio-gate{
     right:max(12px,env(safe-area-inset-right));
     bottom:max(10px,env(safe-area-inset-bottom));
   }
-  .hud-objective{
-    max-width:48vw;
-    overflow-wrap:anywhere;
-  }
+
   #pause.screen{
     padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
   }
