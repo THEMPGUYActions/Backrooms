@@ -35,8 +35,9 @@ export class AudioDirector{
     this.ctx=null;this.master=null;this.fxBus=null;this.reverb=null;this.delay=null;
     this.ready=false;this.loading=null;this.buffers=new Map();
     this.stepDistance=0;this.ambientTimer=70;this.buzzTimer=11;this.humGain=null;this.lastRareEvent=-Infinity;
-    this.levelId="0";this.levelAmbienceSource=null;this.levelAmbienceGain=null;this.levelAmbienceKey="";this.levelAmbienceTimer=12;
+    this.levelId="0";this.zoneId="normal";this.levelAmbienceSource=null;this.levelAmbienceGain=null;this.levelAmbienceKey="";this.levelAmbienceTimer=12;
     this.levelRainSource=null;this.levelRainGain=null;
+    this.blackoutBedSource=null;this.blackoutBedGain=null;this.blackoutEventTimer=18+Math.random()*16;
     this.volume=Number(localStorage.getItem("br.volume")??.65);
     this.redZoneSource=null;this.redZoneGain=null;this.redZoneStartedAt=0;this.redZoneDuration=0;this.redZoneLoading=null;
     this.redZoneMedia=null;this.redZoneMediaSource=null;this.redZoneMediaGain=null;this.redZoneMediaUnlocked=false;this.redZoneMetadataPromise=null;this.redZonePrimePromise=null;this.redZoneClockStartedAt=0;
@@ -118,8 +119,35 @@ export class AudioDirector{
   }
   setLevel(levelId){
     this.levelId=String(levelId??"0");
+    this.zoneId="normal";
     this.levelAmbienceTimer=8+Math.random()*12;
     this.startLevelAmbience();
+  }
+  setZone(zoneId){
+    const next=zoneId==="blackout"?"blackout":"normal";
+    if(next===this.zoneId)return;
+    this.zoneId=next;
+    this.blackoutEventTimer=18+Math.random()*18;
+    this.startLevelAmbience();
+  }
+  startBlackoutBed(){
+    if(!this.ready||!this.ctx||this.blackoutBedSource)return;
+    const source=this.ctx.createBufferSource();source.buffer=this.createNoiseLoop(6);source.loop=true;
+    const highpass=this.ctx.createBiquadFilter();highpass.type="highpass";highpass.frequency.value=34;highpass.Q.value=.35;
+    const lowpass=this.ctx.createBiquadFilter();lowpass.type="lowpass";lowpass.frequency.value=210;lowpass.Q.value=.4;
+    const gain=this.ctx.createGain();gain.gain.value=.0055;
+    source.connect(highpass).connect(lowpass).connect(gain);this.connectFx(gain,.08,.035);source.start();
+    this.blackoutBedSource=source;this.blackoutBedGain=gain;
+  }
+  stopBlackoutBed(){
+    const source=this.blackoutBedSource,gain=this.blackoutBedGain;
+    if(!source)return;
+    this.blackoutBedSource=null;this.blackoutBedGain=null;
+    try{
+      const now=this.ctx.currentTime;
+      gain?.gain.setTargetAtTime(.00001,now,.055);
+      source.stop(now+.32);
+    }catch{}
   }
   startFieldRain(){
     if(!this.ready||!this.ctx||this.levelId!=="10"||this.levelRainSource)return;
@@ -132,7 +160,17 @@ export class AudioDirector{
   }
   startLevelAmbience(){
     if(!this.ready||!this.ctx)return;
-    const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":this.levelId==="7"?"ocean_waves":this.levelId==="10"?"field_wind":"";
+    if(this.levelId==="0"&&this.zoneId==="blackout"){
+      if(this.levelAmbienceSource){try{this.levelAmbienceSource.stop()}catch{}this.levelAmbienceSource.disconnect();this.levelAmbienceSource=null}
+      if(this.levelRainSource){try{this.levelRainSource.stop()}catch{}this.levelRainSource.disconnect();this.levelRainSource=null}
+      this.levelAmbienceGain?.disconnect();this.levelAmbienceGain=null;
+      this.levelRainGain?.disconnect();this.levelRainGain=null;
+      this.levelAmbienceKey="blackout";
+      this.startBlackoutBed();
+      return;
+    }
+    this.stopBlackoutBed();
+    const key=this.levelId==="2"?"level2_machinery":this.levelId==="3"?"transformer_hum":(this.levelId==="7"||this.levelId==="37")?"ocean_waves":(this.levelId==="9"||this.levelId==="10")?"field_wind":"";
     if(key===this.levelAmbienceKey&&this.levelAmbienceSource){this.startFieldRain();return}
     if(this.levelAmbienceSource){try{this.levelAmbienceSource.stop()}catch{}this.levelAmbienceSource.disconnect();this.levelAmbienceSource=null}
     if(this.levelRainSource){try{this.levelRainSource.stop()}catch{}this.levelRainSource.disconnect();this.levelRainSource=null}
@@ -141,10 +179,14 @@ export class AudioDirector{
     this.levelAmbienceKey=key;
     if(key){
       const buffer=this.buffers.get(key);if(!buffer)return;
+      const isPool=this.levelId==="37";
       const source=this.ctx.createBufferSource();source.buffer=buffer;source.loop=true;
-      const filter=this.ctx.createBiquadFilter();filter.type="lowpass";filter.frequency.value=this.levelId==="7"?680:this.levelId==="10"?980:this.levelId==="3"?1450:1150;filter.Q.value=.45;
-      const gain=this.ctx.createGain();gain.gain.value=this.levelId==="7"?.145:this.levelId==="10"?.12:this.levelId==="3"?.075:.105;
-      source.connect(filter).connect(gain);this.connectFx(gain,.11,.045);source.start();
+      const filter=this.ctx.createBiquadFilter();filter.type="lowpass";
+      filter.frequency.value=isPool?1180:this.levelId==="7"?680:this.levelId==="10"?980:this.levelId==="9"?760:this.levelId==="3"?1450:1150;
+      filter.Q.value=.45;
+      const gain=this.ctx.createGain();
+      gain.gain.value=isPool?.058:this.levelId==="7"?.145:this.levelId==="10"?.12:this.levelId==="9"?.035:this.levelId==="3"?.075:.105;
+      source.connect(filter).connect(gain);this.connectFx(gain,isPool?.2:.11,isPool?.14:.045);source.start();
       this.levelAmbienceSource=source;this.levelAmbienceGain=gain;
       this.startFieldRain();
     }else if(this.levelId==="3"){
@@ -408,13 +450,27 @@ export class AudioDirector{
     g.gain.exponentialRampToValueAtTime(gain,now+.01);g.gain.exponentialRampToValueAtTime(.0001,now+duration);
     this.connectFx(g,.08,.04);o.connect(g);o.start(now);o.stop(now+duration+.02);
   }
-  noise(duration=.12,gain=.035,band=900){
+  noise(duration=.12,gain=.035,band=900,pan=0){
     if(!this.ready)return;
     const len=Math.max(1,Math.floor(this.ctx.sampleRate*duration)),b=this.ctx.createBuffer(1,len,this.ctx.sampleRate),d=b.getChannelData(0);
     for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*(1-i/len);
-    const s=this.ctx.createBufferSource(),f=this.ctx.createBiquadFilter(),g=this.ctx.createGain();
-    f.type="bandpass";f.frequency.value=band;f.Q.value=.75;g.gain.value=gain;s.buffer=b;s.connect(f).connect(g);
-    this.connectFx(g,.06,.03);s.start();
+    const s=this.ctx.createBufferSource(),f=this.ctx.createBiquadFilter(),g=this.ctx.createGain(),p=this.ctx.createStereoPanner();
+    f.type="bandpass";f.frequency.value=band;f.Q.value=.75;g.gain.value=gain;p.pan.value=clamp(pan,-1,1);s.buffer=b;s.connect(f).connect(g).connect(p);
+    this.connectFx(p,.06,.03);s.start();
+  }
+  wallScratch(pan=0,intensity=1){
+    if(!this.ready)return;
+    const side=clamp(pan,-1,1),scale=clamp(intensity,.15,1.5);
+    this.noise(.48,.009*scale,2300+Math.random()*900,side);
+    this.noise(.23,.006*scale,1250+Math.random()*650,side*.82);
+    this.tone(145+Math.random()*70,.15,"triangle",.0025*scale);
+  }
+  blackoutMurmur(pan=0){
+    if(!this.ready)return;
+    const side=clamp(pan,-1,1),base=170+Math.random()*90;
+    this.noise(.72,.0038,470+Math.random()*260,side);
+    this.tone(base,.42,"triangle",.0022);
+    setTimeout(()=>this.noise(.46,.0027,780+Math.random()*260,side*.9),180+Math.random()*260);
   }
   step(intensity=1){
     const pick=1+Math.floor(Math.random()*6);
@@ -475,23 +531,29 @@ export class AudioDirector{
       play("deathmoth_wings",chase?.13:.075,.9+Math.random()*.22,.24,.045);
       this.noise(.13,.02*falloff,1800+Math.random()*900);this.tone(170+Math.random()*70,.08,"triangle",.012*falloff);
     }else if(type==="crawler"){
-      play("hound_bark",.045,1.35+Math.random()*.22,.2,.04);
-      this.noise(.09,.022*falloff,1200);this.tone(72,.12,"square",.012*falloff);
+      this.noise(.12,.027*falloff,2450+Math.random()*700,pan);
+      this.noise(.08,.016*falloff,1500+Math.random()*500,-pan*.8);
+      this.tone(58+Math.random()*25,.12,"triangle",.012*falloff);
     }else if(type==="clump"){
       play("steam_hiss",.065,.55+Math.random()*.15,.4,.12);
       this.tone(48,.2,"sawtooth",.018*falloff);this.noise(.12,.025*falloff,190);
     }else if(type==="wretch"){
       play("wretch_howl",chase?.22:.13,.82+Math.random()*.2,.5,.2);
       this.tone(64,.3,"sawtooth",.024*falloff);if(chase)this.noise(.22,.025*falloff,360);
-    }else if(type==="duller"||type==="faceling"){
-      if(Math.random()<.5)play("skinstealer_sigh",.07,.68+Math.random()*.18,.48,.18);
-      this.noise(.07,.01*falloff,550);if(Math.random()<.35)this.tone(72,.09,"triangle",.009*falloff);
+    }else if(type==="duller"){
+      this.noise(.55,.008*falloff,230+Math.random()*120,pan);
+      this.tone(42+Math.random()*18,.32,"sine",.012*falloff);
+      if(chase)this.noise(.18,.012*falloff,420,pan);
+    }else if(type==="faceling"){
+      this.noise(.2,.0045*falloff,980+Math.random()*350,pan);
+      if(chase)this.tone(210+Math.random()*65,.08,"sine",.004*falloff);
     }else if(type==="partygoer"){
       play("partygoer_laugh",chase?.21:.14,.88+Math.random()*.18,.48,.16);
       this.tone(440,.09,"square",.018*falloff);this.tone(330,.12,"triangle",.012*falloff);
     }else if(type==="deathrat"||type==="tiny"){
-      play("hound_bark",.035,1.55+Math.random()*.22,.18,.03);
-      this.noise(.055,.016*falloff,1900);this.tone(112,.06,"square",.01*falloff);
+      this.noise(.07,.016*falloff,1850+Math.random()*650,pan);
+      this.noise(.045,.009*falloff,2850+Math.random()*500,-pan*.7);
+      this.tone(145+Math.random()*55,.045,"triangle",.006*falloff);
     }else if(type==="leviathan"){
       play("entity_growl",.28,.42+Math.random()*.12,.7,.28);
       this.tone(36,.42,"sine",.035*falloff);this.noise(.3,.028*falloff,90);
@@ -511,8 +573,9 @@ export class AudioDirector{
     this.noise(.45,.08,250);this.tone(43,.5,"sawtooth",.055);this.tone(89,.28,"triangle",.028);
   }
   lightsOut(){
-    if(this.humGain)this.humGain.gain.setTargetAtTime(.001,this.ctx.currentTime,.035);
-    if(Math.random()<.16)this.tone(72,.035,"square",.008);
+    if(this.humGain)this.humGain.gain.setTargetAtTime(.00015,this.ctx.currentTime,.045);
+    this.playBuffer("industrial_switch",{gain:.035,rate:.82+Math.random()*.32,pan:(Math.random()-.5)*.25,send:.08,delay:.025});
+    if(Math.random()<.28)this.noise(.045,.006,2200);
   }
   ambientSting(gain=.1){
     this.playBuffer("ambient_horror",{gain,rate:.94+Math.random()*.1,pan:(Math.random()-.5)*.5,send:.52,delay:.18});
@@ -526,10 +589,20 @@ export class AudioDirector{
     if(Math.random()<.16)this.playBuffer("ambient_horror",{gain:.018,rate:.68,pan,send:.6,delay:.35});
     if(Math.random()<.22)this.playBuffer("door_creak",{gain:.028,rate:.72+Math.random()*.25,pan,send:.55,delay:.24});
   }
-  update(dt,moving,running,fear=0,proximity=0,lightState="ON",distance=0,levelId=this.levelId){
+  update(dt,moving,running,fear=0,proximity=0,lightState="ON",distance=0,levelId=this.levelId,zoneId="normal"){
     if(!this.ready)return;
     if(String(levelId)!==this.levelId)this.setLevel(levelId);
+    if(zoneId!==this.zoneId)this.setZone(zoneId);
     this.levelAmbienceTimer-=dt;
+    if(this.levelId==="0"&&this.zoneId==="blackout"){
+      this.blackoutEventTimer-=dt;
+      if(this.blackoutEventTimer<=0){
+        const pan=(Math.random()<.5?-1:1)*(.22+Math.random()*.72);
+        if(Math.random()<.62)this.wallScratch(pan,.55+Math.random()*.5);
+        else this.blackoutMurmur(pan);
+        this.blackoutEventTimer=19+Math.random()*35;
+      }
+    }
     if(this.levelId==="3"&&this.levelAmbienceTimer<=0){
       this.playBuffer("transformer_hum",{gain:.065+Math.random()*.035,rate:.88+Math.random()*.18,pan:(Math.random()-.5)*.42,send:.34,delay:.12});
       this.levelAmbienceTimer=24+Math.random()*32;
@@ -552,15 +625,61 @@ export class AudioDirector{
     const p=clamp(proximity);
 
     if(this.ambientTimer<=0){
-      if(this.levelId==="6"){
-        // Level 6 is canonically silent; only rare, barely audible auditory hallucinations break it.
-        if(Math.random()<.32)this.playBuffer("skinstealer_sigh",{gain:.004,rate:.42+Math.random()*.12,pan:(Math.random()-.5)*.8,send:.18,delay:.18});
-        this.ambientTimer=105+Math.random()*145;
-      }else if(this.levelId==="7"||this.levelId==="10"){
-        this.ambientTimer=92+Math.random()*120;
-      }else{
-        this.ambientSting(.028+Math.random()*.038);
-        this.ambientTimer=78+Math.random()*110;
+      const pan=(Math.random()-.5)*.9;
+      switch(this.levelId){
+        case "0":
+          if(this.zoneId!=="blackout"&&Math.random()<.42)this.blackoutMurmur(pan);
+          this.ambientTimer=64+Math.random()*72;
+          break;
+        case "1":
+          if(Math.random()<.68)this.playBuffer("electric_buzz",{gain:.025+Math.random()*.02,rate:.72+Math.random()*.55,pan,send:.22,delay:.07});
+          else this.playBuffer("industrial_switch",{gain:.018,rate:.75+Math.random()*.3,pan,send:.12,delay:.04});
+          this.ambientTimer=42+Math.random()*52;
+          break;
+        case "2":
+          this.playBuffer("steam_hiss",{gain:.035+Math.random()*.025,rate:.78+Math.random()*.35,pan,send:.38,delay:.12});
+          this.ambientTimer=34+Math.random()*42;
+          break;
+        case "3":
+          this.playBuffer("transformer_hum",{gain:.055+Math.random()*.035,rate:.82+Math.random()*.25,pan,send:.3,delay:.1});
+          this.ambientTimer=32+Math.random()*46;
+          break;
+        case "4":
+          if(Math.random()<.64)this.playBuffer("door_creak",{gain:.025+Math.random()*.02,rate:.72+Math.random()*.32,pan,send:.42,delay:.2});
+          else this.noise(.38,.0035,370,pan);
+          this.ambientTimer=54+Math.random()*62;
+          break;
+        case "5":
+          if(Math.random()<.6)this.playBuffer("door_creak",{gain:.032+Math.random()*.025,rate:.58+Math.random()*.34,pan,send:.52,delay:.24});
+          else this.ambientSting(.016+Math.random()*.022);
+          this.ambientTimer=44+Math.random()*72;
+          break;
+        case "6":
+          // Lights Out remains intentionally quiet.
+          this.ambientTimer=125+Math.random()*145;
+          break;
+        case "7":
+          this.ambientTimer=100+Math.random()*130;
+          break;
+        case "8":
+          if(Math.random()<.55)this.playBuffer("steam_hiss",{gain:.025+Math.random()*.018,rate:.52+Math.random()*.24,pan,send:.5,delay:.24});
+          else this.noise(.46,.004,260,pan);
+          this.ambientTimer=42+Math.random()*58;
+          break;
+        case "9":
+          if(Math.random()<.35)this.playBuffer("field_wind",{gain:.018+Math.random()*.012,rate:.62+Math.random()*.2,pan,send:.28,delay:.1});
+          else this.playBuffer("door_creak",{gain:.018,rate:.62+Math.random()*.25,pan,send:.36,delay:.18});
+          this.ambientTimer=62+Math.random()*75;
+          break;
+        case "10":
+          this.ambientTimer=92+Math.random()*120;
+          break;
+        case "37":
+          this.ambientTimer=95+Math.random()*110;
+          break;
+        default:
+          this.ambientSting(.018+Math.random()*.025);
+          this.ambientTimer=70+Math.random()*95;
       }
     }
 
