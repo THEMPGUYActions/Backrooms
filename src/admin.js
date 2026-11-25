@@ -8,6 +8,9 @@ export class BackroomsAdmin{
     this.opened=false;
     this.ready=false;
     this.busy=false;
+    this.teleportRevision="manila-queue3";
+    this.lastManilaTeleportCall=null;
+    this.teleportInFlight=null;
     this.opener=null;
   }
   activate(){
@@ -378,8 +381,16 @@ export class BackroomsAdmin{
     }
   }
 
-  teleportManilaRoom(){
-    return this.teleportLevel("0",{manilaRoom:true});
+  async teleportManilaRoom(){
+    this.lastManilaTeleportCall={
+      revision:this.teleportRevision,
+      busyAtRequest:this.busy,
+      inFlightAtRequest:!!this.teleportInFlight
+    };
+    const result=await this.teleportLevel("0",{manilaRoom:true});
+    this.lastManilaTeleportCall.result=result;
+    this.lastManilaTeleportCall.teleportResult=this.lastTeleportResult||null;
+    return result;
   }
 
   action(kind){
