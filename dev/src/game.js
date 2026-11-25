@@ -6,7 +6,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { InputManager } from "./input.js?v=20261120-level7-ocean-sky-swim1";
 import { Level1Reflection } from "./level1-wet.js?v=20261120-level7-ocean-sky-swim1";
-import { AudioDirector } from "./audio.js?v=20260926-redzone-audio4";
+import { AudioDirector } from "./audio.js?v=20261125-level0-fluorescent-acoustics1";
 import { LEVELS, levelById, cycleHash } from "./levels.js?v=20261120-level4-office-level1-multifloor1";
 import { makeLibrary, applyFoundFootageLevel0Assets, applyOpenGameArtPBR, applyIndustrialPBR, applyLevelSpecificPBR, applyLevel1Assets, disposeLibrary, tileGeometryUV, box, makePropSet } from "./assets.js?v=20261125-level0-architecture-daylight-sky1";
 import { EntityModelLibrary } from "./entity-models.js?v=20261024-bacteria-roof3";
@@ -693,18 +693,18 @@ class Chunk{
       const mask=this.walls[this.index(x,z)];
       if(mask&1)buildWallEdge(x,z,"north");if(mask&8)buildWallEdge(x,z,"west");if(z===cells-1&&(mask&4))buildWallEdge(x,z,"south");if(x===cells-1&&(mask&2))buildWallEdge(x,z,"east");
       if(level.id==="0"){
-        const fixtureChance=region==="blackout"?0:region==="red"?.34:.58;
+        const fixtureChance=region==="blackout"?0:region==="red"?.20:.32;
         if(rngBase.next()<fixtureChance){
-          const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?.85:1.05;
+          const mat=(region==="red"?lib.redLight:lib.light).clone();mat.emissiveIntensity=region==="red"?.24:.34;
           const rotation=rngBase.next()<.5?0:Math.PI/2,px=this.originX+x*cell+cell/2,pz=this.originZ+z*cell+cell/2;
           // Four-by-two tile texture sheet: fluorescent trays sit across
           // several tiles and repeat at consistent ceiling-grid positions.
           const snap=(value,step)=>Math.round((value-step/2)/step)*step+step/2;
           const fixtureX=snap(px,1.27),fixtureZ=snap(pz,1.14);
           const fixture=box(g,new THREE.BoxGeometry(1.18,.035,.56),mat,fixtureX,level.wallHeight-.05,fixtureZ,0,rotation,0);
-          fixture.userData.light=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
-          const intensity=region==="red"?20:30;
-          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?9:8.5,decay:2,fixture});
+          fixture.userData.light=true;fixture.userData.level0Fixture=true;fixture.userData.baseEmissive=mat.emissiveIntensity;this.fixtures.push(fixture);
+          const intensity=region==="red"?3.2:5.4;
+          this.lightSources.push({position:new THREE.Vector3(fixtureX,level.wallHeight-.15,fixtureZ),color:region==="red"?0xa52a20:0xffefc8,baseIntensity:intensity,intensity,distance:region==="red"?5.8:7.2,decay:2,fixture});
         }
       }else if(!["1","2","3","4","6","7","8","9","10"].includes(level.id)&&rngBase.next()<(level.id==="5"?.17:.13)){
         const fixtureMat=level.id==="2"&&rngBase.next()<.28?lib.orangeLight:lib.light,material=fixtureMat.clone();material.emissiveIntensity=fixtureMat===lib.orangeLight?2.2:3.0;
@@ -2309,7 +2309,7 @@ class Chunk{
         box(outlet,new THREE.CylinderGeometry(.006,.006,.004,8),lib.intercomSlot,0,screwY,.008,Math.PI/2,0,0);
       g.add(outlet);
       if(!this.level0Blackout){
-        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.material.emissiveIntensity=.95;fixture.userData.light=true;fixture.userData.baseEmissive=.95;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffedc8,baseIntensity:24,intensity:24,distance:7.5,decay:2,fixture});
+        const fixture=box(g,new THREE.BoxGeometry(1.25,.05,.42),lib.light,p.x,h-.13,p.z);fixture.material.emissiveIntensity=.34;fixture.userData.light=true;fixture.userData.baseEmissive=.34;this.fixtures.push(fixture);this.lightSources.push({position:new THREE.Vector3(p.x,h-.32,p.z),color:0xffd6a0,baseIntensity:4.2,intensity:4.2,distance:6.2,decay:2,fixture});
       }
       return;
     }
@@ -2768,22 +2768,28 @@ class Chunk{
   }
   startFlickerEvent(){
     const now=this.game.gameTime;
-    const fixtureCount=this.fixtures.length;
-    if(!fixtureCount)return;
-    // Every rendered fixture participates, but each gets its own 1-6 pulse
-    // pattern. The starts are spread across the event so the whole ceiling
-    // never strobes in lockstep.
-    const duration=Math.max(4.2,Math.min(9.5,3.1+fixtureCount*.055+Math.random()*2.4));
-    const order=this.fixtures.slice();
-    for(let i=order.length-1;i>0;i--){
+    const candidates=this.game.level.id==="0"
+      ? this.fixtures.filter(fixture=>fixture.userData.level0Fixture===true)
+      : this.fixtures.slice();
+    if(!candidates.length)return;
+    for(let i=candidates.length-1;i>0;i--){
       const j=Math.floor(Math.random()*(i+1));
-      [order[i],order[j]]=[order[j],order[i]];
+      [candidates[i],candidates[j]]=[candidates[j],candidates[i]];
     }
-    const pulseSlots=Math.max(1,fixtureCount*3);
-    for(let i=0;i<order.length;i++){
-      const fixture=order[i];
-      const count=1+Math.floor(Math.random()*6);
-      const pulses=[];
+    if(this.game.level.id==="0"){
+      const affected=candidates.slice(0,Math.min(candidates.length,Math.random()<.78?1:2));
+      for(const fixture of affected){
+        const pulses=[{start:.04+Math.random()*.16,end:.11+Math.random()*.16,played:false}];
+        if(Math.random()<.16){const start=.42+Math.random()*.28;pulses.push({start,end:start+.07+Math.random()*.09,played:false})}
+        fixture.userData.flickerPulses=pulses;
+        fixture.userData.flickerEventStart=now;
+      }
+      return;
+    }
+    const duration=Math.max(4.2,Math.min(9.5,3.1+candidates.length*.055+Math.random()*2.4));
+    const pulseSlots=Math.max(1,candidates.length*3);
+    for(let i=0;i<candidates.length;i++){
+      const fixture=candidates[i],count=1+Math.floor(Math.random()*6),pulses=[];
       const baseOffset=(i/pulseSlots)*duration;
       for(let n=0;n<count;n++){
         const wave=(n/Math.max(1,count-1||1))*.82*duration;
@@ -2793,8 +2799,7 @@ class Chunk{
         pulses.push({start,end:Math.min(duration,start+offDuration),played:false});
       }
       pulses.sort((a,b)=>a.start-b.start);
-      fixture.userData.flickerPulses=pulses;
-      fixture.userData.flickerEventStart=now;
+      fixture.userData.flickerPulses=pulses;fixture.userData.flickerEventStart=now;
     }
   }
   flickerScale(fixture){
@@ -2805,8 +2810,7 @@ class Chunk{
     for(const pulse of pulses){
       if(!pulse.played&&elapsed>=pulse.start){
         pulse.played=true;
-        const p=fixture?.position;
-        if(p)this.game.audio.flickerAt?.(p);
+        // The fixture flickers visually; the ballast hum remains the only cue.
       }
       if(elapsed>=pulse.start&&elapsed<pulse.end)dark=true;
     }
@@ -2820,9 +2824,16 @@ class Chunk{
     if(enteredFlicker)this.startFlickerEvent();
 
     if(state==="BLACKOUT"){
+      this.group.traverse(object=>{
+        const materials=Array.isArray(object.material)?object.material:[object.material];
+        for(const material of materials){
+          if(!material?.emissive)continue;
+          material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
+          material.emissiveIntensity=0;
+        }
+      });
       for(const fixture of this.fixtures){
-        if(fixture.material?.emissive)
-          fixture.material.emissiveIntensity=0;
+        if(fixture.material?.emissive)fixture.material.emissiveIntensity=0;
       }
       for(const light of this.lightSources)light.intensity=0;
       return;
@@ -2846,6 +2857,14 @@ class Chunk{
         fixture.material.emissiveIntensity=fixture.userData.baseEmissive;
       fixture.userData.flickerPulses=null;
     }
+    this.group.traverse(object=>{
+      const materials=Array.isArray(object.material)?object.material:[object.material];
+      for(const material of materials){
+        if(!material?.emissive||material.userData.baseBlackoutEmissive===undefined)continue;
+        material.emissiveIntensity=material.userData.baseBlackoutEmissive;
+        delete material.userData.baseBlackoutEmissive;
+      }
+    });
     for(const light of this.lightSources)light.intensity=light.baseIntensity;
   }
 }
@@ -3586,7 +3605,7 @@ class Player{
     }
     if(run)this.stamina=Math.max(0,this.stamina-dt*15);else this.stamina=Math.min(100,this.stamina+dt*9);
     this.flashWarmup=Math.max(0,this.flashWarmup-dt);
-    if(this.flashlight&&this.flashBattery>0){
+    if(this.flashlight&&this.flashBattery>0&&!this.game.totalBlackoutActive){
       this.flashBattery=Math.max(0,this.flashBattery-dt*(run?.46:.31));
       if(this.flashBattery<=0)this.flashlight=false;
     }
@@ -3594,7 +3613,7 @@ class Player{
     const dark=this.game.isDark();
     if(!this.game.admin?.god){
       if(this.hydration<18)this.health=Math.max(0,this.health-dt*1.5);
-      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark)this.sanity+=dt*.12;
+      this.sanity+=dt*(dark?-.95:.22);if(this.flashlight&&dark&&!this.game.totalBlackoutActive)this.sanity+=dt*.12;
       if(this.game.world.hazardAt(this.position.x,this.position.z))this.health-=dt*34;
     }else{
       this.health=100;this.sanity=100;
@@ -3696,7 +3715,7 @@ class Player{
 
     this.game.blackoutLight.position.copy(this.game.camera.position);
     const blackout=this.game.level.id==="0"&&this.game.lightState==="BLACKOUT";
-    this.game.blackoutLight.intensity=blackout?12.0:0;
+    this.game.blackoutLight.intensity=0;
 
     this.game.flashTarget.position.copy(this.game.camera.position)
       .addScaledVector(flashForward,2.0);
@@ -4375,7 +4394,7 @@ export class BackroomsGame{
     this.flash.target=this.flashTarget;
     this.flashFill.target=this.flashFillTarget;
     this.scene.add(this.flash,this.flashFill,this.flashTarget,this.flashFillTarget);
-    this.horror=0;this.scareTimer=18+Math.random()*20;this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.runtimeFaulted=false;
+    this.horror=0;this.scareTimer=18+Math.random()*20;this.totalBlackoutActive=false;this.totalBlackoutTimer=260+Math.random()*220;this.totalBlackoutDuration=0;this.totalBlackoutSnapshot=null;this.totalBlackoutWorldSuppressed=false;this.lightState="ON";this.lightEventTimer=105+Math.random()*90;this.runtimeFaulted=false;
     this.bindUI();
     const introControls=document.getElementById("mobile-controls");
     introControls?.classList.add("hidden");
@@ -4650,7 +4669,7 @@ export class BackroomsGame{
     }
   }
   setLevel(id,options={}){
-    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();this.lightState="ON";this.lightEventTimer=48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
+    this.levelId=String(id);this.level=levelById(id);this.resizeLocalLightPool();if(this.totalBlackoutActive)this.totalBlackoutWorldSuppressed=false;this.lightState=this.totalBlackoutActive?"BLACKOUT":"ON";this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;this.redZoneTimer=0;this.redZoneTrapped=false;this.redZoneId=null;this.redZoneBounds=null;this.redZoneFontTimer=0;this.redZoneAudioToken++;this.redZoneAudioDuration=0;this.redZoneAudioStarted=false;this.audio.stopRedZone();this.world.forceLevel0AllRed=false;this.world.forceLevel0Zone=null;this.world.forceLevel0ManilaRoom=options.manilaRoom?{...options.manilaRoom}:null;this.intercomTimer=80+Math.random()*100;
     this.scene.background=new THREE.Color(this.level.theme.fog??0x000000);
     this.scene.fog=this.level.id==="4"?null:new THREE.FogExp2(this.level.theme.fog??0x000000,this.level.fogDensity??(this.level.id==="0"?.014:this.level.id==="1"?.024:.038));
     this.ambient.color.setHex(this.level.theme.ambient);this.ambient.groundColor.setHex(this.level.id==="10"?0x9a9678:this.level.id==="7"?0x8ab0c0:this.level.id==="4"?0x7d898b:this.level.id==="37"?0xb8c8c4:0x080704);this.ambient.intensity=this.level.id==="7"||this.level.id==="10"?Math.max(this.level.ambientIntensity??.85,1.05):this.level.id==="37"?Math.max(this.level.ambientIntensity??.9,.95):(this.level.ambientIntensity??(this.level.id==="1"?.026:this.level.id==="0"?.044:.052));
@@ -4675,6 +4694,7 @@ export class BackroomsGame{
     this.daylight.position.set(-35,this.level.id==="9"?-18:this.level.id==="7"?34:88,24);
     this.daylight.intensity=this.level.id==="10"?1.55:this.level.id==="7"?1.65:this.level.id==="9"?.035:0;
     this.renderer.toneMappingExposure=["7","10"].includes(this.level.id)?1.35:this.level.id==="9"?.95:.78;
+    if(this.totalBlackoutActive)this.captureTotalBlackoutLighting();
     this.audio.setLevel?.(this.level.id);
     const flashlightColor=this.level.id==="2"?0xd9d7ff:0xfff1d5;
     this.flash.color.setHex(flashlightColor);this.flashFill.color.setHex(flashlightColor);const worldLoad=this.world.configure();
@@ -4957,8 +4977,91 @@ export class BackroomsGame{
       }
     }
   }
+  captureTotalBlackoutLighting(){
+    this.totalBlackoutSnapshot={
+      ambientIntensity:this.ambient.intensity,
+      daylightIntensity:this.daylight.intensity,
+      skyVisible:this.sky.visible,
+      cloudVisible:this.cloudLayer.visible,
+      background:this.scene.background?.clone?.()??null,
+      fog:this.scene.fog?{color:this.scene.fog.color.clone(),density:this.scene.fog.density}:null
+    };
+  }
+  restoreTotalBlackoutLighting(){
+    const saved=this.totalBlackoutSnapshot;
+    if(!saved)return;
+    this.ambient.intensity=saved.ambientIntensity;
+    this.daylight.intensity=saved.daylightIntensity;
+    this.sky.visible=saved.skyVisible;
+    this.cloudLayer.visible=saved.cloudVisible;
+    if(saved.background&&this.scene.background?.copy)this.scene.background.copy(saved.background);
+    if(saved.fog&&this.scene.fog){this.scene.fog.color.copy(saved.fog.color);this.scene.fog.density=saved.fog.density;}
+    this.totalBlackoutSnapshot=null;
+  }
+  beginTotalBlackout(){
+    if(this.totalBlackoutActive)return;
+    this.captureTotalBlackoutLighting();
+    this.totalBlackoutActive=true;
+    this.totalBlackoutWorldSuppressed=false;
+    this.totalBlackoutDuration=24+Math.random()*18;
+    this.lightState="BLACKOUT";
+    this.audio.lightsOut();
+    this.triggerFear(.72);
+    this.showArgMessage("THE FLICKER // TOTAL POWER FAILURE");
+  }
+  endTotalBlackout(){
+    if(!this.totalBlackoutActive)return;
+    this.totalBlackoutActive=false;
+    this.totalBlackoutDuration=0;
+    this.totalBlackoutWorldSuppressed=false;
+    this.lightState="ON";
+    this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;
+    this.restoreTotalBlackoutLighting();
+    this.totalBlackoutTimer=420+Math.random()*480;
+  }
+  applyTotalBlackoutLighting(){
+    if(!this.totalBlackoutActive)return;
+    this.ambient.intensity=0;
+    this.daylight.intensity=0;
+    this.sky.visible=false;
+    this.cloudLayer.visible=false;
+    this.scene.background?.setHex?.(0x000000);
+    if(this.scene.fog){this.scene.fog.color.setHex(0x000000);this.scene.fog.density=.075;}
+    this.flash.intensity=0;
+    this.flashFill.intensity=0;
+    this.blackoutLight.intensity=0;
+    for(const light of this.localLights){light.intensity=0;light.visible=false;}
+    if(!this.totalBlackoutWorldSuppressed){
+      for(const chunk of this.world.chunks.values()){
+        for(const light of chunk.lightSources)light.intensity=0;
+        chunk.group.traverse(object=>{
+          const materials=Array.isArray(object.material)?object.material:[object.material];
+          for(const material of materials){
+            if(!material?.emissive)continue;
+            material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
+            material.emissiveIntensity=0;
+          }
+        });
+      }
+      this.totalBlackoutWorldSuppressed=true;
+    }
+  }
   updateLightEvent(dt){
     if(!this.running||this.paused||this.dead)return;
+    if(this.totalBlackoutActive){
+      this.totalBlackoutDuration-=dt;
+      if(this.totalBlackoutDuration<=0)this.endTotalBlackout();
+      else this.lightState="BLACKOUT";
+      return;
+    }
+    this.totalBlackoutTimer-=dt;
+    if(this.totalBlackoutTimer<=0){
+      this.beginTotalBlackout();
+      return;
+    }
+    if(this.level.id==="0"&&this.world.chunkAt(this.player.position.x,this.player.position.z)?.level0Blackout){
+      this.lightState="ON";this.lightEventTimer=30;return;
+    }
     this.lightEventTimer-=dt;
     if(this.lightState!=="ON"){
       if(this.lightEventTimer<=0){
@@ -4968,16 +5071,15 @@ export class BackroomsGame{
       return;
     }
     if(this.lightEventTimer>0)return;
-    if((this.level.id==="0"&&Math.random()<.42)||(this.level.id==="1"&&Math.random()<.34)){
+    if((this.level.id==="0"&&Math.random()<.12)||(this.level.id==="1"&&Math.random()<.34)){
       this.lightState="BLACKOUT";
       // Short unstable-ballast outages, not multi-minute total darkness.
-      this.lightEventTimer=this.level.id==="0"?1.2+Math.random()*2.2:30;
+      this.lightEventTimer=this.level.id==="0"?1.8+Math.random()*2.2:30;
       this.audio.lightsOut();
       this.triggerFear(this.level.id==="1"?.38:.48);
     }else{
       this.lightState="FLICKER";
-      this.lightEventTimer=this.level.id==="1"?10:2.8+Math.random()*3.2;
-      this.audio.flicker();
+      this.lightEventTimer=this.level.id==="1"?10:1.2+Math.random()*1.6;
       this.triggerFear(this.level.id==="1"?.20:.16);
     }
   }
@@ -5042,7 +5144,7 @@ export class BackroomsGame{
     lightFrustum.setFromProjectionMatrix(frustumMatrix);
     const currentChunk=this.world.chunkAt(this.player.position.x,this.player.position.z);
     const insideBlackout=this.level.id==="0"&&currentChunk?.level0Blackout===true;
-    if(insideBlackout|| (this.level.id==="0"&&this.lightState==="BLACKOUT")){
+    if(this.totalBlackoutActive||insideBlackout||this.lightState==="BLACKOUT"){
       for(const light of this.localLights){light.intensity=0;light.visible=false}
       return;
     }
@@ -5066,7 +5168,7 @@ export class BackroomsGame{
         target.intensity=0;
         continue;
       }
-      target.intensity=source.intensity*(this.level.id==="0"?18:4);
+      target.intensity=source.intensity*(this.level.id==="0"?4:4);
     }
   }
   updateIntro(dt){
@@ -5162,8 +5264,9 @@ export class BackroomsGame{
       this.scene.fog.color.setHex(blackout&&!this.redZoneTrapped?0x000000:red?0x240000:0x000000);
       document.documentElement.style.setProperty("--level0-zone",zone);
     }
-    this.updateArgLayer(dt);
     this.updateLightEvent(dt);
+    this.applyTotalBlackoutLighting();
+    this.updateArgLayer(dt);
     this.updateHorror(dt);
     const c=this.world.chunkAt(this.player.position.x,this.player.position.z);
     const coords=document.getElementById("coords");if(coords)coords.textContent=(c?c.cx:0)+" : "+(c?c.cz:0);
@@ -5177,7 +5280,7 @@ export class BackroomsGame{
       if(bar)bar.style.width=Math.max(0,value)+"%";
     }
     const status=document.getElementById("status");
-    if(status)status.textContent=this.player.flashlight?"LIGHT ON":"LIGHT OFF";
+    if(status)status.textContent=this.totalBlackoutActive?"POWER OUT":this.player.flashlight?"LIGHT ON":"LIGHT OFF";
     const battery=document.getElementById("flash-battery");
     if(battery)battery.textContent="BAT "+Math.round(this.player.flashBattery)+"%";
   }
@@ -5203,7 +5306,9 @@ export class BackroomsGame{
   render(){
     // Keep the daylight atmosphere stable while chunks stream. The scene
     // background remains a blue fallback if a browser loses the sky dome.
-    if(this.level.id==="7"){
+    if(this.totalBlackoutActive){
+      this.scene.background.setHex(0x000000);this.sky.visible=false;this.cloudLayer.visible=false;
+    }else if(this.level.id==="7"){
       this.scene.background.setHex(0x8bc3e8);
       this.sky.visible=true;this.oceanSky.visible=false;this.cloudLayer.visible=true;
       if(this.world.ceilingSurface)this.world.ceilingSurface.visible=false;
