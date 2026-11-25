@@ -458,11 +458,11 @@ async function checkStartupAndLevelPresentation(){
   if(css.includes(".intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{\n    animation-duration:.01ms"))fail("Reduced-motion CSS must not collapse the intro into a near-instant flash");
   if(!main.includes("if(event.persisted)window.location.reload()"))fail("Back-forward cache restoration must start a fresh intro timeline");
   if(!sw.includes("backrooms-assets-v69"))fail("Service-worker cache version must change when startup and scene bundles change");
-  for(const token of ["this.totalBlackoutActive=false","this.beginTotalBlackout()","this.endTotalBlackout()","this.ambient.intensity=0","this.daylight.intensity=0","this.flash.intensity=0","this.flashFill.intensity=0","this.scene.background?.setHex?.(0x000000)","this.totalBlackoutActive||insideBlackout||this.lightState===\\"BLACKOUT\\""]){
+  for(const token of ["this.totalBlackoutActive=false","this.beginTotalBlackout()","this.endTotalBlackout()","this.ambient.intensity=0","this.daylight.intensity=0","this.flash.intensity=0","this.flashFill.intensity=0","this.scene.background?.setHex?.(0x000000","this.totalBlackoutActive||insideBlackout"]){
     if(!game.includes(token))fail("Backrooms-wide total blackout is missing a required all-lights-off control: "+token);
   }
-  if(!game.includes("material.emissiveIntensity=0")||!game.includes("baseBlackoutEmissive"))fail("Total blackout must suppress and restore emissive meshes, not only point lights");
-  if(!game.includes("this.totalBlackoutActive?\\"BLACKOUT\\":\\"ON\\""))fail("Total blackout must persist across level transitions");
+  if(!game.includes("material.emissiveIntensity=0")||!game.includes("baseBlackoutEmissive")||!game.includes("baseBlackoutColor"))fail("Total blackout must suppress and restore emissive and unlit meshes, not only point lights");
+  if(!game.includes('this.totalBlackoutActive?"BLACKOUT":"ON"'))fail("Total blackout must persist across level transitions");
   if(!game.includes("this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half})")||!game.includes("for(const rect of nearby?.solidRects||[])"))fail("Level 1 pillar collision must handle spawn points starting inside a solid pillar");
   if(!game.includes("this.player.position.set(0,this.player.eyeY,0)")||!game.includes("addPanel(left+.14,z,Math.PI/2"))fail("Level 1 central spawn or Level 3 wall-mounted electrical panel layout missing");
   if(!game.includes("addGate(cx,cz-size*.22,true)")||!game.includes("addGate(cx+size*.22,cz,false)"))fail("Level 3 barred gates must be located on visible main service corridors");
