@@ -271,7 +271,7 @@ export class BackroomsAdmin{
 
   async teleportLevel(id,options={}){
     const level=LEVELS[String(id)];
-    if(!level||this.busy||!this.game.running||this.game.introActive)return;
+    if(!level||this.busy)return;
     this.busy=true;
     const wasPaused=this.game.paused;
     const manilaRoom=String(id)==="0"&&options.manilaRoom===true;
@@ -284,6 +284,9 @@ export class BackroomsAdmin{
       this.game.dead=false;
       this.game.deathSequenceActive=false;
       this.game.deathSequenceTime=0;
+      this.game.running=true;
+      this.game.introActive=false;
+      this.game.introPlaying=false;
       this.game.paused=true;
       document.getElementById("pause")?.classList.add("hidden");
       document.getElementById("death")?.classList.add("hidden");
