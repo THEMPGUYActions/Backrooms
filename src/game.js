@@ -5031,6 +5031,20 @@ export class BackroomsGame{
     this.flashFill.intensity=0;
     this.blackoutLight.intensity=0;
     for(const light of this.localLights){light.intensity=0;light.visible=false;}
+    if(!this.totalBlackoutWorldSuppressed){
+      for(const chunk of this.world.chunks.values()){
+        for(const light of chunk.lightSources)light.intensity=0;
+        chunk.group.traverse(object=>{
+          const materials=Array.isArray(object.material)?object.material:[object.material];
+          for(const material of materials){
+            if(!material?.emissive)continue;
+            material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
+            material.emissiveIntensity=0;
+          }
+        });
+      }
+      this.totalBlackoutWorldSuppressed=true;
+    }
   }
   updateLightEvent(dt){
     if(!this.running||this.paused||this.dead)return;
