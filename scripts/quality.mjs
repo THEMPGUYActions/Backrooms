@@ -379,6 +379,12 @@ async function checkLevelSpecificPbrAssets(){
 async function checkLevelEnvironment(){
   const game=await readFile(join(root,"src/game.js"),"utf8");
   const assets=await readFile(join(root,"src/assets.js"),"utf8");
+  const admin=await readFile(join(root,"src/admin.js"),"utf8");
+  if(!game.includes("pushLevel0Baseboard")||!game.includes("trimToeGeom")||!game.includes("addLevel0Outlet"))fail("Level 0 needs visible cove baseboards and detailed duplex outlets");
+  if(!assets.includes('level.id==="0"?0xd7d3c8'))fail("Level 0 cove base must use its aged ivory trim material");
+  if(!game.includes("this.sky.visible=openSky")||!game.includes("this.sky.visible=true;this.oceanSky.visible=false")||!game.includes("sunY=this.level.id==="))fail("Daylight levels must use an active Preetham sky with an above-horizon sun");
+  if(!game.includes("isForcedManila")||!game.includes("forceLevel0ManilaRoom"))fail("Manila Room must have a deterministic admin-generation path");
+  if(!admin.includes("teleportManilaRoom")||!admin.includes("Manila Room chunk did not generate"))fail("Admin Manila Room teleport must validate its generated destination");
   if(LEVELS["7"].fog<0x506070)fail("Level 7 sky/fog palette must not be near-black");
   if(LEVELS["10"].fog<0x808080)fail("Level 10 overcast sky must use a visible daylight palette");
   if(LEVELS["10"].fogDensity>.003)fail("Level 10 must use light atmospheric haze, not permanent dense fog");
@@ -445,7 +451,7 @@ async function checkStartupAndLevelPresentation(){
   if(!css.includes(".intro-ready .intro-audio-page")||!css.includes("animation:intro-audio-sequence 1s ease 15.25s forwards"))fail("Intro audio gate timeline is missing");
   if(css.includes(".intro-screen,.intro-page,.brand-logo,.movie-title,.movie-present,.audio-gate{\n    animation-duration:.01ms"))fail("Reduced-motion CSS must not collapse the intro into a near-instant flash");
   if(!main.includes("if(event.persisted)window.location.reload()"))fail("Back-forward cache restoration must start a fresh intro timeline");
-  if(!sw.includes("backrooms-assets-v62"))fail("Service-worker cache version must change when startup and scene bundles change");
+  if(!sw.includes("backrooms-assets-v63"))fail("Service-worker cache version must change when startup and scene bundles change");
   if(!game.includes("this.solidRects.push({minX:p.x-half,maxX:p.x+half,minZ:p.z-half,maxZ:p.z+half})")||!game.includes("for(const rect of nearby?.solidRects||[])"))fail("Level 1 pillar collision must handle spawn points starting inside a solid pillar");
   if(!game.includes("this.player.position.set(0,this.player.eyeY,0)")||!game.includes("addPanel(left+.14,z,Math.PI/2"))fail("Level 1 central spawn or Level 3 wall-mounted electrical panel layout missing");
   if(!game.includes("addGate(cx,cz-size*.22,true)")||!game.includes("addGate(cx+size*.22,cz,false)"))fail("Level 3 barred gates must be located on visible main service corridors");
