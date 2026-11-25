@@ -166,7 +166,7 @@ See assets/README.md.
 
 ## Audio
 
-The audio layer combines procedural Web Audio synthesis with bundled CC0 recordings from OpenGameArt and BigSoundBank. Level 2 has machinery and steam, Level 3 has transformer hum, Level 7 has ocean waves, Level 10 has field wind and light rain, and creature types have distinct one-shot cues. All source URLs, authors, licenses, sizes and hashes are tracked in data/audio-assets-lock.json and assets/audio/manifest.json.
+The audio layer combines procedural Web Audio synthesis with bundled CC0 recordings from OpenGameArt and BigSoundBank. Level 2 has machinery and steam, Level 3 has transformer hum, Level 7 has ocean waves, Level 8 has a cave-room recording, Level 10 has field wind and light rain, and Level 37 has an indoor-pool recording. Hotel footsteps use a separate wooden-floor set; industrial, cave, and suburban levels use concrete-footstep variations. Entity cues are spatialized and varied by behavior state. All source URLs, authors, licenses, input checksums and converted-output hashes are tracked in data/audio-assets-lock.json and assets/audio/manifest.json.
 
 The game starts audio after a user gesture, which is required by modern browser autoplay policies.
 
