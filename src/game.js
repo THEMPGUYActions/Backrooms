@@ -2827,9 +2827,9 @@ class Chunk{
       this.group.traverse(object=>{
         const materials=Array.isArray(object.material)?object.material:[object.material];
         for(const material of materials){
-          if(!material?.emissive)continue;
-          material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
-          material.emissiveIntensity=0;
+          if(!material)continue;
+          if(material.color){material.userData.baseBlackoutColor??=material.color.clone();material.color.setRGB(0,0,0);}
+          if(material.emissive){material.userData.baseBlackoutEmissive??=material.emissiveIntensity;material.emissiveIntensity=0;}
         }
       });
       for(const fixture of this.fixtures){
@@ -2860,9 +2860,9 @@ class Chunk{
     this.group.traverse(object=>{
       const materials=Array.isArray(object.material)?object.material:[object.material];
       for(const material of materials){
-        if(!material?.emissive||material.userData.baseBlackoutEmissive===undefined)continue;
-        material.emissiveIntensity=material.userData.baseBlackoutEmissive;
-        delete material.userData.baseBlackoutEmissive;
+        if(!material)continue;
+        if(material.color&&material.userData.baseBlackoutColor){material.color.copy(material.userData.baseBlackoutColor);delete material.userData.baseBlackoutColor;}
+        if(material.emissive&&material.userData.baseBlackoutEmissive!==undefined){material.emissiveIntensity=material.userData.baseBlackoutEmissive;delete material.userData.baseBlackoutEmissive;}
       }
     });
     for(const light of this.lightSources)light.intensity=light.baseIntensity;
@@ -4998,6 +4998,17 @@ export class BackroomsGame{
     if(saved.fog&&this.scene.fog){this.scene.fog.color.copy(saved.fog.color);this.scene.fog.density=saved.fog.density;}
     this.totalBlackoutSnapshot=null;
   }
+  restoreTotalBlackoutMaterials(){
+    this.scene.traverse(object=>{
+      if(!object.isMesh)return;
+      const materials=Array.isArray(object.material)?object.material:[object.material];
+      for(const material of materials){
+        if(!material)continue;
+        if(material.color&&material.userData.baseBlackoutColor){material.color.copy(material.userData.baseBlackoutColor);delete material.userData.baseBlackoutColor;}
+        if(material.emissive&&material.userData.baseBlackoutEmissive!==undefined){material.emissiveIntensity=material.userData.baseBlackoutEmissive;delete material.userData.baseBlackoutEmissive;}
+      }
+    });
+  }
   beginTotalBlackout(){
     if(this.totalBlackoutActive)return;
     this.captureTotalBlackoutLighting();
@@ -5016,6 +5027,7 @@ export class BackroomsGame{
     this.totalBlackoutWorldSuppressed=false;
     this.lightState="ON";
     this.lightEventTimer=this.level.id==="0"?105+Math.random()*90:48+Math.random()*55;
+    this.restoreTotalBlackoutMaterials();
     this.restoreTotalBlackoutLighting();
     this.totalBlackoutTimer=420+Math.random()*480;
   }
@@ -5034,14 +5046,16 @@ export class BackroomsGame{
     if(!this.totalBlackoutWorldSuppressed){
       for(const chunk of this.world.chunks.values()){
         for(const light of chunk.lightSources)light.intensity=0;
-        chunk.group.traverse(object=>{
-          const materials=Array.isArray(object.material)?object.material:[object.material];
-          for(const material of materials){
-            if(!material?.emissive)continue;
-            material.userData.baseBlackoutEmissive??=material.emissiveIntensity;
-            material.emissiveIntensity=0;
-          }
-        });
+      }
+      this.scene.traverse(object=>{
+        if(!object.isMesh)return;
+        const materials=Array.isArray(object.material)?object.material:[object.material];
+        for(const material of materials){
+          if(!material)continue;
+          if(material.color){material.userData.baseBlackoutColor??=material.color.clone();material.color.setRGB(0,0,0);}
+          if(material.emissive){material.userData.baseBlackoutEmissive??=material.emissiveIntensity;material.emissiveIntensity=0;}
+        }
+      });
       }
       this.totalBlackoutWorldSuppressed=true;
     }
