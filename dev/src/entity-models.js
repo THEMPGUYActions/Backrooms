@@ -51,6 +51,31 @@ export const ENTITY_MODEL_SOURCES = Object.freeze({
 });
 
 function normalizeClipName(name){ return String(name||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function collectEntityRig(root,type){
+  if(type!=="faceling")return null;
+  const roles={leftThigh:[],rightThigh:[],leftCalf:[],rightCalf:[],leftFoot:[],rightFoot:[],
+    leftShoulder:[],rightShoulder:[],leftForearm:[],rightForearm:[],spine:[],neck:[],head:[]};
+  root.traverse(object=>{
+    if(!object.isBone)return;
+    const name=normalizeClipName(object.name);
+    const add=(role)=>roles[role].push({bone:object,rest:object.rotation.clone()});
+    if(name.includes("thighl"))add("leftThigh");
+    else if(name.includes("thighr"))add("rightThigh");
+    else if(name.includes("calfl"))add("leftCalf");
+    else if(name.includes("calfr"))add("rightCalf");
+    else if(name.includes("footl"))add("leftFoot");
+    else if(name.includes("footr"))add("rightFoot");
+    else if(name.includes("shoulderl"))add("leftShoulder");
+    else if(name.includes("shoulderr"))add("rightShoulder");
+    else if(name.includes("foearml")||name.includes("forearml"))add("leftForearm");
+    else if(name.includes("foearmr")||name.includes("forearmr"))add("rightForearm");
+    else if(name.includes("spine"))add("spine");
+    else if(name.includes("neck"))add("neck");
+    else if(name.includes("head"))add("head");
+  });
+  const usable=Object.values(roles).some(group=>group.length);
+  return usable?roles:null;
+}
 function pickClip(clips,names){
   const wanted=names.map(normalizeClipName);
   return clips.find(c=>wanted.some(n=>normalizeClipName(c.name).includes(n)))||null;
@@ -296,6 +321,7 @@ export class EntityModelLibrary{
       if(ignoredRootScaleTracks)console.info("[Backrooms] Ignored model scale animation tracks:",entity.type,ignoredRootScaleTracks);
       const mixer=clips.length?new THREE.AnimationMixer(root):null;
       model={root,container,mixer,clips,format:asset.format,file:asset.file,targetHeight,targetWidth,scale:targetHeight,horizontalScale:displayScaleXZ,sourceCenter:sourceCenter.clone(),sourceHeight:size.y,sourceHorizontalSize,actions:new Map(),current:null,ready:true,pendingClip:null,pendingTime:0,stableMode:"stalk",pendingMode:"stalk",completedClips:new Set()};
+      model.rig=collectEntityRig(root,entity.type);
       if(mixer)mixer.addEventListener("finished",event=>{
         const finishedName=normalizeClipName(event.action?.getClip?.().name);
         for(const clipName of ["jumpscare","bendingoverscene","chasesceneend"]){
@@ -439,6 +465,29 @@ export class EntityModelLibrary{
       if (chaseLike) model.container.rotation.x = -0.05 + Math.sin(model.phase * 0.48) * 0.018;
       else if (moving) model.container.rotation.x = -0.02;
       else model.container.rotation.x = 0;
+    }
+    if(model.rig){
+      const stride=chaseLike?.78:moving?.38:.035;
+      const swing=Math.sin(model.phase),lift=Math.max(0,Math.cos(model.phase));
+      const pose=(role,x=0,y=0,z=0)=>{
+        for(const entry of model.rig[role]||[]){
+          const r=entry.rest,b=entry.bone;
+          b.rotation.set(r.x+x,r.y+y,r.z+z);
+        }
+      };
+      pose("leftThigh",swing*stride);
+      pose("rightThigh",-swing*stride);
+      pose("leftCalf",lift*stride*.48);
+      pose("rightCalf",(1-lift)*stride*.48);
+      pose("leftFoot",-lift*stride*.18);
+      pose("rightFoot",-(1-lift)*stride*.18);
+      pose("leftShoulder",-swing*stride*.3);
+      pose("rightShoulder",swing*stride*.3);
+      pose("leftForearm",.08+lift*stride*.12);
+      pose("rightForearm",.08+(1-lift)*stride*.12);
+      pose("spine",0,0,Math.sin(model.phase*.5)*(chaseLike?.055:.018));
+      pose("neck",Math.sin(model.phase*.5)*(chaseLike?.045:.012));
+      pose("head",-Math.sin(model.phase*.5)*(chaseLike?.065:.018));
     }
   }
 }
